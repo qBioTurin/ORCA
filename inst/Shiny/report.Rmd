@@ -1,0 +1,31 @@
+---
+title: "Report"
+date: "`r Sys.Date()`"
+output: pdf_document
+params:
+   Plots: x
+   TruncatedPlots: x
+   pl: x
+   CutTab: x
+   IDlane: x
+   AUCdf: x
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo=FALSE}
+library(ggplot2)
+Plots<-params$Plots
+pl<-ggplot(Plots,aes(X,Y))+geom_line()+facet_wrap(~ID)
+pl
+```
+
+```{r, echo=FALSE}
+
+AUCdf<-params$AUCdf
+AUCdf
+```
+
