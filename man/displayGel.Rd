@@ -11,7 +11,7 @@ displayGel()
 }
 \examples{
 \dontrun{
-display_data()
+displayGel()
 }
 }
 \author{

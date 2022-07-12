@@ -4,6 +4,8 @@
 # library(knitr)
 
 # Run the application 
+source("ui.R")
+source("server.R")
 shinyApp(ui = ui, server = server)
 
 Appui <- system.file("Shiny","ui.R", package = "GelAnalyser")

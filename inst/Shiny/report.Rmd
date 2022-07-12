@@ -18,8 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, echo=FALSE}
 library(ggplot2)
-Plots<-params$Plots
-pl<-ggplot(Plots,aes(X,Y))+geom_line()+facet_wrap(~ID)
+pl<-params$Plots
 pl
 ```
 

@@ -4,11 +4,11 @@
 #' @param 
 #'
 #' @author Pernice Simone
-#' @import shiny zoo knitr ggplot2
+#' @import shiny zoo knitr ggplot2 shinythemes OpenImageR dplyr
 #' 
 #' @examples
 #'\dontrun{
-#' display_data()
+#' displayGel()
 #' }
 #' @export
 displayGel <-function()
