@@ -17,7 +17,7 @@ To install it you can use  **devtools**:
 ```
 install.packages("devtools")
 library(devtools)
-install_github("qBioTurin/GelAnalyser", ref="master",dependencies=TRUE)
+install_github("qBioTurin/GelAnalyser", ref="main",dependencies=TRUE)
 ```
 To run the Shiny application:
 
