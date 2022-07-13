@@ -7,7 +7,8 @@ The following R packages must be installed:
 ....
 
 ```
-install.packages(c( "ggplot2", "RColorBrewer", "shinyWidgets", "viridis", "dashboardthemes"))
+install.packages(c( "ggplot2", "shinydashboard", "shinyWidgets", "shiny", "dashboardthemes",
+"dplyr","OpenImageR","knitr","zoo","shinythemes","readxl"))
 ```
 
 ### How to install ....
