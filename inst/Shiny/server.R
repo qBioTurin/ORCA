@@ -55,7 +55,7 @@ server <- function(input, output, session) {
   PanelData = data.frame(Panel_ID = numeric(),
                          xmin = numeric(), ymin = numeric(), 
                          xmax = numeric(), ymax = numeric())
-
+  
   wbResult <- reactiveValues(Im = NULL,
                              Planes = NULL,
                              PanelsValue = NULL,
@@ -96,13 +96,13 @@ server <- function(input, output, session) {
       observeEvent(input$confirmUpload,{
         removeModal()
         wbResult <- reactiveValues( Im = NULL,
-                                   Planes = NULL,
-                                   PanelsValue = NULL,
-                                   Plots = NULL,
-                                   TruncatedPlots = NULL,
-                                   pl = NULL,
-                                   IDlane = 0,
-                                   AUCdf=data.frame(Truncation = "no", AUC = "0", Lane=0  ))
+                                    Planes = NULL,
+                                    PanelsValue = NULL,
+                                    Plots = NULL,
+                                    TruncatedPlots = NULL,
+                                    pl = NULL,
+                                    IDlane = 0,
+                                    AUCdf=data.frame(Truncation = "no", AUC = "0", Lane=0  ))
         Flags$ShowTif <- TRUE
       })
     }
@@ -173,7 +173,7 @@ server <- function(input, output, session) {
       
     }
   })
-
+  
   output$rectCoordOutput <- renderText({
     xy_str <- function(e) {
       if(is.null(e)) return("NULL\n")
@@ -197,7 +197,7 @@ server <- function(input, output, session) {
   
   output$AUC <- renderTable({
     wbResult$AUCdf
-    },width = "100%")
+  },width = "100%")
   
   observeEvent(input$GenLines,{
     if(NumberOfPlanes$N >1){
@@ -243,9 +243,9 @@ server <- function(input, output, session) {
                         choices = unique(PanelsValue$ID),
                         selected = 0
       )
-
+      
       output$DataPlot <- renderPlot({pl})
-
+      
     }
   })
   
@@ -396,7 +396,7 @@ server <- function(input, output, session) {
       pcrResult$data = PCR
       
       AllGenes = unique(PCR$Target)
-      Exp = unique(PCRexample$Sample)
+      Exp = unique(PCR$Sample)
       
       updateSelectInput(session, "PCRbaseline",
                         choices = Exp )
@@ -404,7 +404,7 @@ server <- function(input, output, session) {
                                choices = AllGenes )
       
     }
-    })
+  })
   
   observeEvent(input$PCRnorm,{
     pcrResult$PCRnorm = input$PCRnorm
@@ -414,7 +414,7 @@ server <- function(input, output, session) {
     pcrResult$BaselineExp = input$PCRbaseline
     FlagsPCR$baseline = T
   })
-    
+  
   observe({
     if(FlagsPCR$baseline & FlagsPCR$norm){
       
@@ -465,7 +465,7 @@ server <- function(input, output, session) {
       print(CompPRC)
       
       AllGenes = unique(PCR$Target)
-         
+      
       pcrResult$CompPRC = CompPRC
       pcrResult$NewPCR = NewPCR
       
@@ -483,14 +483,13 @@ server <- function(input, output, session) {
         })
         do.call(tagList, plot_output_list)
       })
-      output$PCRplots <- renderPlot({
-        CompPRC %>%
-          ggplot(aes(x= Target, y = Qnorm, fill = Sample)) + 
-          facet_wrap(~Norm,ncol = 1) +
+      output$PCRplot <- renderPlot({
+        ggplot(data = CompPRC, aes(x= Target, y = Qnorm, fill = Sample)) + 
+          facet_wrap(~Norm, ncol = 1) +
           geom_bar(stat = "identity",position = "dodge")
-
-      },width = "100%")
         
+      })
+      
       
       for (i in AllGenes){
         local({
@@ -514,8 +513,8 @@ server <- function(input, output, session) {
       
     }
   })
-
-
+  
+  
   #### END PCR analysis
   
   output$downloadReport <- downloadHandler(

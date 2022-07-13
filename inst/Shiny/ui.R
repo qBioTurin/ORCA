@@ -87,7 +87,7 @@ ui <- dashboardPage(
                              column(width = 6,
                                     checkboxGroupInput(inputId = "PCRnorm",
                                                        "Select the normalizers:")
-                                    ),
+                             ),
                              column(width = 6,
                                     selectInput(inputId = "PCRbaseline", label = "Select the baseline:",
                                                 choices = "ID" )
@@ -105,24 +105,24 @@ ui <- dashboardPage(
       # Second tab content
       tabItem(tabName = "tablesPCR",
               h2("Tables"),
-              box(width= 12,title = "Summary",collapsible = TRUE,collapsed = TRUE,
-                  fluidRow(
+              fluidRow(
+                box(width= 12,title = "Summary",collapsible = TRUE,collapsed = TRUE,
                     uiOutput("PCRtables")
-                    )
+                )
               ),
-              box(width= 12,title = "Comparison",collapsible = TRUE,collapsed = TRUE,
-                  fluidRow(
+              fluidRow(
+                box(width= 12,title = "Comparison",collapsible = TRUE,collapsed = TRUE,
                     uiOutput("PCRtablesComp")
-                  )
+                )
               )
       ),
       # Second tab content
       tabItem(tabName = "plotsPCR",
               h2("Plots"),
-              box(width= 12,title = "",
-                  fluidRow(
-                    plotOutput("PCRplots")
-                  )
+              fluidRow(
+                box(width= 12,title = "",
+                    plotOutput("PCRplot",width = "100%")
+                )
               )
       ),
       ## WB 
