@@ -1,7 +1,31 @@
+readfile <- function(filename,type) {
+  out <- tryCatch(
+    {
+      if(type == "RDs"){
+        readRDS(filename)
+      }else if(type == "Excel"){
+        readxl::read_excel(filename)
+      }else{
+        LoadImage(filename)
+      }
+    },
+    error=function(cond) {
+      # message(cond)
+      # Choose a return value in case of error
+      return(cond)
+    },
+    warning=function(cond) {
+      # message(cond)
+      # Choose a return value in case of warning
+      return(cond)
+    }
+  )    
+  return(out)
+}
 
 AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,Lane=1,AUCdf.new=NULL){
   if(is.null(AUCdf.new)){
-    if(length(AUCdf[,1])==1 & AUCdf$AUC[1] == "0")
+    if(length(AUCdf[,1])==1 & AUCdf$AUC[1] == "-")
     {
       AUCdf.new <- AUCdf
     }else{
@@ -13,9 +37,9 @@ AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,Lane=1,AUCdf.ne
   id <- order(PanelsValue.Lane$Y)
   AUC <- sum(diff(PanelsValue.Lane$Y[id])*rollmean(PanelsValue.Lane$Values[id],2))
   AUCdf.new$AUC <- AUC
-  AUCdf.new$Lane <- Lane
+  AUCdf.new$Lane <- paste(Lane)
   
-  if(length(AUCdf[,1])==1 & AUCdf$AUC[1] == "0")
+  if(length(AUCdf[,1])==1 & AUCdf$AUC[1] == "-")
   {
     A<-AUCdf.new
   }else{
@@ -25,7 +49,6 @@ AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,Lane=1,AUCdf.ne
   return(unique(A)) 
   #output$AUC <- renderTable({AUCdf2})
 }
-
 LoadImage = function(pathImage){
   im <- OpenImageR::readImage(pathImage,as.is = T)
   
@@ -45,8 +68,9 @@ LoadImage = function(pathImage){
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-  
   AllResult <- reactiveValues(wbResult = NULL,
+                              WBanalysis = NULL,
+                              NormWBanalysis = NULL,
                               elisaResult = NULL,
                               pcrResult = NULL)
   
@@ -56,122 +80,164 @@ server <- function(input, output, session) {
                          xmin = numeric(), ymin = numeric(), 
                          xmax = numeric(), ymax = numeric())
   
-  wbResult <- reactiveValues(Im = NULL,
-                             Planes = NULL,
-                             PanelsValue = NULL,
-                             Plots = NULL,
-                             TruncatedPlots = NULL,
-                             pl = NULL,
-                             IDlane = 0,
-                             AUCdf=data.frame(Truncation = "no", AUC = "0", Lane=0  ))
+  wbResult <- list(Normalizer = NULL,
+                   Im = NULL,
+                   Planes = NULL,
+                   TruncatedPanelsValue = NULL,
+                   PanelsValue = NULL,
+                   Plots = NULL,
+                   TruncatedPlots = NULL,
+                   pl = NULL,
+                   AUCdf=data.frame(Truncation = "-", AUC = "-", Lane="-"  ))
   
-  Flags <- reactiveValues( ShowTif = F, LanesCut = F,
-                           CutTab="V")
+  AllResult$wbResult = wbResult
+  EmptyRes <- reactiveValues(wbResults0 = wbResult)
+  
+  Flags <- reactiveValues( ShowTif = F, 
+                           LanesCut = F,
+                           CutTab="V",
+                           IDlane = 0)
   prev_vals <- NULL
   PanelStructures <- reactiveValues(data = PanelData )
   NumberOfPlanes <- reactiveValues(N = 0)
   PlaneSelected <- reactiveValues(First = NULL)
   
-  observeEvent(c(input$LoadingTif),{
+  observeEvent(input$LoadingTif,{
     output$LoadingError <- renderText({
       validate(
-        need(!is.null(input$imImport) ,
+        need(!is.null(input$imImport) && file.exists(input$imImport$datapath) ,
              "Please select a tif file!!" )
       )
+      
+      mess = readfile(
+        filename = input$imImport$datapath,
+        type = "tif"
+      )
+      
+      validate(
+        need(!is.character(mess[[1]]) ,
+             mess[[1]] )
+      )
+      
       Flags$ShowTif <- TRUE
-      ""
+      AllResult$wbResult$Im = mess
+      
+      updateTabsetPanel(session, "SideTabs",
+                        selected = "plane")
+      
+      "The image is uploaded with success"
     })
     
-    if( !is.null(wbResult$Im) )
+    if( !is.null(AllResult$wbResult$Im) )
     { ### alert!!! if it is already present! 
       showModal(modalDialog(
         title = "Important message",
-        "Do you want to update the WB data already present?",
+        "Do you want to update the WB data already present, by resetting the previous analysis?",
         easyClose = TRUE,
         footer= tagList(actionButton("confirmUpload", "Update"),
                         modalButton("Cancel")
         )
       ))
-      
-      observeEvent(input$confirmUpload,{
-        removeModal()
-        wbResult <- reactiveValues( Im = NULL,
-                                    Planes = NULL,
-                                    PanelsValue = NULL,
-                                    Plots = NULL,
-                                    TruncatedPlots = NULL,
-                                    pl = NULL,
-                                    IDlane = 0,
-                                    AUCdf=data.frame(Truncation = "no", AUC = "0", Lane=0  ))
-        Flags$ShowTif <- TRUE
-      })
     }
+  })
+  
+  observeEvent(input$confirmUpload,{
+    removeModal()
+    AllResult$wbResult = EmptyRes$wbResults0
+    
+    output$AUC <- renderTable({
+      AllResult$wbResult$AUCdf
+    },width = "100%")
+    
+    output$LoadingError <- renderText({
+      validate(
+        need(!is.null(input$imImport) && file.exists(input$imImport$datapath) ,
+             "Please select a tif file!!" )
+      )
+      
+      mess = readfile(
+        filename = input$imImport$datapath,
+        type = "tif"
+      )
+      
+      validate(
+        need(!is.character(mess[[1]]) ,
+             mess[[1]] )
+      )
+      
+      Flags$ShowTif <- TRUE
+      AllResult$wbResult$Im = mess
+      
+      updateTabsetPanel(session, "SideTabs",
+                        selected = "plane")
+      
+      "The image is uploaded with success"
+    })
+    
   })
   
   observe({
     if(Flags$ShowTif)
     {
-      ListIm = LoadImage(input$imImport$datapath)
+      #output$LoadingError <- renderText({      })
+      #ListIm = LoadImage(input$imImport$datapath)
+      AllResult$wbResult$Im -> ListIm 
       im = ListIm$RGB
-      wbResult$Im = ListIm 
       
       output$TifPlot  <- renderPlot({ imageShow(im) })
       output$TifPlot2 <- renderPlot({ 
-        #plot(1:(max(dim(im))), type='n')
         plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
         rasterImage(im,1,1,dim(im)[2],dim(im)[1])
-        
         if (nrow(PanelStructures$data) > 0) {
           r <- PanelStructures$data
           rect(r$xmin, r$ymin, r$xmax, r$ymax, border = "red")
         }
-        
-      })#, height = dim(im)[2], width = dim(im)[1])
-      
-      observeEvent(input$panelSelect_button,{
-        NumberOfPlanes$N = NumberOfPlanes$N + 1
-        e <- input$plot_brush
-        if (!is.null(e)) {
-          vals <- data.frame(xmin = round(e$xmin, 1),
-                             ymin = round(e$ymin, 1),
-                             xmax = round(e$xmax, 1),
-                             ymax = round(e$ymax, 1))
-          
-          if (!identical(vals,prev_vals))  #We dont want to change anything if the values havent changed.
-          {
-            if(NumberOfPlanes$N > 1){
-              newH = vals$ymax - vals$ymin
-              newW = vals$xmax - vals$xmin
-              prevH = prev_vals$ymax - prev_vals$ymin
-              prevW = prev_vals$xmax - prev_vals$xmin
-              # print(paste0("newH: ",newH,"; prevH: ",prevH,
-              #              "; newW: ",newW,"; prevW: ", prevW))
-              # print(paste0("Res: ", (newH - prevH) + (newW - prevW) ))
-              if( abs((newH - prevH) + (newW - prevW)) > 1 )
-              {
-                NumberOfPlanes$N = 1
-                PanelStructures$data <- data.frame(Panel_ID = 1,vals)
-              }else{
-                PanelStructures$data <- rbind(PanelStructures$data,
-                                              cbind(data.frame(Panel_ID = nrow(PanelStructures$data)+1),
-                                                    vals))
-              }
-            }else{
-              PanelStructures$data <- rbind(PanelStructures$data,
-                                            cbind(data.frame(Panel_ID = nrow(PanelStructures$data)+1),
-                                                  vals))
-            }
-            prev_vals <<- vals
-          }
-          
-        }
       })
-      observeEvent(input$ResetPan,{
-        NumberOfPlanes$N = 1
-        PanelStructures$data <- PanelData
-      })
-      
+      Flags$ShowTif = FALSE
     }
+  })
+  
+  observeEvent(input$panelSelect_button,{
+    e <- input$plot_brush
+    if (!is.null(e)) {
+      vals <- data.frame(xmin = round(e$xmin, 1),
+                         ymin = round(e$ymin, 1),
+                         xmax = round(e$xmax, 1),
+                         ymax = round(e$ymax, 1))
+      
+      if (!identical(vals,prev_vals))  #We dont want to change anything if the values havent changed.
+      {
+        NumberOfPlanes$N = NumberOfPlanes$N + 1
+        if(NumberOfPlanes$N > 1){
+          newH = vals$ymax - vals$ymin
+          newW = vals$xmax - vals$xmin
+          prevH = prev_vals$ymax - prev_vals$ymin
+          prevW = prev_vals$xmax - prev_vals$xmin
+          # print(paste0("newH: ",newH,"; prevH: ",prevH,
+          #              "; newW: ",newW,"; prevW: ", prevW))
+          # print(paste0("Res: ", (newH - prevH) + (newW - prevW) ))
+          if( abs((newH - prevH) + (newW - prevW)) > 1 )
+          {
+            NumberOfPlanes$N = 1
+            PanelStructures$data <- data.frame(Panel_ID = 1,vals)
+          }else{
+            PanelStructures$data <- rbind(PanelStructures$data,
+                                          cbind(data.frame(Panel_ID = nrow(PanelStructures$data)+1),
+                                                vals))
+          }
+        }else{
+          PanelStructures$data <- rbind(PanelStructures$data,
+                                        cbind(data.frame(Panel_ID = nrow(PanelStructures$data)+1),
+                                              vals))
+        }
+        prev_vals <<- vals
+      }
+    }
+  })
+  
+  observeEvent(input$ResetPan,{
+    NumberOfPlanes$N = 1
+    PanelStructures$data <- PanelData
   })
   
   output$rectCoordOutput <- renderText({
@@ -191,17 +257,18 @@ server <- function(input, output, session) {
     )
     
   })
+  
   output$PlanesStructureTable <- renderTable({
     PanelStructures$data
   },width = "100%")
   
   output$AUC <- renderTable({
-    wbResult$AUCdf
+    AllResult$wbResult$AUCdf
   },width = "100%")
   
-  observeEvent(input$GenLines,{
+  observeEvent(input$GenLanes,{
     if(NumberOfPlanes$N >1){
-      wbResult$Planes = round(PanelStructures$data)
+      AllResult$wbResult$Planes = round(PanelStructures$data)
       print(PanelStructures$data)
       Flags$LanesCut= T
     }else{
@@ -214,8 +281,8 @@ server <- function(input, output, session) {
       updateTabsetPanel(session, "SideTabs",
                         selected = "grey")
       
-      im = wbResult$Im$WB
-      PanelData = wbResult$Planes
+      im = AllResult$wbResult$Im$WB
+      PanelData = AllResult$wbResult$Planes
       
       PanelsValue = do.call("rbind",
                             lapply(1:dim(PanelData)[1],
@@ -226,7 +293,8 @@ server <- function(input, output, session) {
                                      plane = im[(Nrow-p$ymax):(Nrow-p$ymin),p$xmin:p$xmax]
                                      #imageShow(plane)
                                      GreyPlane = apply(plane,1,"mean")
-                                     data.frame(Values = GreyPlane, ID = i, Y = 1:length(GreyPlane) )
+                                     data.frame(Values = GreyPlane - min(GreyPlane),
+                                                ID = paste("Lane",i), Y = 1:length(GreyPlane) )
                                    },
                                    im,PanelData)
       )
@@ -236,8 +304,8 @@ server <- function(input, output, session) {
         geom_line() + theme_bw() +
         facet_wrap(~ID)
       
-      wbResult$PanelsValue <- PanelsValue
-      wbResult$Plots <- pl
+      AllResult$wbResult$PanelsValue <- PanelsValue
+      AllResult$wbResult$Plots <- pl
       
       updateSelectInput(session, "LaneChoice",
                         choices = unique(PanelsValue$ID),
@@ -250,23 +318,27 @@ server <- function(input, output, session) {
   })
   
   observeEvent(c(input$LaneChoice),{
-    if(Flags$LanesCut & !is.null(wbResult$PanelsValue))
+    if(Flags$LanesCut & !is.null(AllResult$wbResult$PanelsValue))
     {
-      wbResult$PanelsValue -> PanelsValue
+      if(!is.null(AllResult$wbResult$TruncatedPanelsValue ))
+      {
+        pl <- AllResult$wbResult$TruncatedPlots    
+        AllResult$wbResult$TruncatedPanelsValue -> PanelsValue
+      }
+      else{
+        AllResult$wbResult$PanelsValue -> PanelsValue
+        pl<-AllResult$wbResult$Plots
+      }
+      
       Plots.Lane <- PanelsValue[which(PanelsValue$ID == input$LaneChoice),]
       colnames(Plots.Lane) = c("Y","ID","X")
-      min(Plots.Lane$X)
       
       cat(input$LaneChoice,"\n")
-      updateSliderInput(session,"truncX",
+      updateSliderInput(session,"truncV",
                         min = min(Plots.Lane$X),
                         max = max(Plots.Lane$X),
                         value = c(min(Plots.Lane$X), max(Plots.Lane$X) ) ) 
-      updateSliderInput(session,"truncV1",
-                        min = min(Plots.Lane$X),
-                        max = max(Plots.Lane$X),
-                        value = c(min(Plots.Lane$X), max(Plots.Lane$X) ) ) 
-      updateSliderInput(session,"truncH1",
+      updateSliderInput(session,"truncH",
                         min = min(Plots.Lane$Y),
                         max = max(Plots.Lane$Y),
                         value =min(Plots.Lane$Y) )
@@ -277,20 +349,26 @@ server <- function(input, output, session) {
   
   observe({  Flags$CutTab <- input$tabs })
   
-  observeEvent(c(input$truncX,input$truncH1,input$LaneChoice), {
-    if(!is.null(wbResult$PanelsValue))
+  observeEvent(c(input$truncV,input$truncH,input$LaneChoice), {
+    if(!is.null(AllResult$wbResult$PanelsValue))
     {
-      wbResult$PanelsValue -> PanelsValue
-      IDlane =as.numeric(input$LaneChoice)
+      if(!is.null(AllResult$wbResult$TruncatedPanelsValue ))
+      {
+        pl <- AllResult$wbResult$TruncatedPlots    
+        AllResult$wbResult$TruncatedPanelsValue -> PanelsValue
+      }
+      else{
+        AllResult$wbResult$PanelsValue -> PanelsValue
+        pl<-AllResult$wbResult$Plots
+      }
       
-      wbResult$IDlane <- IDlane
-      
-      pl<-wbResult$Plots
+      IDlane = input$LaneChoice
+      Flags$IDlane <- IDlane
       
       if(Flags$CutTab=="V")
       {
-        MinTrunc<-input$truncX[1]
-        MaxTrunc<-input$truncX[2]
+        MinTrunc<-input$truncV[1]
+        MaxTrunc<-input$truncV[2]
         
         vline.dat <- data.frame(ID=as.factor(rep(PanelsValue$ID,2)), vl =0)
         vline.dat  <-  vline.dat[ vline.dat$ID == IDlane, ]
@@ -299,7 +377,7 @@ server <- function(input, output, session) {
         pl <- pl + geom_vline(data=vline.dat,aes(xintercept=vl),linetype="dashed")
       }else if(Flags$CutTab=="H")
       {
-        TruncY<-input$truncH1[1]
+        TruncY<-input$truncH[1]
         hline.dat <- data.frame(ID=as.factor(PanelsValue$ID), hl =0)
         hline.dat  <-  hline.dat[ hline.dat$ID == IDlane, ]
         hline.dat$hl <- TruncY
@@ -309,68 +387,197 @@ server <- function(input, output, session) {
       
       output$DataPlot <- renderPlot({pl})
       
-      # ### AUC calculation:
-      AUCdf<-AUCfunction(wbResult$AUCdf,PanelsValue,Lane = IDlane)
-      wbResult$AUCdf <- AUCdf
+      ### AUC calculation of the whole lane without cuts:
+      AUCdf<-AUCfunction(AllResult$wbResult$AUCdf,PanelsValue,Lane = IDlane)
+      AllResult$wbResult$AUCdf <- AUCdf
     }  
     
   })
   
-  observeEvent(c(input$TruncateDataV,input$TruncateDataH),{
+  observeEvent(c(input$actionButton_TruncV,input$actionButton_TruncH),{
     
-    if( !is.null(wbResult$PanelsValue))
+    if( !is.null(AllResult$wbResult$PanelsValue))
     {
-      wbResult$IDlane -> IDlane
-      wbResult$PanelsValue -> PanelsValue
+      Flags$IDlane -> IDlane
+      if(!is.null(AllResult$wbResult$TruncatedPanelsValue ))
+      {
+        pl <- AllResult$wbResult$TruncatedPlots    
+        AllResult$wbResult$TruncatedPanelsValue -> PanelsValue
+      }
+      else{
+        AllResult$wbResult$PanelsValue -> PanelsValue
+        pl<-AllResult$wbResult$Plots
+      }
       
-      wbResult$AUCdf -> AUCdf
+      AllResult$wbResult$AUCdf -> AUCdf
       AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
       
       if(Flags$CutTab=="V")
       {
-        MinTrunc<-input$truncX[1]
-        MaxTrunc<-input$truncX[2]
+        MinTrunc<-input$truncV[1]
+        MaxTrunc<-input$truncV[2]
         AUCdf.new$Truncation <- paste("X = [", MinTrunc," ; ", MaxTrunc ,"]")
         PanelsValue<- PanelsValue[!((PanelsValue$Y < MinTrunc | PanelsValue$Y > MaxTrunc) & PanelsValue$ID == IDlane),]
         PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] -min(PanelsValue$Values[PanelsValue$ID == IDlane]) 
-        
-      }else if(Flags$CutTab=="H")
+        pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
+          geom_line() + theme_bw() +
+          facet_wrap(~ID)
+        updateSliderInput(session,"truncV",
+                          min = min(PanelsValue$Y[PanelsValue$ID == IDlane]),
+                          max = max(PanelsValue$Y[PanelsValue$ID == IDlane]),
+                          value = c(min(PanelsValue$Y[PanelsValue$ID == IDlane]),
+                                    max(PanelsValue$Y[PanelsValue$ID == IDlane]) ) )
+      }
+      else if(Flags$CutTab=="H")
       {
-        TruncY<-input$truncH1[1]
+        TruncY<-input$truncH[1]
         PanelsValue <- PanelsValue[!(PanelsValue$Values<TruncY & PanelsValue$ID == IDlane),]
         PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] - TruncY
         AUCdf.new$Truncation <- paste("Y = ", TruncY)
+        pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
+          geom_line() + theme_bw() +
+          facet_wrap(~ID)
+        updateSliderInput(session,"truncH",
+                          min = min(PanelsValue$Values[PanelsValue$ID == IDlane]),
+                          max = max(PanelsValue$Values[PanelsValue$ID == IDlane]),
+                          value = c(min(PanelsValue$Values[PanelsValue$ID == IDlane]),
+                                    max(PanelsValue$Values[PanelsValue$ID == IDlane]) ) )
       }
       
-      wbResult$TruncatedPanelsValue <- PanelsValue
-      pl<-wbResult$Plots
-      
+      AllResult$wbResult$TruncatedPanelsValue <- PanelsValue
+      AllResult$wbResult$TruncatedPlots <- pl
       output$DataPlot <- renderPlot({pl})
-      AUCdf<-AUCfunction(AUCdf.new=AUCdf.new,wbResult$AUCdf,PanelsValue,Lane = IDlane)
+      AUCdf<-AUCfunction(AUCdf.new=AUCdf.new,AllResult$wbResult$AUCdf,PanelsValue,Lane = IDlane)
       output$AUC <- renderTable({AUCdf})
-      wbResult$AUCdf <- AUCdf
+      AllResult$wbResult$AUCdf <- AUCdf
     }
+  })
+  
+  observeEvent(input$actionButton_ResetPlanes,{
+    
+    AllResult$wbResult$AUCdf = EmptyRes$wbResults0$AUCdf
+    AllResult$wbResult$TruncatedPanelsValue = EmptyRes$wbResults0$TruncatedPanelsValue
+    
+    output$AUC <- renderTable({
+      AllResult$wbResult$AUCdf
+    },width = "100%")
+    output$DataPlot <- renderPlot({AllResult$wbResult$Plots})
+  })
+  
+  output$downloadButton_saveRes <- downloadHandler(
+    filename = function() {
+      paste('WBanalysis-', Sys.Date(), '.RDs', sep='')
+    },
+    content = function(file) {
+      results = AllResult$wbResult
+      saveRDS(results, file = file)
+    }
+  )
+  
+  # quantification WB
+  observeEvent(input$actionB_loadingWB,{
+    output$LoadingError <- renderText({
+      validate(
+        need(!is.null(input$WBImport) && file.exists(input$WBImport$datapath) ,
+             "Please select a tif file!!" )
+      )
+      
+      mess = readfile(
+        filename = input$WBImport$datapath,
+        type = "RDs"
+      )
+      
+      validate(
+        need(!is.character(mess[[1]]) ,
+             mess[[1]] )
+      )
+      
+      AllResult$WBanalysis = mess
+      
+      "The RDs is uploaded with success"
+    })
+    
+  })
+  observeEvent(input$actionB_loadingNormWB,{
+    output$LoadingErrorNormWB <- renderText({
+      validate(
+        need(!is.null(input$NormWBImport) && file.exists(input$NormWBImport$datapath) ,
+             "Please select a tif file!!" )
+      )
+      
+      mess = readfile(
+        filename = input$NormWBImport$datapath,
+        type = "RDs"
+      )
+      
+      validate(
+        need(!is.character(mess[[1]]) ,
+             mess[[1]] )
+      )
+      
+      AllResult$NormWBanalysis = mess
+      
+      "The RDs is uploaded with success"
+    })
+    
+  })
+  
+  observe({
+    if(is.null(AllResult$WBanalysis)){
+      table = EmptyRes$wbResults0$AUCdf
+    }else{
+      table = AllResult$WBanalysis$AUCdf
+    }
+    output$AUC_WB <- renderTable({
+      table
+    },width = "100%")
+  })
+  observe({
+    if(is.null(AllResult$NormWBanalysis)){
+      table = EmptyRes$wbResults0$AUCdf
+    }else{
+      table = AllResult$NormWBanalysis$AUCdf
+    }
+    output$AUC_WBnorm <- renderTable({
+      table
+    },width = "100%")
   })
   
   #### END WB analysis #####
   
   #### PCR analysis
   
-  pcrResult <- reactiveValues(data = NULL)
+  pcrResult = pcrResult = reactiveValues(data = NULL,
+                                         PCRnorm = NULL,
+                                         BaselineExp = NULL,
+                                         CompPRC = NULL,
+                                         NewPCR = NULL)
   
-  FlagsPCR <- reactiveValues(DataLoaded = F, norm=F, baseline = F)
+  FlagsPCR <- reactiveValues(Initdata= NULL, norm=F, baseline = F)
   
-  observeEvent(c(input$LoadPCR_Button),{
+  observeEvent(input$LoadPCR_Button,{
     output$LoadingError_PCR <- renderText({
       validate(
-        need(!is.null(input$PCRImport) ,
-             "Please select an RT-PCR excel file!!" )
+        need(!is.null(input$PCRImport) && file.exists(input$PCRImport$datapath) ,
+             "Please select an RT-qPCR excel file!!" )
       )
-      FlagsPCR$DataLoaded <- TRUE
-      ""
+      
+      mess = readfile(
+        filename = input$PCRImport$datapath,
+        type = "Excel"
+      )
+      
+      validate(
+        need(!setequal(names(mess),c("message","call")) ,
+             mess[["message"]] )
+      )
+
+      FlagsPCR$Initdata = mess
+      
+      "The RT-qPCR excel is uploaded with success"
     })
     
-    if( !is.null(pcrResult$data) )
+    if( !is.null(FlagsPCR$Initdata) )
     { ### alert!!! if it is already present! 
       showModal(modalDialog(
         title = "Important message",
@@ -381,21 +588,75 @@ server <- function(input, output, session) {
         )
       ))
       
-      observeEvent(input$confirmUploadPCR,{
-        removeModal()
-        pcrResult <- reactiveValues()
-        Flags$DataLoaded <- TRUE
-      })
     }
   })
   
-  observe({
-    if(FlagsPCR$DataLoaded){
-      library(readxl)
-      PCR <- read_excel(input$PCRImport$datapath)
-      pcrResult$data = PCR
+  observeEvent(input$confirmUploadPCR,{
+    removeModal()
+    pcrResult = pcrResult0
+    output$LoadingError_PCR <- renderText({
+      validate(
+        need(!is.null(input$PCRImport) && file.exists(input$PCRImport$datapath) ,
+             "Please select an RT-PCR excel file!!" )
+      )
       
-      AllGenes = unique(PCR$Target)
+      mess = readfile(
+        filename = input$PCRImport$datapath,
+        type = "Excel"
+      )
+      
+      validate(
+        need(!is.character(mess[[1]]) ,
+             mess[[1]] )
+      )
+
+      FlagsPCR$Initdata = mess
+      
+      "The RDs is uploaded with success"
+    })
+  })
+  
+  observe({
+    print("HERE updateSelectizeInput ")
+    updateSelectizeInput(session,"selectPCRcolumns",
+                         choices = colnames(FlagsPCR$Initdata),
+                         selected = colnames(FlagsPCR$Initdata)[1]
+                         )
+    })
+
+  
+  observeEvent(input$selectPCRcolumns,{
+    
+    if( !is.null(FlagsPCR$Initdata) ){
+      PCR = FlagsPCR$Initdata
+      colNames = colnames(PCR)
+      output$PCRpreview = renderTable({
+        if(length(input$selectPCRcolumns)!=0 ){
+          tmp = PCR[,input$selectPCRcolumns]
+          colnames(tmp) = c("Gene", "Sample", "Value")[1:length(colnames(tmp))]
+          head(tmp) 
+        }
+        else
+          NULL
+      })
+      
+      if(length(input$selectPCRcolumns)==3){
+        tmp = PCR[,input$selectPCRcolumns]
+        colnames(tmp) = c("Gene", "Sample", "Value")[1:length(colnames(tmp))]
+        pcrResult$data = tmp
+      }else{
+        pcrResult$data = NULL
+      }
+    }
+    
+  })
+  
+  observe({
+    if(!is.null(pcrResult$data)){
+      
+      PCR = pcrResult$data
+
+      AllGenes = unique(PCR$Gene)
       Exp = unique(PCR$Sample)
       
       updateSelectInput(session, "PCRbaseline",
@@ -403,6 +664,11 @@ server <- function(input, output, session) {
       updateCheckboxGroupInput(session,"PCRnorm",
                                choices = AllGenes )
       
+    }else{
+      updateSelectInput(session, "PCRbaseline",
+                        choices = "" )
+      updateCheckboxGroupInput(session,"PCRnorm",
+                               choices = "" )
     }
   })
   
@@ -423,9 +689,9 @@ server <- function(input, output, session) {
       pcrResult$data -> PCR
       
       NewPCR = PCR %>%
-        group_by(Sample,Target) %>%
-        dplyr::summarise(Mean = mean(Cq),
-                         Sd = sd(Cq)) %>%
+        group_by(Sample,Gene) %>%
+        dplyr::summarise(Mean = mean(Value),
+                         Sd = sd(Value)) %>%
         ungroup()
       
       BaselinePCR = NewPCR %>% 
@@ -433,10 +699,10 @@ server <- function(input, output, session) {
         rename(BaselineMean=Mean, BaselineSd=Sd) %>%
         select(-Sample)
       
-      NewPCR = merge(BaselinePCR,NewPCR,all.y = T,by="Target")
+      NewPCR = merge(BaselinePCR,NewPCR,all.y = T,by="Gene")
       
       NewPCR = NewPCR %>%
-        group_by(Sample,Target) %>%
+        group_by(Sample,Gene) %>%
         dplyr::summarise(dCt = Mean - BaselineMean,
                          Q = 2^{-dCt},
                          Sd = Sd,
@@ -444,11 +710,11 @@ server <- function(input, output, session) {
         ungroup()
       
       OnePCR = NewPCR %>%
-        filter(!Target %in% PCRnorm)
+        filter(!Gene %in% PCRnorm)
       
       NormPCR = NewPCR %>%
-        filter(Target %in% PCRnorm ) %>%
-        rename(Norm = Target,
+        filter(Gene %in% PCRnorm ) %>%
+        rename(Norm = Gene,
                Norm_dCt = dCt,
                NormQ = Q,
                NormSd = Sd,
@@ -456,7 +722,7 @@ server <- function(input, output, session) {
       
       CompPRC = merge(OnePCR,NormPCR)
       
-      CompPRC = CompPRC %>% group_by(Sample,Target,Norm) %>%
+      CompPRC = CompPRC %>% group_by(Sample,Gene,Norm) %>%
         dplyr::summarise(Qnorm = Q/NormQ,
                          SDddct = sqrt(Sd^2+NormSd^2),
                          SDrq = log(2)*Qnorm*SDddct) %>%
@@ -464,7 +730,7 @@ server <- function(input, output, session) {
       
       print(CompPRC)
       
-      AllGenes = unique(PCR$Target)
+      AllGenes = unique(PCR$Gene)
       
       pcrResult$CompPRC = CompPRC
       pcrResult$NewPCR = NewPCR
@@ -484,7 +750,7 @@ server <- function(input, output, session) {
         do.call(tagList, plot_output_list)
       })
       output$PCRplot <- renderPlot({
-        ggplot(data = CompPRC, aes(x= Target, y = Qnorm, fill = Sample)) + 
+        ggplot(data = CompPRC, aes(x= Gene, y = Qnorm, fill = Sample)) + 
           facet_wrap(~Norm, ncol = 1) +
           geom_bar(stat = "identity",position = "dodge")
         
@@ -496,7 +762,7 @@ server <- function(input, output, session) {
           my_i <- i
           tablename <- paste("tablename", my_i, sep="")
           output[[tablename]] <- renderTable({
-            NewPCR %>% filter(Target == my_i)
+            NewPCR %>% filter(Gene == my_i)
           })
           
           ComparisonPCR = list()
@@ -504,7 +770,7 @@ server <- function(input, output, session) {
             tablename <- paste("CompTablename", my_i, sep="")
             output[[tablename]] <- renderTable({
               CompPRC %>% 
-                filter(Target == my_i) %>%
+                filter(Gene == my_i) %>%
                 arrange(Norm,Sample)
             })
           }
@@ -514,6 +780,9 @@ server <- function(input, output, session) {
     }
   })
   
+  observe({
+    AllResult$pcrResult = reactiveValuesToList(pcrResult)
+  })
   
   #### END PCR analysis
   
@@ -522,7 +791,9 @@ server <- function(input, output, session) {
       "Report.pdf"
     },
     content = function(file) {
-      rmarkdown::render("report.Rmd",output_file = file, params = reactiveValuesToList(wbResult) )
+      rmarkdown::render("report.Rmd",
+                        output_file = file,
+                        params = reactiveValuesToList(AllResult) )
     }
   )
   

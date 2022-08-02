@@ -1,4 +1,4 @@
-# GelAnalyser
+# InitGreat
 
 It is R package that is able to.....
 

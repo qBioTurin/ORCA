@@ -46,16 +46,17 @@ ui <- dashboardPage(
                          tabName = 'Home',
                          icon = icon('home')
                 ),
-                menuItem('WB data',
+                menuItem('Western Blot analysis',
                          tabName = 'wb',
-                         menuSubItem("Image uploading", tabName = "uploadIm"),
-                         menuSubItem("Planes", tabName = "plane"),
-                         menuSubItem("Lanes", tabName = "grey")
+                         menuSubItem("Upload Image", tabName = "uploadIm"),
+                         menuSubItem("Protein Bands", tabName = "plane"),
+                         menuSubItem("Lanes", tabName = "grey"),
+                         menuSubItem("Quantification", tabName = "quantification")
                 ),
-                menuItem('RT-PCR data',
+                menuItem('RT-qPCR analysis',
                          tabName = 'pcr',
-                         menuSubItem("Data uploading", tabName = "uploadPCR"),
-                         menuSubItem("Tables", tabName = "tablesPCR"),
+                         menuSubItem("Upload data", tabName = "uploadPCR"),
+                         menuSubItem("Quantification", tabName = "tablesPCR"),
                          menuSubItem("Plot", tabName = "plotsPCR")
                 )#,
                 # menuItem('??? data',
@@ -71,7 +72,7 @@ ui <- dashboardPage(
       ## RT-PCR 
       # First tab content
       tabItem(tabName = "uploadPCR",
-              h2("Data Loading"),
+              h2("Load RT-qPCR raw data"),
               fluidRow(
                 column(10,
                        fileInput(inputId = "PCRImport",
@@ -83,13 +84,27 @@ ui <- dashboardPage(
                        )
                        ),
                        fluidRow(
-                         box(width = 12, title = "Data visualization:",
+                         box(width = 12, title = "Experimental Setup:",
                              column(width = 6,
-                                    checkboxGroupInput(inputId = "PCRnorm",
-                                                       "Select the normalizers:")
+                                    selectizeInput(
+                                      inputId = "selectPCRcolumns",
+                                      label = "Select the columns to assign \n
+                                      the Gene, Sample, Value names (in order):",
+                                      choices = c(""),
+                                      selected = "",
+                                      multiple = TRUE,
+                                      options = list(maxItems = 3),
+                                      width = "99%"
+                                    ),
+                                    tableOutput("PCRpreview")
                              ),
-                             column(width = 6,
-                                    selectInput(inputId = "PCRbaseline", label = "Select the baseline:",
+                             column(width = 3,
+                                    checkboxGroupInput(inputId = "PCRnorm",
+                                                       "Select housekeeping genes:")
+                             ),
+                             column(width = 3,
+                                    selectInput(inputId = "PCRbaseline",
+                                                label = "Select control sample:",
                                                 choices = "ID" )
                              ) 
                          )
@@ -106,12 +121,12 @@ ui <- dashboardPage(
       tabItem(tabName = "tablesPCR",
               h2("Tables"),
               fluidRow(
-                box(width= 12,title = "Summary",collapsible = TRUE,collapsed = TRUE,
+                box(width= 12,title = "Single gene Quantification",collapsible = TRUE,collapsed = TRUE,
                     uiOutput("PCRtables")
                 )
               ),
               fluidRow(
-                box(width= 12,title = "Comparison",collapsible = TRUE,collapsed = TRUE,
+                box(width= 12,title = "“Normalization on Housekeeping Genes",collapsible = TRUE,collapsed = TRUE,
                     uiOutput("PCRtablesComp")
                 )
               )
@@ -130,34 +145,31 @@ ui <- dashboardPage(
       tabItem(tabName = "uploadIm",
               h2("Loading Image"),
               fluidRow(
-                column(10,
+                column(9,
                        fileInput(inputId = "imImport",
                                  label = "",
                                  placeholder = "Select a tif file",
-                                 width = "80%"),
-                       fluidRow(column(width = 10,offset = 1,
-                                       verbatimTextOutput("LoadingError")))
+                                 width = "90%")
+                ),
+                column(2,
+                       actionButton( label = "Load",
+                                     width = "100%",
+                                     inputId = "LoadingTif" )
                        
                 ),
-                column(1,
-                       actionButton( label = "Load",
-                                     inputId = "LoadingTif" )
-                )
-                # column(1,offset = 1,
-                #        )
-                # column(1,offset = 2,
-                #        downloadButton("downloadData", "Download") 
-                # )
+                tags$style(type='text/css', "#LoadingTif { width:100%; margin-top: 20px;}")
               ),
-              plotOutput("TifPlot")
+              fluidRow(
+                column(
+                  width = 10,
+                  offset = 1,
+                  verbatimTextOutput("LoadingError")
+                )
+              )
       ),
       # Second tab content
       tabItem(tabName = "plane",
-              h2("Planes definition"),
-              # tags$head(
-              #   tags$style(css),
-              #   tags$script(HTML(js))
-              # ),
+              h2("Select protein bands"),
               fluidRow(
                 box( width = 12,
                      plotOutput("TifPlot2",width="100%",
@@ -167,54 +179,151 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box( width = 6,
-                     title = tagList(shiny::icon("gear"), "Select planes"),
+                     title = tagList(shiny::icon("gear"), "Protein bands"),
                      tableOutput("PlanesStructureTable")
-                     #uiOutput('panelset')
                 ),
                 box( width = 6,
-                     actionButton(inputId = "panelSelect_button", label = "Select panel"),
-                     actionButton(inputId = "ResetPan", label = 'Reset panel'),
-                     actionButton(inputId = "GenLines", label = 'Generate lines'),
+                     actionButton(inputId = "panelSelect_button", label = "Select protein band"),
+                     actionButton(inputId = "ResetPan", label = 'Reset protein bands'),
+                     actionButton(inputId = "GenLanes", label = 'Generate lanes'),
                      verbatimTextOutput("rectCoordOutput")
                 )
               )
       ),
-      #   
       #   # Third tab content
       tabItem(tabName = "grey",
-              h2("Lanes generation"),
+              h2("Signal Profiles"),
+              fluidRow(
+                column(width = 6, offset = 0.5,
+                       selectInput(inputId = "LaneChoice",
+                                   label = "Choose a lane:",
+                                   choices = c("")
+                       ) 
+                )
+                # column(width = 5,
+                #        textInput(inputId = "text_LaneName",
+                #                  label = "Assign a name to the lane",
+                #                  value = ""
+                #                  )
+                # )
+              ),
               box(width = 12,
                   plotOutput("DataPlot")
-              ),
-              fluidRow(
-                selectInput(inputId = "LaneChoice",
-                            label = "Choose a Lane:",
-                            choices = c(""))
               ),
               fluidRow(
                 box(width = 6,
                     tabsetPanel(id = "tabs",
                                 tabPanel("Vertical cut", value= "V",textOutput("V"),
-                                         sliderInput(inputId = "truncX", label = h4("Truncation:"),
-                                                     min = 0, max = 0, value = c(0,0),step = 1),
-                                         actionButton( label = "Truncate", inputId = "TruncateDataV",
-                                                       icon = icon("cut") )),
+                                         sliderInput(inputId = "truncV", label = h4("Truncation:"),
+                                                     min = 0, max = 0, value = c(0,0),step = 1
+                                         ),
+                                         actionButton( 
+                                           label = "Cut", inputId = "actionButton_TruncV",
+                                           icon = icon("cut")
+                                         )
+                                ),
                                 tabPanel("Horizontal cut", value= "H",textOutput("H"),
-                                         sliderInput(inputId = "truncH1", label = h4("Horizontal truncation:"),
+                                         sliderInput(inputId = "truncH", label = h4("Horizontal truncation:"),
                                                      min = 0, max = 0, value = 0,step = 1),
-                                         actionButton( label = "Truncate", inputId = "TruncateDataH",
-                                                       icon = icon("cut") ))
-                                #tabPanel("Derivatives cut", value= "D",textOutput("D"))
+                                         actionButton( label = "Cut", inputId = "actionButton_TruncH",
+                                                       icon = icon("cut") 
+                                         )
+                                )
                     )
                 ),
                 box(width=6,
-                    tableOutput('AUC')
+                    tableOutput('AUC'),
+                    actionButton( label = "Reset all", 
+                                  inputId = "actionButton_ResetPlanes"),
+                    downloadButton( label = "Save the analysis", 
+                                    outputId = "downloadButton_saveRes",
+                                    #href = "Results.RData",
+                                    #download = "Results.RData",
+                                    icon = icon("save") )
                 )
+              )
+      ),
+      # fourth tab content
+      tabItem(tabName = "quantification",
+              h2("WB quantification"),
+              fluidRow(
+                box( width = 6,
+                     title = tagList(shiny::icon("gear"), "Set the WB analysis as normalizer"),
+                     column(9,
+                            fileInput(inputId = "NormWBImport",
+                                      label = "",
+                                      placeholder = "Select an WB RData file",
+                                      width = "90%"
+                            )
+                     ),
+                     column(2,
+                            actionButton( label = "Load",
+                                          width = "100%",
+                                          inputId = "actionB_loadingNormWB"
+                            )
+                            
+                     ),
+                     tags$style(type='text/css',
+                                "#actionB_loadingNormWB { width:100%; margin-top: 20px;}"
+                     ),
+                     fluidRow(
+                       column(
+                         width = 10,
+                         offset = 1,
+                         verbatimTextOutput("LoadingErrorNormWB")
+                       )
+                     ),
+                     fluidRow(
+                       column(
+                         width = 10,
+                         offset = 1,
+                         tableOutput('AUC_WBnorm')
+                       )
+                     )
+                ),
+                box( width = 6,
+                     title = tagList(shiny::icon("gear"), "Set the WB analysis to normalize"),
+                     column(9,
+                            fileInput(inputId = "WBImport",
+                                      label = "",
+                                      placeholder = "Select an WB RData file",
+                                      width = "90%"
+                            )
+                     ),
+                     column(2,
+                            actionButton( label = "Load",
+                                          width = "100%",
+                                          inputId = "actionB_loadingWB"
+                            )
+                            
+                     ),
+                     tags$style(type='text/css',
+                                "#actionB_loadingWB { width:100%; margin-top: 20px;}"
+                     ),
+                     fluidRow(
+                       column(
+                         width = 10,
+                         offset = 1,
+                         verbatimTextOutput("LoadingErrorWB")
+                       )
+                     ),
+                     fluidRow(
+                       column(
+                         width = 10,
+                         offset = 1,
+                         tableOutput('AUC_WB')
+                       )
+                     )
+                )
+              ),
+              box( width = 12,
+                   title = tagList(shiny::icon("gear"), "WB quantification")
               )
       )
     )
   )
 )
+
 
 #   fluidPage(
 #   

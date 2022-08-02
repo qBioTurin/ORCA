@@ -1,14 +1,7 @@
-# library(shiny)
-# library(ggplot2)
-# library(zoo)
-# library(knitr)
-
-# Run the application 
-source("ui.R")
-source("server.R")
-shinyApp(ui = ui, server = server)
 
 Appui <- system.file("Shiny","ui.R", package = "GelAnalyser")
 Appserver <- system.file("Shiny","server.R", package = "GelAnalyser")
 
-shinyApp(Appui, Appserver )
+shinyApp(Appui, Appserver,
+         options =  options(shiny.maxRequestSize=500*1024^2,
+                            shiny.launch.browser = .rs.invokeShinyWindowExternal) )
