@@ -11,8 +11,8 @@ library("shinyWidgets")
 
 ui <- dashboardPage(
   #theme = shinytheme("paper"),
-  dashboardHeader(title = "Nome Pacchetto",
-                  tags$li(a(onclick = "onclick =window.open('https://github.com/xxx/xxx')",
+  dashboardHeader(title = "InteGreat",
+                  tags$li(a(onclick = "onclick =window.open('https://github.com/qBioTurin/InteGreat')",
                             href = NULL,
                             icon("github"),
                             title = "GitHub",
