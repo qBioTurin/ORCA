@@ -129,9 +129,16 @@ server <- function(input, output, session) {
                    pl = NULL,
                    AUCdf=data.frame(Truncation = "-", AUC = "-", Lane="-"  ))
   
+  AllResult$wbResult = wbResult
+  
   observeEvent(input$saveWBButton,{
     AllResult$wbResult = wbResult
     })
+  
+  observeEvent(input$saveWBButton,{
+    session$sendCustomMessage(type = 'testmessage',
+                              message = "The data and analysis are saved with success into the RDs containing the results. You can download it from purple button in the navbar." )
+  })
   
   EmptyRes <- reactiveValues(wbResults0 = wbResult)
   
@@ -319,7 +326,6 @@ server <- function(input, output, session) {
     
     if(Flags$LanesCut)
     {
-      
       updateTabsetPanel(session, "SideTabs",
                         selected = "grey")
       
@@ -595,7 +601,7 @@ server <- function(input, output, session) {
     )
   })
   observe({
-    
+
     if(!is.null(AllResult$WBanalysis) & !is.null(AllResult$NormWBanalysis)){
       indexesWB = input$AUC_WB_rows_selected 
       indexesWBnorm = input$AUC_WBnorm_rows_selected 
@@ -652,6 +658,10 @@ server <- function(input, output, session) {
   
   observeEvent(input$savePCRButton,{
     AllResult$pcrResult = reactiveValuesToList(pcrResult, all.names = T) 
+  })
+  observeEvent(input$savePCRButton,{
+    session$sendCustomMessage(type = 'testmessage',
+                              message = "The data and analysis are saved with success into the RDs containing the results. You can download it from purple button in the navbar." )
   })
   
   FlagsPCR <- reactiveValues(Initdata= NULL, norm=F, baseline = F)
@@ -892,6 +902,10 @@ server <- function(input, output, session) {
     AllResult$elisaResult = reactiveValuesToList(elisaResult, all.names = T) 
   })
   
+  observeEvent(input$saveElisaButton,{
+    session$sendCustomMessage(type = 'testmessage',
+                              message = "The data and analysis are saved with success into the RDs containing the results. You can download it from purple button in the navbar." )
+  })
   
   FlagsELISA <- reactiveValues(Initdata= NULL,
                                cellCoo = NULL,
@@ -1116,7 +1130,7 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent( FlagsELISA$expToselect ,{
+  observeEvent(FlagsELISA$expToselect,{
     expToselect = FlagsELISA$expToselect
     print(expToselect)
     output$ElisaBaselineSelection <- renderUI({
@@ -1230,8 +1244,6 @@ server <- function(input, output, session) {
     }
     
   })
-  
-  
   
   ### End ELISA analysis ####
   

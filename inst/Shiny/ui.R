@@ -435,8 +435,9 @@ ui <- dashboardPage(
                 actionButton(
                   label = "Pre-Save the analysis",
                   inputId = "saveElisaButton",
-                  align = "right" 
+                  align = "right"
                 ),
+                tags$head(tags$script(src = "message-handler.js")),
                 box(width= 12,
                     title = "Select a baseline for the following experiment replicants",
                     collapsible = TRUE,
@@ -568,6 +569,11 @@ ui <- dashboardPage(
       tabItem(tabName = "quantification",
               h2("WB quantification"),
               fluidRow(
+                actionButton(
+                  label = "Pre-Save the analysis",
+                  inputId = "saveWBButton",
+                  align = "right" 
+                ),
                 box( width = 6,
                      title = tagList(shiny::icon("gear"), "Set the WB analysis as normalizer"),
                      column(9,
@@ -639,11 +645,6 @@ ui <- dashboardPage(
               ),
               box( width = 12,
                    title = tagList(shiny::icon("gear"), "WB quantification"),
-                   actionButton(
-                     label = "Pre-Save the analysis",
-                     inputId = "saveWBButton",
-                     align = "right" 
-                   ),
                    fluidRow(
                      column(
                        width = 10,

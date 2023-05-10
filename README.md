@@ -8,7 +8,7 @@ The following R packages must be installed:
 
 ```
 install.packages(c( "ggplot2", "shinydashboard", "shinyWidgets", "shiny", "dashboardthemes",
-"dplyr","OpenImageR","knitr","zoo","shinythemes","readxl"))
+"dplyr","OpenImageR","knitr","zoo","shinythemes","readxl","DT","shinyjs"))
 ```
 
 ### How to install ....
