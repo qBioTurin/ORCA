@@ -7,6 +7,7 @@ library(shinythemes)
 library(OpenImageR)
 library(dplyr)
 library("shinyWidgets")
+library(DT)
 
 
 ui <- dashboardPage(
@@ -36,6 +37,14 @@ ui <- dashboardPage(
                                       text-align: center; vertical-align: middle;
                                       border: 1px solid #9809AF;",
                                                                 class="dlButton")
+                                         ),
+                                         tags$li(shinyjs::useShinyjs(),
+                                                 downloadButton(outputId = 'downloadRDSwholeAnalysis',
+                                                                label = "RDs",title = "RDS storing the whole analysis",
+                                                                style = "cursor: pointer; width: 98%;
+                                      text-align: center; vertical-align: middle;
+                                      border: 1px solid #9809AF;",
+                                                                class="dlButton")
                                          )
                           ),
                           block = TRUE)
@@ -46,30 +55,249 @@ ui <- dashboardPage(
                          tabName = 'Home',
                          icon = icon('home')
                 ),
-                menuItem('Western Blot analysis',
-                         tabName = 'wb',
-                         menuSubItem("Upload Image", tabName = "uploadIm"),
-                         menuSubItem("Protein Bands", tabName = "plane"),
-                         menuSubItem("Lanes", tabName = "grey"),
-                         menuSubItem("Quantification", tabName = "quantification")
+                menuItem("Data Analysis",
+                         tabName = 'DataAnaslysis',
+                         menuItem('Western Blot analysis',
+                                  tabName = 'wb',
+                                  menuSubItem("Upload Image", tabName = "uploadIm"),
+                                  menuSubItem("Protein Bands", tabName = "plane"),
+                                  menuSubItem("Lanes", tabName = "grey"),
+                                  menuSubItem("Quantification", tabName = "quantification")
+                         ),
+                         menuItem('RT-qPCR analysis',
+                                  tabName = 'pcr',
+                                  menuSubItem("Upload data", tabName = "uploadPCR"),
+                                  menuSubItem("Quantification", tabName = "tablesPCR"),
+                                  menuSubItem("Plot", tabName = "plotsPCR")
+                         ),
+                         menuItem('ELISA analysis',
+                                  tabName = 'elisa',
+                                  menuSubItem("Upload data", tabName = "uploadELISA"),
+                                  menuSubItem("Quantification", tabName = "tablesELISA")
+                         )
                 ),
-                menuItem('RT-qPCR analysis',
-                         tabName = 'pcr',
-                         menuSubItem("Upload data", tabName = "uploadPCR"),
-                         menuSubItem("Quantification", tabName = "tablesPCR"),
-                         menuSubItem("Plot", tabName = "plotsPCR")
-                )#,
-                # menuItem('??? data',
-                #          tabName = 'newdat'
-                # )
+                menuItem('Model integration',
+                         tabName = 'integ',
+                         menuSubItem("Proteomic Data", tabName = "Proteomic_tab"),
+                         menuSubItem("WB,RT-qPCR,ELISA ", tabName = "WbPcrElisa_tab"),
+                         menuSubItem("IF,.. ", tabName = "otherData_tab")
+                )
+                
     )),
   dashboardBody(
     tabItems(
       ## HOME
-      tabItem(tabName = "Home",
-              h2("Super Package for different data analysis!!!!")
+      tabItem(
+        tabName = "Home",
+        h2("Super Package for different data analysis!!!!")
       ),
-      ## RT-PCR 
+      ###### BEGIN MODEL INTEGRATION ####
+      ## BEGIN model integration: proteomic ####
+      tabItem(tabName = "Proteomic_tab",
+              h2("Proteomic data"),
+              fluidRow(
+                box(width = 12,
+                    title = "Proteomic from literature",
+                    collapsible = T,
+                    numericInput(inputId = "InputDefault_rescaling",
+                                 label = "Rescaling factor",
+                                 value = "1",
+                                 min = 0,
+                                 step = 100,
+                                 width = "10%"),
+                    DTOutput("ProteomicDefault_table",width = "90%")
+                ),
+                box(width = 12,
+                    title = "User Proteomic Data",
+                    collapsible = T,
+                    collapsed = T,
+                    fluidRow(
+                      column(10,
+                             fileInput(
+                               inputId = "ProtImport",
+                               label = "",
+                               placeholder = "Select an excel file",
+                               width = "80%", 
+                               multiple = TRUE
+                             )
+                      ),
+                      column(1,
+                             actionButton(
+                               label = "Load",
+                               inputId = "LoadProt_Button" 
+                             )
+                      ),
+                      column(1,
+                             actionButton(
+                               label = "Reset",
+                               inputId = "ResetProt_Button" 
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      column(
+                        width = 10,
+                        offset = 1,
+                        verbatimTextOutput("LoadingError_Prot")
+                      ),
+                      fluidRow(
+                        column(
+                          width = 3,
+                          offset = 1,
+                          numericInput(
+                            inputId = "InputUser_rescaling",
+                            label = "Rescaling factor",
+                            value = "1",
+                            min = 0,
+                            step = 100,
+                            width = "100%"
+                          )
+                        ),
+                        column(
+                          width = 3,
+                          selectInput(
+                            inputId = "RescalingColms_User",
+                            label = "Select columns to rescale:",
+                            choices = "" ,
+                            multiple = T
+                          )
+                        ) 
+                      ),
+                      DTOutput("ProteomicUser_table",width = "80%")
+                    )
+                ),
+              )
+      ),
+      ## END model integration: proteomic
+      ## BEGIN model integration: WB PCR ELISA ####
+      tabItem(
+        tabName = "WbPcrElisa_tab",
+        h2("Data harmization as initial marking into the Petri Net model "),
+        fluidRow(
+          box(
+            width = 12,
+            fluidRow(
+              column(
+                10,
+                fileInput(
+                  inputId = "IntGImport",
+                  label = "",
+                  placeholder = "Select the RDs files storing InteGreat analysises",
+                  width = "80%", 
+                  multiple = TRUE)
+              ),
+              column(
+                1,
+                actionButton( label = "Load",
+                              inputId = "LoadIntG_Button" )
+              )
+            ),
+            fluidRow(
+              column(
+                width = 10,
+                offset = 1,
+                verbatimTextOutput("LoadingError_IntG")
+              )
+            )
+          ),
+          box(
+            width = 12,
+            collapsible = T,
+            collapsed = T,
+            title = "WB analysis",
+            selectizeInput(
+              width = "50%",
+              inputId = "Selectprot_wb",
+              multiple = F,
+              options = list(maxItems = 1),
+              label = "Select the value from proteomic:",
+              choices = ""
+            ),
+            DTOutput("Tab_IntG_wb")
+          ),
+          box(
+            width = 12,
+            collapsible = T,
+            collapsed = T,
+            title = "RT-qPCR analysis",
+            selectizeInput(
+              width = "50%",
+              inputId = "SelectGene",
+              multiple = F,
+              options = list(maxItems = 1),
+              label = "Select the gene of interest:",
+              choices = ""
+            ),
+            uiOutput("tables_IntG_pcr")
+          ),
+          box(
+            width = 12,
+            collapsible = T,
+            collapsed = T,
+            title = "ELISA analysis",
+            tableOutput("Tab_IntG_elisa")
+          )
+        )
+      ),
+      ## END model integration: WB PCR ELISA
+      ## BEGIN model integration: IF..etc  #######
+      tabItem( tabName = "otherData_tab",
+               h2("Other expertiments"),
+               h4("It is possible to upload an excel file with at least (i) one character column \n
+                  identifying the experiments ID, and (ii) one numeric's from which it is possible \n
+                  calculate the average that will be rescaled with the proteomic value. "),
+               fluidRow(
+                 column(
+                   10,
+                   fileInput(
+                     inputId = "OtherImport",
+                     label = "",
+                     placeholder = "Select an excel file",
+                     width = "80%", 
+                     multiple = TRUE
+                   )
+                 ),
+                 column(1,
+                        actionButton(
+                          label = "Load",
+                          inputId = "LoadOther_Button" 
+                        )
+                 )
+               ),
+               fluidRow(
+                 column(
+                   width = 10,
+                   offset = 1,
+                   verbatimTextOutput("LoadingError_Other")
+                 ),  
+                 column(
+                   width = 10,
+                   offset = 1,
+                   selectizeInput(
+                     width = "50%",
+                     inputId = "Selectprot_other",
+                     multiple = F,
+                     options = list(maxItems = 1),
+                     label = "Select the value from proteomic:",
+                     choices = ""
+                   )
+                 ),
+                 box(
+                   width = 12,
+                   title = "Data",
+                   collapsible = T,
+                   DTOutput("Other_table",width = "80%")
+                 ),
+                 fluidRow(
+                   DTOutput("Other_tableMean",width = "80%")
+                 )
+               )
+      ),
+      ## END model integration:  
+      ######### END MODEL INTEGRATION
+      
+      ###### BEGIN DATA ANALYSIS ####
+      ## BEGIN data integration: RT-PCR  #######
       # First tab content
       tabItem(tabName = "uploadPCR",
               h2("Load RT-qPCR raw data"),
@@ -79,9 +307,11 @@ ui <- dashboardPage(
                                  label = "",
                                  placeholder = "Select an Excel file",
                                  width = "80%"),
-                       fluidRow(column(width = 10,offset = 1,
-                                       verbatimTextOutput("LoadingError_PCR")
-                       )
+                       fluidRow(
+                         column(
+                           width = 10,offset = 1,
+                           verbatimTextOutput("LoadingError_PCR")
+                         )
                        ),
                        fluidRow(
                          box(width = 12, title = "Experimental Setup:",
@@ -120,13 +350,22 @@ ui <- dashboardPage(
       # Second tab content
       tabItem(tabName = "tablesPCR",
               h2("Tables"),
+              actionButton(
+                label = "Pre-Save the analysis",
+                inputId = "savePCRButton",
+                align = "right" 
+              ),
               fluidRow(
-                box(width= 12,title = "Single gene Quantification",collapsible = TRUE,collapsed = TRUE,
+                box(width= 12,title = "Single gene Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
                     uiOutput("PCRtables")
                 )
               ),
               fluidRow(
-                box(width= 12,title = "“Normalization on Housekeeping Genes",collapsible = TRUE,collapsed = TRUE,
+                box(width= 12,title = "“Normalization on Housekeeping Genes",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
                     uiOutput("PCRtablesComp")
                 )
               )
@@ -140,22 +379,104 @@ ui <- dashboardPage(
                 )
               )
       ),
-      ## WB 
+      ## END data analysis:  RT-PCR 
+      
+      ## BEGIN data analysis: ELISA  #######
+      tabItem(
+        tabName = "uploadELISA",
+        h2("Load ELISA data"),
+        fluidRow(
+          box(
+            width = 12,
+            fluidRow(
+              column(
+                10,
+                fileInput(
+                  inputId = "ELISAImport",
+                  label = "",
+                  placeholder = "Select an Excel file.",
+                  width = "80%", 
+                  multiple = TRUE
+                )
+              ),
+              actionButton(
+                label = "Load",
+                inputId = "LoadELISA_Button"
+              )
+            ),
+            fluidRow(
+              column(
+                width = 10,offset = 1,
+                verbatimTextOutput("LoadingError_ELISA")
+              )
+            )
+          )
+        ),
+        fluidRow(
+          box(width = 12, title = "ELISA matrix:",
+              column(width = 6,
+                     DTOutput("ELISAmatrix")
+              ),
+              column(width = 6,
+                     selectizeInput("ELISAcell_EXP",
+                                    label = "Experiments:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     textInput("ELISAcell_TIME",label = "Time:",value = "")
+              )
+          ),
+          plotOutput("ELISAinitplots")
+        )
+      ),
+      # Second tab content
+      tabItem(tabName = "tablesELISA",
+              h2("Tables"),
+              fluidRow(
+                actionButton(
+                  label = "Pre-Save the analysis",
+                  inputId = "saveElisaButton",
+                  align = "right" 
+                ),
+                box(width= 12,
+                    title = "Select a baseline for the following experiment replicants",
+                    collapsible = TRUE,
+                    collapsed = FALSE,
+                    uiOutput("ElisaBaselineSelection"),
+                    actionButton(
+                      label = "Average calculation",
+                      inputId = "MeanCalcELISA_Button",
+                      align = "center" 
+                    ),
+                ),
+                box(width= 12,
+                    title = "Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    DTOutput("ELISAtables"),
+                    plotOutput("ELISAplots")
+                )
+              )
+      ),
+      ## END data analysis: ELISA
+      ## BEGIN data analysis: WB  #######
       # First tab content
       tabItem(tabName = "uploadIm",
               h2("Loading Image"),
               fluidRow(
                 column(9,
-                       fileInput(inputId = "imImport",
-                                 label = "",
-                                 placeholder = "Select a tif file",
-                                 width = "90%")
+                       fileInput(
+                         inputId = "imImport",
+                         label = "",
+                         placeholder = "Select a tif file",
+                         width = "90%"
+                       )
                 ),
                 column(2,
-                       actionButton( label = "Load",
-                                     width = "100%",
-                                     inputId = "LoadingTif" )
-                       
+                       actionButton( 
+                         label = "Load",
+                         width = "100%",
+                         inputId = "LoadingTif"
+                       )
                 ),
                 tags$style(type='text/css', "#LoadingTif { width:100%; margin-top: 20px;}")
               ),
@@ -190,7 +511,7 @@ ui <- dashboardPage(
                 )
               )
       ),
-      #   # Third tab content
+      ## Third tab content
       tabItem(tabName = "grey",
               h2("Signal Profiles"),
               fluidRow(
@@ -250,18 +571,19 @@ ui <- dashboardPage(
                 box( width = 6,
                      title = tagList(shiny::icon("gear"), "Set the WB analysis as normalizer"),
                      column(9,
-                            fileInput(inputId = "NormWBImport",
-                                      label = "",
-                                      placeholder = "Select an WB RData file",
-                                      width = "90%"
+                            fileInput(
+                              inputId = "NormWBImport",
+                              label = "",
+                              placeholder = "Select an WB RData file",
+                              width = "90%"
                             )
                      ),
                      column(2,
-                            actionButton( label = "Load",
-                                          width = "100%",
-                                          inputId = "actionB_loadingNormWB"
+                            actionButton(
+                              label = "Load",
+                              width = "100%",
+                              inputId = "actionB_loadingNormWB"
                             )
-                            
                      ),
                      tags$style(type='text/css',
                                 "#actionB_loadingNormWB { width:100%; margin-top: 20px;}"
@@ -277,7 +599,7 @@ ui <- dashboardPage(
                        column(
                          width = 10,
                          offset = 1,
-                         tableOutput('AUC_WBnorm')
+                         DTOutput('AUC_WBnorm')
                        )
                      )
                 ),
@@ -295,7 +617,6 @@ ui <- dashboardPage(
                                           width = "100%",
                                           inputId = "actionB_loadingWB"
                             )
-                            
                      ),
                      tags$style(type='text/css',
                                 "#actionB_loadingWB { width:100%; margin-top: 20px;}"
@@ -311,17 +632,32 @@ ui <- dashboardPage(
                        column(
                          width = 10,
                          offset = 1,
-                         tableOutput('AUC_WB')
+                         DTOutput('AUC_WB')
                        )
                      )
                 )
               ),
               box( width = 12,
-                   title = tagList(shiny::icon("gear"), "WB quantification")
+                   title = tagList(shiny::icon("gear"), "WB quantification"),
+                   actionButton(
+                     label = "Pre-Save the analysis",
+                     inputId = "saveWBButton",
+                     align = "right" 
+                   ),
+                   fluidRow(
+                     column(
+                       width = 10,
+                       offset = 1,
+                       DTOutput('AUC_rapp')
+                     )
+                   )
               )
       )
     )
+    ## END data analysis: WB
+    ###### END DATA ANALYSIS ####
   )
+  
 )
 
 
