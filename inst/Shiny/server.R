@@ -258,6 +258,10 @@ server <- function(input, output, session) {
       {
         NumberOfPlanes$N = NumberOfPlanes$N + 1
         if(NumberOfPlanes$N > 1){
+          # we set the same height in the new panel
+          vals$ymax = prev_vals$ymax
+          vals$ymin = prev_vals$ymin
+          
           newH = vals$ymax - vals$ymin
           newW = vals$xmax - vals$xmin
           prevH = prev_vals$ymax - prev_vals$ymin
@@ -301,8 +305,8 @@ server <- function(input, output, session) {
     }
     
     paste0(
-      "hover: ", xy_str(input$plot_hover),
-      "brush: ", xy_range_str(input$plot_brush)
+      "Mouse hover: ", xy_str(input$plot_hover),
+      "New band coordinates: ", xy_range_str(input$plot_brush)
     )
     
   })
@@ -312,7 +316,7 @@ server <- function(input, output, session) {
   },width = "100%")
   
   output$AUC <- renderTable({
-    AllResult$wbResult$AUCdf
+    AllResult$wbResult$AUCdf  %>% dplyr::select(Lane,Truncation, AUC)
   },width = "100%")
   
   observeEvent(input$GenLanes,{
@@ -656,6 +660,18 @@ server <- function(input, output, session) {
                                          CompPRC = NULL,
                                          NewPCR = NULL)
   
+  # next buttons
+  
+  observeEvent(input$NextQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "tablesPCR")
+  })
+  observeEvent(input$NextpcrPlots,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "plotsPCR")
+  })
+  #
+  
   observeEvent(input$savePCRButton,{
     AllResult$pcrResult = reactiveValuesToList(pcrResult, all.names = T) 
   })
@@ -893,6 +909,14 @@ server <- function(input, output, session) {
   #### END PCR analysis ####
   
   ### ELISA analysis ####
+  
+  # next buttons
+  observeEvent(input$NextElisaQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "tablesELISA")
+  })
+  #
+  
   elisaResult = elisaResult0 = reactiveValues(data = NULL,
                                               ELISAcell_TIME = NULL,
                                               ELISAcell_EXP = NULL,
@@ -1030,8 +1054,8 @@ server <- function(input, output, session) {
       print(cellCoo)
       print(elisaResult$ELISAcell_TIME[ cellCoo[1],cellCoo[2] ])
       print(elisaResult$ELISAcell_EXP[ cellCoo[1], cellCoo[2] ])
-      updateTextInput(inputId = "ELISAcell_TIME",
-                      value = ifelse(is.null(elisaResult$ELISAcell_TIME[cellCoo[1],cellCoo[2]]),"",elisaResult$ELISAcell_TIME[cellCoo[1],cellCoo[2]])
+      updateSelectizeInput(inputId = "ELISAcell_TIME",
+                           selected = ifelse(is.null(elisaResult$ELISAcell_TIME[cellCoo[1],cellCoo[2]]),"",elisaResult$ELISAcell_TIME[cellCoo[1],cellCoo[2]])
       )
       updateSelectizeInput(inputId = "ELISAcell_EXP",
                            selected = ifelse(is.null(elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]]),"",elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]])
@@ -1180,12 +1204,13 @@ server <- function(input, output, session) {
         filter(time != "",  exp != "") 
       
       output$ELISAinitplots <- renderPlot(
-        ggplot(elisaTot, aes(x = time, y=values, col = exp, group = exp),alpha = 1.4) +
-          geom_point() +
-          # geom_line(linetype = "dashed") +
+        ggplot(elisaTot, aes(x = time, y=values, col = exp),alpha = 1.4) +
+          #geom_boxplot(aes(fill= exp, group = time),alpha = 0.4) +
+          geom_point(aes(group = exp)) +
           scale_color_manual(values = FlagsELISA$EXPcol) + 
+          #scale_fill_manual(values = FlagsELISA$EXPcol) + 
           theme_bw()+
-          labs(x = "Times", y = "Values", col = "Exp")+
+          labs(x = "Times", y = "Values", col = "Exp",fill = "Exp")+
           theme(legend.position = c(0, 1), 
                 legend.justification = c(0, 1),
                 legend.direction = "vertical",
@@ -1220,21 +1245,28 @@ server <- function(input, output, session) {
         rename(BaseValues = values)
       
       elisaTot = merge(elisaTot,MapBaseline, by.x = c("exp","time"), by.y = c("Exp","time"))
-      
+      print(elisaTot)
       if(length(elisaTot[,1]) != 0 ){
         elisamean = elisaTot %>%
-          group_by(exp,time) %>%
-          dplyr::summarise(MeanV = mean(values)/BaseValues * 100,
-                           MedianV = median(values)/BaseValues * 100 ) %>%
-          na.omit()
+          ungroup()%>%
+          dplyr::select(Baseline,BaseValues,exp,values,time) %>%
+          group_by(exp,time,Baseline) %>%
+          dplyr::summarise(MeanExperiment = mean(values),
+                           MeanBaseline = mean(BaseValues),
+                           Quantification = MeanV/MeanB * 100) %>%
+          na.omit() %>%
+          ungroup() %>%
+          rename(Experiment = exp,Time = time)
         
         output$ELISAtables = renderDT(elisamean)
         
         output$ELISAplots = renderPlot(
           elisamean%>%
-            ggplot()+
-            geom_line(aes(x = time, y = MeanV, col=exp,group = exp))+
-            theme_bw()
+            ggplot(aes(x = Time, y = Quantification, col=Experiment,group = Experiment))+
+            geom_point()+
+            geom_line()+
+            theme_bw()+
+            labs(x = "Time", y = "Quantifications")
         )
       }else{
         output$ELISAtables = renderDT(data.frame(Error = "No baseline is associated with the experiment replicants, or the time do not match!"))
@@ -1244,7 +1276,27 @@ server <- function(input, output, session) {
     }
     
   })
-  
+ 
+  observeEvent(input$ResetBaselinesELISA_Button, {
+    
+    if(!is.null(elisaResult$MapBaseline)){
+      expToselect = FlagsELISA$expToselect
+      print(expToselect)
+      output$ElisaBaselineSelection <- renderUI({
+        select_output_list <- lapply(expToselect, function(i) {
+            expsel = ""
+            exp = FlagsELISA$EXPselected
+            selectInput(inputId = paste0("Exp",i),
+                      label = i,
+                      choices = c("",exp[exp!=i]),
+                      selected = expsel)
+        })
+        do.call(tagList, select_output_list)
+      })
+      }
+    
+  })
+   
   ### End ELISA analysis ####
   
   ### Proteomic ####

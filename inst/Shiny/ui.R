@@ -12,7 +12,7 @@ library(DT)
 
 ui <- dashboardPage(
   #theme = shinytheme("paper"),
-  dashboardHeader(title = "InteGreat",
+  dashboardHeader(title = "InteGREAT",
                   tags$li(a(onclick = "onclick =window.open('https://github.com/qBioTurin/InteGreat')",
                             href = NULL,
                             icon("github"),
@@ -61,7 +61,7 @@ ui <- dashboardPage(
                                   tabName = 'wb',
                                   menuSubItem("Upload Image", tabName = "uploadIm"),
                                   menuSubItem("Protein Bands", tabName = "plane"),
-                                  menuSubItem("Lanes", tabName = "grey"),
+                                  menuSubItem("Profile Plots", tabName = "grey"),
                                   menuSubItem("Quantification", tabName = "quantification")
                          ),
                          menuItem('RT-qPCR analysis',
@@ -76,7 +76,7 @@ ui <- dashboardPage(
                                   menuSubItem("Quantification", tabName = "tablesELISA")
                          )
                 ),
-                menuItem('Model integration',
+                menuItem('Model Integration',
                          tabName = 'integ',
                          menuSubItem("Proteomic Data", tabName = "Proteomic_tab"),
                          menuSubItem("WB,RT-qPCR,ELISA ", tabName = "WbPcrElisa_tab"),
@@ -89,7 +89,24 @@ ui <- dashboardPage(
       ## HOME
       tabItem(
         tabName = "Home",
-        h2("Super Package for different data analysis!!!!")
+        h1("InteGreat"),
+        h2(em("A framework for cellular biology data analysis and integration for computational modelling.")),
+        h4("The InteGreat workflow provides an exhaustive platform where scientists
+	          can experience the discovery process from the analysis of a single datum to
+	          the creation of a complex computational model."),
+        h4("InteGreat consists of two modules:"),
+        tags$ol(
+          tags$li(
+            h4("The ", strong("Data Analysis module"), "includes tools specifically developed or adapted for the elaboration
+           of raw Western Blot (WB), Reverse Transcription-quantitative PCR (RT-qPCR) and Enzyme-Linked ImmunoSorbent Assay (ELISA) experiments.")
+          ),
+          tags$li(
+            h4("The ",strong("Model Integration module"),"supports scientists in the process of integration of lab data resulting from any type of experiment into a computational model.")
+          )
+        ),
+        h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the InteGreat framework, or ",
+              a("here", href="https://www.google.com/"),"to download the user guide.")),
+        p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
       ),
       ###### BEGIN MODEL INTEGRATION ####
       ## BEGIN model integration: proteomic ####
@@ -124,6 +141,7 @@ ui <- dashboardPage(
                       column(1,
                              actionButton(
                                label = "Load",
+                               icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
                                inputId = "LoadProt_Button" 
                              )
                       ),
@@ -188,7 +206,8 @@ ui <- dashboardPage(
               ),
               column(
                 1,
-                actionButton( label = "Load",
+                actionButton( label = "Load",style = "margin-top: 20px;",
+                              icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
                               inputId = "LoadIntG_Button" )
               )
             ),
@@ -246,30 +265,38 @@ ui <- dashboardPage(
                h4("It is possible to upload an excel file with at least (i) one character column \n
                   identifying the experiments ID, and (ii) one numeric's from which it is possible \n
                   calculate the average that will be rescaled with the proteomic value. "),
-               fluidRow(
-                 column(
-                   10,
-                   fileInput(
-                     inputId = "OtherImport",
-                     label = "",
-                     placeholder = "Select an excel file",
-                     width = "80%", 
-                     multiple = TRUE
+               
+               box(
+                 width = 12,
+                 fluidRow(
+                   column(
+                     8,
+                     fileInput(
+                       inputId = "OtherImport",
+                       label = "",
+                       placeholder = "Select an excel file",
+                       width = "100%", 
+                       multiple = TRUE
+                     )
+                   ),
+                   column(
+                     1,
+                     actionButton(
+                       label = "Load",style = "margin-top: 20px;",
+                       icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                       inputId = "LoadOther_Button" 
+                     )
                    )
                  ),
-                 column(1,
-                        actionButton(
-                          label = "Load",
-                          inputId = "LoadOther_Button" 
-                        )
+                 fluidRow(
+                   column(
+                     width = 10,
+                     offset = 1,
+                     verbatimTextOutput("LoadingError_Other")
+                   )
                  )
                ),
-               fluidRow(
-                 column(
-                   width = 10,
-                   offset = 1,
-                   verbatimTextOutput("LoadingError_Other")
-                 ),  
+               fluidRow(  
                  column(
                    width = 10,
                    offset = 1,
@@ -307,66 +334,84 @@ ui <- dashboardPage(
                                  label = "",
                                  placeholder = "Select an Excel file",
                                  width = "80%"),
-                       fluidRow(
-                         column(
-                           width = 10,offset = 1,
-                           verbatimTextOutput("LoadingError_PCR")
-                         )
-                       ),
-                       fluidRow(
-                         box(width = 12, title = "Experimental Setup:",
-                             column(width = 6,
-                                    selectizeInput(
-                                      inputId = "selectPCRcolumns",
-                                      label = "Select the columns to assign \n
-                                      the Gene, Sample, Value names (in order):",
-                                      choices = c(""),
-                                      selected = "",
-                                      multiple = TRUE,
-                                      options = list(maxItems = 3),
-                                      width = "99%"
-                                    ),
-                                    tableOutput("PCRpreview")
-                             ),
-                             column(width = 3,
-                                    checkboxGroupInput(inputId = "PCRnorm",
-                                                       "Select housekeeping genes:")
-                             ),
-                             column(width = 3,
-                                    selectInput(inputId = "PCRbaseline",
-                                                label = "Select control sample:",
-                                                choices = "ID" )
-                             ) 
-                         )
-                       )
-                       
                 ),
                 column(1,
+                       style = "margin-top: 20px;",
                        actionButton( label = "Load",
-                                     inputId = "LoadPCR_Button" )
+                                     icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                                     inputId = "LoadPCR_Button")
+                )
+              ),
+              fluidRow(
+                column(
+                  width = 10,offset = 1,
+                  verbatimTextOutput("LoadingError_PCR")
+                )
+              ),
+              fluidRow(
+                box(width = 12, title = "Experimental Setup:",
+                    column(width = 6,
+                           selectizeInput(
+                             inputId = "selectPCRcolumns",
+                             label = "Select the columns to assign \n
+                                      the Gene, Sample, Value names (in order):",
+                             choices = c(""),
+                             selected = "",
+                             multiple = TRUE,
+                             options = list(maxItems = 3),
+                             width = "99%"
+                           ),
+                           tableOutput("PCRpreview")
+                    ),
+                    column(width = 3,
+                           checkboxGroupInput(inputId = "PCRnorm",
+                                              "Select housekeeping genes:")
+                    ),
+                    column(width = 3,
+                           selectInput(inputId = "PCRbaseline",
+                                       label = "Select control sample:",
+                                       choices = "ID" )
+                    ),
+                    column(width = 3,offset = 9,
+                           actionButton(inputId = "NextQuantif",
+                                        label = 'Proceed to Quantification',
+                                        align = "right",
+                                        icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
+                    )
                 )
               )
       ),
       # Second tab content
       tabItem(tabName = "tablesPCR",
-              h2("Tables"),
-              actionButton(
-                label = "Pre-Save the analysis",
-                inputId = "savePCRButton",
-                align = "right" 
-              ),
+              h2("Output"),
               fluidRow(
-                box(width= 12,title = "Single gene Quantification",
+                box(width= 12,title = "Single Gene Quantification",
                     collapsible = TRUE,
                     collapsed = TRUE,
                     uiOutput("PCRtables")
                 )
               ),
               fluidRow(
-                box(width= 12,title = "“Normalization on Housekeeping Genes",
+                box(width= 12,title = "Normalization on Housekeeping Genes",
                     collapsible = TRUE,
                     collapsed = TRUE,
                     uiOutput("PCRtablesComp")
+                )
+              ),
+              fluidRow(
+                column(width = 1,offset = 7,
+                       actionButton(inputId = "NextpcrPlots",
+                                    label = 'Proceed to Plots',
+                                    align = "right",
+                                    icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
+                ),
+                column(width = 1,offset = 1,
+                       actionButton(
+                         label = "Pre-Save the analysis",
+                         inputId = "savePCRButton",
+                         align = "right",
+                         icon = shiny::icon("save") 
+                       )
                 )
               )
       ),
@@ -390,18 +435,21 @@ ui <- dashboardPage(
             width = 12,
             fluidRow(
               column(
-                10,
+                8,
                 fileInput(
                   inputId = "ELISAImport",
                   label = "",
                   placeholder = "Select an Excel file.",
-                  width = "80%", 
+                  width = "100%", 
                   multiple = TRUE
                 )
               ),
-              actionButton(
-                label = "Load",
-                inputId = "LoadELISA_Button"
+              column(1,style = "margin-top: 20px;",
+                     actionButton(
+                       label = "Load",
+                       icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                       inputId = "LoadELISA_Button"
+                     )
               )
             ),
             fluidRow(
@@ -413,16 +461,27 @@ ui <- dashboardPage(
           )
         ),
         fluidRow(
-          box(width = 12, title = "ELISA matrix:",
+          box(width = 12,
+              title = "Assign experimental information to values:",
               column(width = 6,
                      DTOutput("ELISAmatrix")
               ),
               column(width = 6,
                      selectizeInput("ELISAcell_EXP",
-                                    label = "Experiments:",
+                                    label = "Experimental condition:",
                                     choices = "",
                                     options = list(create = TRUE)),
-                     textInput("ELISAcell_TIME",label = "Time:",value = "")
+                     selectizeInput("ELISAcell_TIME",label = "Time:",
+                                    choices = "",
+                                    options = list(create = TRUE))
+              ),
+              fluidRow(
+                column(width = 1,offset = 9,
+                       actionButton(inputId = "NextElisaQuantif",
+                                    label = 'Proceed to Quantification',
+                                    align = "right",
+                                    icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
+                )
               )
           ),
           plotOutput("ELISAinitplots")
@@ -430,24 +489,30 @@ ui <- dashboardPage(
       ),
       # Second tab content
       tabItem(tabName = "tablesELISA",
-              h2("Tables"),
+              h2("Output"),
               fluidRow(
-                actionButton(
-                  label = "Pre-Save the analysis",
-                  inputId = "saveElisaButton",
-                  align = "right"
-                ),
                 tags$head(tags$script(src = "message-handler.js")),
                 box(width= 12,
                     title = "Select a baseline for the following experiment replicants",
                     collapsible = TRUE,
                     collapsed = FALSE,
                     uiOutput("ElisaBaselineSelection"),
-                    actionButton(
-                      label = "Average calculation",
-                      inputId = "MeanCalcELISA_Button",
-                      align = "center" 
-                    ),
+                    fluidRow(
+                      column(1,
+                             actionButton(
+                               label = "Average calculation",
+                               inputId = "MeanCalcELISA_Button",
+                               align = "center" 
+                             )
+                      ),
+                      column(1,offset =1,
+                             actionButton(
+                               label = "Reset",
+                               inputId = "ResetBaselinesELISA_Button",
+                               align = "center" 
+                             )
+                      )
+                    )
                 ),
                 box(width= 12,
                     title = "Quantification",
@@ -456,13 +521,23 @@ ui <- dashboardPage(
                     DTOutput("ELISAtables"),
                     plotOutput("ELISAplots")
                 )
+              ),
+              fluidRow(
+                column(width = 1,offset = 9,
+                       actionButton(
+                         label = "Pre-Save the analysis",
+                         inputId = "saveElisaButton",
+                         align = "right",
+                         icon = shiny::icon("save")
+                       )
+                )
               )
       ),
       ## END data analysis: ELISA
       ## BEGIN data analysis: WB  #######
       # First tab content
       tabItem(tabName = "uploadIm",
-              h2("Loading Image"),
+              h2("Upload Image"),
               fluidRow(
                 column(9,
                        fileInput(
@@ -491,7 +566,7 @@ ui <- dashboardPage(
       ),
       # Second tab content
       tabItem(tabName = "plane",
-              h2("Select protein bands"),
+              h2("Select Protein Bands"),
               fluidRow(
                 box( width = 12,
                      plotOutput("TifPlot2",width="100%",
@@ -501,13 +576,13 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box( width = 6,
-                     title = tagList(shiny::icon("gear"), "Protein bands"),
+                     title = tagList(shiny::icon("gear", verify_fa = FALSE), "Protein Band Selection Coordinates"),
                      tableOutput("PlanesStructureTable")
                 ),
                 box( width = 6,
-                     actionButton(inputId = "panelSelect_button", label = "Select protein band"),
-                     actionButton(inputId = "ResetPan", label = 'Reset protein bands'),
-                     actionButton(inputId = "GenLanes", label = 'Generate lanes'),
+                     actionButton(inputId = "panelSelect_button", label = "Select Protein Bands"),
+                     actionButton(inputId = "ResetPan", label = 'Reset Protein Bands'),
+                     actionButton(inputId = "GenLanes", label = 'Generate Plots'),
                      verbatimTextOutput("rectCoordOutput")
                 )
               )
@@ -569,13 +644,8 @@ ui <- dashboardPage(
       tabItem(tabName = "quantification",
               h2("WB quantification"),
               fluidRow(
-                actionButton(
-                  label = "Pre-Save the analysis",
-                  inputId = "saveWBButton",
-                  align = "right" 
-                ),
                 box( width = 6,
-                     title = tagList(shiny::icon("gear"), "Set the WB analysis as normalizer"),
+                     title = tagList(shiny::icon("gear", verify_fa = FALSE), "Set the WB analysis as normalizer"),
                      column(9,
                             fileInput(
                               inputId = "NormWBImport",
@@ -587,6 +657,7 @@ ui <- dashboardPage(
                      column(2,
                             actionButton(
                               label = "Load",
+                              icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
                               width = "100%",
                               inputId = "actionB_loadingNormWB"
                             )
@@ -610,7 +681,8 @@ ui <- dashboardPage(
                      )
                 ),
                 box( width = 6,
-                     title = tagList(shiny::icon("gear"), "Set the WB analysis to normalize"),
+                     title = tagList(shiny::icon("gear", verify_fa = FALSE),
+                                     "Set the WB analysis to normalize"),
                      column(9,
                             fileInput(inputId = "WBImport",
                                       label = "",
@@ -620,6 +692,7 @@ ui <- dashboardPage(
                      ),
                      column(2,
                             actionButton( label = "Load",
+                                          icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
                                           width = "100%",
                                           inputId = "actionB_loadingWB"
                             )
@@ -644,7 +717,7 @@ ui <- dashboardPage(
                 )
               ),
               box( width = 12,
-                   title = tagList(shiny::icon("gear"), "WB quantification"),
+                   title = tagList(shiny::icon("gear", verify_fa = FALSE), "WB quantification"),
                    fluidRow(
                      column(
                        width = 10,
@@ -652,6 +725,16 @@ ui <- dashboardPage(
                        DTOutput('AUC_rapp')
                      )
                    )
+              ),
+              fluidRow(
+                column(width = 1, offset = 9,
+                       actionButton(
+                         label = "Pre-Save the analysis",
+                         inputId = "saveWBButton",
+                         align = "right",
+                         icon = shiny::icon("save")
+                       )
+                )
               )
       )
     )
