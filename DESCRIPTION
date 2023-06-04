@@ -1,10 +1,13 @@
 Package: InteGreat
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: InteGreat: a framework for cellular biology data analysis and integration for computational modelling
+Version: 1.0
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
+    c(person("Simone", "Pernice", , "simone.pernice@unito.it", role = c("cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID")),
+    person("Dora", "Tortarolo", , "dora.tortarolo@unito.it", role = c("aut"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+           )
+Description: The InteGreat workflow provides an exhaustive platform where scientists can experience the discovery process from the analysis of a single datum to the creation of a complex computational model.
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
     license
 Encoding: UTF-8

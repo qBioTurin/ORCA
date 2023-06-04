@@ -1,20 +1,21 @@
-#' @title Run display data
-#' @description ....
+#' @title Run InteGreat
+#' @description function to lunch the InteGreat shiny application.
 #'
 #' @param 
 #'
-#' @author Pernice Simone
-#' @import shiny zoo knitr ggplot2 shinythemes OpenImageR dplyr
+#' @author Pernice Simone Tortarolo Dora
+#' @import ggplot2 shinydashboard shinyWidgets shiny dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl DT shinyjs
 #' 
 #' @examples
 #'\dontrun{
-#' displayGel()
+#' InteGreat.run()
 #' }
 #' @export
-displayGel <-function()
+
+InteGreat.run <-function()
 {
   x = T
   runApp(
-    appDir = system.file("Shiny", package = "GelAnalyser")
+    appDir = system.file("Shiny", package = "InteGreat")
   )
 }
