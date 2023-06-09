@@ -81,8 +81,8 @@ ui <- dashboardPage(
                          tabName = 'integ',
                          icon = icon('fa-regular fa-inboxes',verify_fa = FALSE),
                          menuSubItem("Omics Data", tabName = "Omics_tab"),
-                         menuSubItem("WB,RT-qPCR,ELISA ", tabName = "WbPcrElisa_tab"),
-                         menuSubItem("IF,.. ", tabName = "otherData_tab")
+                         menuSubItem("WB, RT-qPCR, ELISA ", tabName = "WbPcrElisa_tab"),
+                         menuSubItem("IF, and other data ", tabName = "otherData_tab")
                 ),
                 menuItem('Load analysis',
                          tabName = 'LoadAnalysis',
