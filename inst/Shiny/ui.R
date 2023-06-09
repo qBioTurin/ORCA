@@ -57,6 +57,7 @@ ui <- dashboardPage(
                 ),
                 menuItem("Data Analysis",
                          tabName = 'DataAnaslysis',
+                         icon = icon('fa-regular fa-magnifying-glass-chart',verify_fa = FALSE),
                          menuItem('Western Blot analysis',
                                   tabName = 'wb',
                                   menuSubItem("Upload Image", tabName = "uploadIm"),
@@ -78,15 +79,20 @@ ui <- dashboardPage(
                 ),
                 menuItem('Model Integration',
                          tabName = 'integ',
-                         menuSubItem("Proteomic Data", tabName = "Proteomic_tab"),
+                         icon = icon('fa-regular fa-inboxes',verify_fa = FALSE),
+                         menuSubItem("Omics Data", tabName = "Omics_tab"),
                          menuSubItem("WB,RT-qPCR,ELISA ", tabName = "WbPcrElisa_tab"),
                          menuSubItem("IF,.. ", tabName = "otherData_tab")
+                ),
+                menuItem('Load analysis',
+                         tabName = 'LoadAnalysis',
+                         icon = icon('fa-light fa-upload',verify_fa = FALSE)
                 )
-                
-    )),
+    )
+  ),
   dashboardBody(
     tabItems(
-      ## HOME
+      ## HOME ####
       tabItem(
         tabName = "Home",
         h1("InteGreat"),
@@ -108,13 +114,45 @@ ui <- dashboardPage(
               a("here", href="https://www.google.com/"),"to download the user guide.")),
         p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
       ),
+      
+      ###### BEGIN LOAD ANALYSIS ####
+      tabItem(tabName = "LoadAnalysis",
+              h2("Load analysis"),
+              box(
+                width = 12,
+                fluidRow(
+                  column(
+                    10,
+                    fileInput(
+                      inputId = "loadAnalysis_file",
+                      label = "",
+                      placeholder = "Select the RDs files storing InteGreat analyses",
+                      width = "80%", 
+                      multiple = TRUE)
+                  ),
+                  column(
+                    1,
+                    actionButton( label = "Load",style = "margin-top: 20px;",
+                                  icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                                  inputId = "loadAnalysis_Button" )
+                  )
+                ),
+                fluidRow(
+                  column(
+                    width = 10,
+                    offset = 1,
+                    verbatimTextOutput("loadAnalysis_Error")
+                  )
+                )
+              )
+      ),
       ###### BEGIN MODEL INTEGRATION ####
-      ## BEGIN model integration: proteomic ####
-      tabItem(tabName = "Proteomic_tab",
-              h2("Proteomic data"),
+      ## BEGIN model integration: Omics ####
+      tabItem(tabName = "Omics_tab",
+              h2("Omics data"),
               fluidRow(
                 box(width = 12,
-                    title = "Proteomic from literature",
+                    title = "Omics data from literature",
                     collapsible = T,
                     numericInput(inputId = "InputDefault_rescaling",
                                  label = "Rescaling factor",
@@ -122,10 +160,10 @@ ui <- dashboardPage(
                                  min = 0,
                                  step = 100,
                                  width = "10%"),
-                    DTOutput("ProteomicDefault_table",width = "90%")
+                    DTOutput("OmicsDefault_table",width = "90%")
                 ),
                 box(width = 12,
-                    title = "User Proteomic Data",
+                    title = "User Omics Data",
                     collapsible = T,
                     collapsed = T,
                     fluidRow(
@@ -181,16 +219,16 @@ ui <- dashboardPage(
                           )
                         ) 
                       ),
-                      DTOutput("ProteomicUser_table",width = "80%")
+                      DTOutput("OmicsUser_table",width = "80%")
                     )
                 ),
               )
       ),
-      ## END model integration: proteomic
+      ## END model integration: Omics
       ## BEGIN model integration: WB PCR ELISA ####
       tabItem(
         tabName = "WbPcrElisa_tab",
-        h2("Data harmization as initial marking into the Petri Net model "),
+        h2("Data harmonization as initial marking into the Petri Net model "),
         fluidRow(
           box(
             width = 12,
@@ -200,7 +238,7 @@ ui <- dashboardPage(
                 fileInput(
                   inputId = "IntGImport",
                   label = "",
-                  placeholder = "Select the RDs files storing InteGreat analysises",
+                  placeholder = "Select the RDs files storing InteGreat analyses",
                   width = "80%", 
                   multiple = TRUE)
               ),
@@ -229,7 +267,7 @@ ui <- dashboardPage(
               inputId = "Selectprot_wb",
               multiple = F,
               options = list(maxItems = 1),
-              label = "Select the value from proteomic:",
+              label = "Select the molecule from the omics dataset:",
               choices = ""
             ),
             DTOutput("Tab_IntG_wb")
@@ -264,7 +302,7 @@ ui <- dashboardPage(
                h2("Other expertiments"),
                h4("It is possible to upload an excel file with at least (i) one character column \n
                   identifying the experiments ID, and (ii) one numeric's from which it is possible \n
-                  calculate the average that will be rescaled with the proteomic value. "),
+                  calculate the average that will be rescaled with the omics value. "),
                
                box(
                  width = 12,
@@ -305,7 +343,7 @@ ui <- dashboardPage(
                      inputId = "Selectprot_other",
                      multiple = F,
                      options = list(maxItems = 1),
-                     label = "Select the value from proteomic:",
+                     label = "Select the molecule from the omics dataset:",
                      choices = ""
                    )
                  ),
@@ -351,15 +389,23 @@ ui <- dashboardPage(
               fluidRow(
                 box(width = 12, title = "Experimental Setup:",
                     column(width = 6,
-                           selectizeInput(
-                             inputId = "selectPCRcolumns",
-                             label = "Select the columns to assign \n
-                                      the Gene, Sample, Value names (in order):",
-                             choices = c(""),
-                             selected = "",
-                             multiple = TRUE,
-                             options = list(maxItems = 3),
-                             width = "99%"
+                           h2("Select the columns to assign"),
+                           fluidRow(
+                             column(width = 4,
+                                    selectInput(inputId = "PCR_gene",
+                                                label = "Gene names:",
+                                                choices = "" )
+                             ),
+                             column(width = 4,
+                                    selectInput(inputId = "PCR_sample",
+                                                label = "Sample names:",
+                                                choices = "" )
+                             ),
+                             column(width = 4,
+                                    selectInput(inputId = "PCR_value",
+                                                label = "Value names:",
+                                                choices = "" )
+                             )
                            ),
                            tableOutput("PCRpreview")
                     ),
@@ -406,12 +452,11 @@ ui <- dashboardPage(
                                     icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
                 ),
                 column(width = 1,offset = 1,
-                       actionButton(
-                         label = "Pre-Save the analysis",
-                         inputId = "savePCRButton",
-                         align = "right",
-                         icon = shiny::icon("save") 
-                       )
+                       downloadButton( label = "Download the analysis", 
+                                       outputId = "downloadButton_PCR",
+                                       #href = "Results.RData",
+                                       #download = "Results.RData",
+                                       icon = icon("download") )
                 )
               )
       ),
@@ -473,7 +518,10 @@ ui <- dashboardPage(
                                     options = list(create = TRUE)),
                      selectizeInput("ELISAcell_TIME",label = "Time:",
                                     choices = "",
-                                    options = list(create = TRUE))
+                                    options = list(create = TRUE)),
+                     checkboxGroupInput(inputId = "ELISA_baselines",
+                                        "Select baselines:")
+                     
               ),
               fluidRow(
                 column(width = 1,offset = 9,
@@ -496,23 +544,7 @@ ui <- dashboardPage(
                     title = "Select a baseline for the following experiment replicants",
                     collapsible = TRUE,
                     collapsed = FALSE,
-                    uiOutput("ElisaBaselineSelection"),
-                    fluidRow(
-                      column(1,
-                             actionButton(
-                               label = "Average calculation",
-                               inputId = "MeanCalcELISA_Button",
-                               align = "center" 
-                             )
-                      ),
-                      column(1,offset =1,
-                             actionButton(
-                               label = "Reset",
-                               inputId = "ResetBaselinesELISA_Button",
-                               align = "center" 
-                             )
-                      )
-                    )
+                    uiOutput("ElisaBaselineSelection")
                 ),
                 box(width= 12,
                     title = "Quantification",
@@ -524,12 +556,11 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 column(width = 1,offset = 9,
-                       actionButton(
-                         label = "Pre-Save the analysis",
-                         inputId = "saveElisaButton",
-                         align = "right",
-                         icon = shiny::icon("save")
-                       )
+                       downloadButton( label = "Download the analysis", 
+                                       outputId = "downloadButton_ELISA",
+                                       #href = "Results.RData",
+                                       #download = "Results.RData",
+                                       icon = icon("download") )
                 )
               )
       ),
@@ -632,11 +663,11 @@ ui <- dashboardPage(
                     tableOutput('AUC'),
                     actionButton( label = "Reset all", 
                                   inputId = "actionButton_ResetPlanes"),
-                    downloadButton( label = "Save the analysis", 
-                                    outputId = "downloadButton_saveRes",
+                    downloadButton( label = "Download the analysis", 
+                                    outputId = "downloadButton_WB",
                                     #href = "Results.RData",
                                     #download = "Results.RData",
-                                    icon = icon("save") )
+                                    icon = icon("download") )
                 )
               )
       ),
@@ -650,7 +681,7 @@ ui <- dashboardPage(
                             fileInput(
                               inputId = "NormWBImport",
                               label = "",
-                              placeholder = "Select an WB RData file",
+                              placeholder = "Select an WB RDs file generated through the Profile Plots step",
                               width = "90%"
                             )
                      ),
@@ -686,7 +717,7 @@ ui <- dashboardPage(
                      column(9,
                             fileInput(inputId = "WBImport",
                                       label = "",
-                                      placeholder = "Select an WB RData file",
+                                      placeholder = "Select an WB RDs file generated through the Profile Plots step",
                                       width = "90%"
                             )
                      ),
@@ -728,11 +759,11 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 column(width = 1, offset = 9,
-                       actionButton(
-                         label = "Pre-Save the analysis",
-                         inputId = "saveWBButton",
-                         align = "right",
-                         icon = shiny::icon("save")
+                       downloadButton( label = "Download the analysis", 
+                                       outputId = "downloadButton_WBquant",
+                                       #href = "Results.RData",
+                                       #download = "Results.RData",
+                                       icon = icon("download") 
                        )
                 )
               )
