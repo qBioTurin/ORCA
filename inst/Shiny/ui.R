@@ -429,7 +429,7 @@ ui <- dashboardPage(
       ),
       # Second tab content
       tabItem(tabName = "tablesPCR",
-              h2("Output"),
+              h2("Quantification"),
               fluidRow(
                 box(width= 12,title = "Single Gene Quantification",
                     collapsible = TRUE,
@@ -537,11 +537,11 @@ ui <- dashboardPage(
       ),
       # Second tab content
       tabItem(tabName = "tablesELISA",
-              h2("Output"),
+              h2("Quantification"),
               fluidRow(
                 tags$head(tags$script(src = "message-handler.js")),
                 box(width= 12,
-                    title = "Select a baseline for the following experiment replicants",
+                    title = "Select a baseline for the following experimental conditions",
                     collapsible = TRUE,
                     collapsed = FALSE,
                     uiOutput("ElisaBaselineSelection")
@@ -667,7 +667,11 @@ ui <- dashboardPage(
                                     outputId = "downloadButton_WB",
                                     #href = "Results.RData",
                                     #download = "Results.RData",
-                                    icon = icon("download") )
+                                    icon = icon("download") ),
+                    actionButton(inputId = "NextWBQuantif",
+                                 label = 'Proceed to Quantification',
+                                 align = "right",
+                                 icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
                 )
               )
       ),
@@ -677,6 +681,7 @@ ui <- dashboardPage(
               fluidRow(
                 box( width = 6,
                      title = tagList(shiny::icon("gear", verify_fa = FALSE), "Set the WB analysis as normalizer"),
+                     h5("To remove the not necessary rows just clicking on it."),
                      column(9,
                             fileInput(
                               inputId = "NormWBImport",
@@ -714,6 +719,7 @@ ui <- dashboardPage(
                 box( width = 6,
                      title = tagList(shiny::icon("gear", verify_fa = FALSE),
                                      "Set the WB analysis to normalize"),
+                     h5("To remove the not necessary rows just clicking on it."),
                      column(9,
                             fileInput(inputId = "WBImport",
                                       label = "",
@@ -749,11 +755,24 @@ ui <- dashboardPage(
               ),
               box( width = 12,
                    title = tagList(shiny::icon("gear", verify_fa = FALSE), "WB quantification"),
+                   h3("Relative Density"),
                    fluidRow(
                      column(
-                       width = 10,
-                       offset = 1,
-                       DTOutput('AUC_rapp')
+                       width = 3,
+                       selectInput("IdLaneNorm_RelDens",
+                                   label = "Select the Lane to use for the relative normalization",
+                                   choices = "")
+                     ),
+                     column(
+                       width = 12,
+                       DTOutput('AUC_RelDens')
+                     )
+                   ),
+                   h3("Adjusted Relative Density"),
+                   fluidRow(
+                     column(
+                       width = 12,
+                       DTOutput('AUC_AdjRelDens')
                      )
                    )
               ),

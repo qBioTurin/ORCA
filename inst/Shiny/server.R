@@ -1,5 +1,5 @@
-shiny.maxRequestSize=1000*1024^2
-shiny.launch.browser = .rs.invokeShinyWindowExternal
+#shiny.maxRequestSize=1000*1024^2
+#shiny.launch.browser = .rs.invokeShinyWindowExternal
 
 pcrTab.generation = function(pcrTabs,SelectedGene)
 {
@@ -14,23 +14,23 @@ pcrTab.generation = function(pcrTabs,SelectedGene)
   )
   return(output_list)
 }
-readfile <- function(filename,type,colname = T) {
+readfile <- function(filename,type,colname = T, namesAll = namesAll) {
   out <- tryCatch(
     {
       if(type == "RDs"){
         x = readRDS(filename)
-        if(!length(x) %in% c(6,9) )
-          return(
-            list(message = "The RDs file must be generated from DataIntegrationModule app.",
+        if(! ( all(names(x) %in% namesAll)) )
+           return(
+            list(message = "The RDs file must be generated from Data Analysis module.",
                  call = "")
           )
         x
       }else if(type == "RDsMulti"){
         x = lapply(filename, readRDS)
         for( i in 1:length(x))
-          if(length(x[[i]]) != 6 )
+          if(! (all(names(x) %in% namesAll)))
             return(
-              list(message = "The RDs file must be generated from DataIntegrationModule app.",
+              list(message = "The RDs file must be generated from Data Analysis module.",
                    call = "")
             )
         x
@@ -112,12 +112,11 @@ LoadImage = function(pathImage){
 server <- function(input, output, session) {
   DataAnalysisModule <- reactiveValues(wbResult = NULL,
                                        wbquantResult = NULL,
-                                       NormWBanalysis = NULL,
-                                       RappWBanalysis = NULL,
                                        elisaResult = NULL,
                                        pcrResult = NULL)
   
-  DataIntegrationModule <- reactiveValues(data = NULL,
+  DataIntegrationModule <- reactiveValues(dataLoaded = NULL,
+                                          data = NULL,
                                           wbTabs = NULL, 
                                           pcrTabs = NULL,
                                           elisaTabs=NULL,
@@ -551,10 +550,15 @@ server <- function(input, output, session) {
   
   ## quantification WB
   wbquantResult = reactiveValues(NormWBanalysis = NULL,
+                                 NormWBanalysis_filtered = NULL,
                                  WBanalysis = NULL,
-                                 RappWBanalysis = NULL
+                                 WBanalysis_filtered = NULL,
+                                 RelDensitiy = NULL,
+                                 AdjRelDensitiy = NULL
   )
+  FlagsWBquant = reactiveValues(BothUploaded = F)
   
+  # load the two wb analyses
   observeEvent(input$actionB_loadingWB,{
     
     output$LoadingErrorWB <- renderText({
@@ -565,7 +569,8 @@ server <- function(input, output, session) {
       
       mess = readfile(
         filename = input$WBImport$datapath,
-        type = "RDs"
+        type = "RDs",
+        namesAll = namesAll
       )
       
       validate(
@@ -574,6 +579,7 @@ server <- function(input, output, session) {
       )
       
       wbquantResult$WBanalysis = mess
+      wbquantResult$WBanalysis_filtered = NULL
       
       "The RDs is uploaded with success"
     })
@@ -588,13 +594,26 @@ server <- function(input, output, session) {
       
       mess = readfile(
         filename = input$NormWBImport$datapath,
-        type = "RDs"
+        type = "RDs",
+        namesAll = namesAll
       )
       
       validate(
         need(!setequal(names(mess),c("message","call")) ,
              mess[["message"]])
       )
+      
+      validate(
+        need(!is.null(mess$AUCdf) ,
+             "The WB analysis must contain the AUC table")
+      )
+      
+      choices = paste0(mess$AUCdf$Lane, " with ", mess$AUCdf$Truncation)
+      
+      updateSelectInput("IdLaneNorm_RelDens",
+                        session = session,
+                        choices = choices,
+                        selected = choices[1])
       
       wbquantResult$NormWBanalysis  = mess
       
@@ -604,6 +623,11 @@ server <- function(input, output, session) {
   })
   
   observe({
+    if(!is.null(wbquantResult$WBanalysis) & !is.null(wbquantResult$NormWBanalysis))
+      FlagsWBquant$BothUploaded = T
+  })
+  # update the wb tables
+  observe({
     if(is.null(wbquantResult$NormWBanalysis)){
       table = wbResultsEmpty$AUCdf
     }else{
@@ -612,6 +636,7 @@ server <- function(input, output, session) {
     output$AUC_WBnorm <- renderDT(
       table, 
       filter = 'top', server = FALSE, 
+      selection = "single", 
       options = list(lengthChange = FALSE, autoWidth = TRUE),
       rownames= FALSE
     )
@@ -630,53 +655,153 @@ server <- function(input, output, session) {
       rownames= FALSE
     )
   })
-  observe({
+  
+  # removing rows
+  observeEvent(input$AUC_WB_rows_selected,{
+    if(!is.null(wbquantResult$WBanalysis) & !is.null(wbquantResult$NormWBanalysis)){
+      indexesWB = input$AUC_WB_rows_selected
+      
+      if(!is.null(wbquantResult$WBanalysis_filtered))
+        AUCdf = wbquantResult$WBanalysis_filtered
+      else
+        AUCdf = wbquantResult$WBanalysis$AUCdf
+      
+      if(length(indexesWB) > 0){
+        wbquantResult$WBanalysis_filtered = AUCdf[-indexesWB,]
+        output$AUC_WB <- renderDT(
+          wbquantResult$WBanalysis_filtered, 
+          filter = 'top', server = FALSE, 
+          selection = "single", 
+          options = list(lengthChange = FALSE, autoWidth = TRUE),
+          rownames= FALSE
+        )
+      }
+    }
+  })
+  observeEvent(input$AUC_WBnorm_rows_selected,{
+    if(!is.null(wbquantResult$NormWBanalysis)){
+      indexesWB = input$AUC_WBnorm_rows_selected
+      
+      if(!is.null(wbquantResult$NormWBanalysis_filtered))
+        AUCdf = wbquantResult$NormWBanalysis_filtered
+      else
+        AUCdf = wbquantResult$NormWBanalysis$AUCdf
+      
+      if(length(indexesWB) > 0){
+        choices = paste0(AUCdf$Lane, " with ", AUCdf$Truncation)
+        
+        selected = input$IdLaneNorm_RelDens
+        updateSelectInput("IdLaneNorm_RelDens",
+                          session = session,
+                          choices = choices,
+                          selected = selected)
+        
+        wbquantResult$NormWBanalysis_filtered = AUCdf[-indexesWB,]
+        
+        output$AUC_WBnorm <- renderDT(
+          wbquantResult$NormWBanalysis_filtered,
+          filter = 'top', server = FALSE,
+          selection = "single",
+          options = list(lengthChange = FALSE, autoWidth = TRUE),
+          rownames= FALSE
+        )
+      }
+    }
+  })
+  
+  # resetting the tables
+  
+  # the relative density and adjusted is calculated
+  observeEvent(list(FlagsWBquant$BothUploaded, input$IdLaneNorm_RelDens,input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
+    table =  wbResultsEmpty$AUCdf 
     
     if(!is.null(wbquantResult$WBanalysis) & !is.null(wbquantResult$NormWBanalysis)){
-      indexesWB = input$AUC_WB_rows_selected 
-      indexesWBnorm = input$AUC_WBnorm_rows_selected 
+      IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
+      IdLaneNorm_RelDens = strsplit(IdLaneNorm_RelDens,split = " with ")[[1]]
       
-      if(length(indexesWB) > 0)
-        tbWB = wbquantResult$WBanalysis$AUCdf[indexesWB,]
+      if(!is.null(wbquantResult$NormWBanalysis_filtered))
+        tbWBnorm = wbquantResult$NormWBanalysis_filtered
       else
-        tbWB = NULL
+        tbWBnorm = wbquantResult$NormWBanalysis$AUCdf
       
-      if(length(indexesWBnorm) > 0)
-        tbWBnorm = wbquantResult$NormWBanalysis$AUCdf[indexesWBnorm,] %>% rename(AUC_Norm = AUC,Truncation_Norm = Truncation)
+      tbWBnorm = tbWBnorm %>%
+        filter(Truncation == IdLaneNorm_RelDens[2],
+               Lane ==IdLaneNorm_RelDens[1]) %>%
+        rename(AUC_Norm = AUC,
+               Truncation_Norm = Truncation,
+               Lane_Norm = Lane)
+      
+      if(!is.null(wbquantResult$WBanalysis_filtered))
+        tbWB = wbquantResult$WBanalysis_filtered
       else
-        tbWBnorm = NULL 
+        tbWB = wbquantResult$WBanalysis$AUCdf
       
-      if(!is.null(tbWBnorm) & !is.null(tbWB)){
-        table = merge(tbWBnorm, tbWB, by  = "Lane",all = T)
-        table$Rel.Norm. = table$AUC/table$AUC_Norm
+      if(!is.null(tbWBnorm) & !is.null(tbWB) & dim(tbWBnorm)[1]==1 ){
+        table = tbWB
+        table$AUC_Norm = tbWBnorm$AUC_Norm
+        table$RelDens = table$AUC/table$AUC_Norm
         table$ExpName = "To set"
-        table = table %>% dplyr::select(ExpName, Lane, Truncation_Norm, Truncation, AUC_Norm, AUC, Rel.Norm.)
-      }else{
-        table = wbResultsEmpty$AUCdf 
+        table = table %>% dplyr::select(ExpName, Lane, Truncation, AUC, AUC_Norm, RelDens)
       }
-      
-    }else{
-      table = wbResultsEmpty$AUCdf 
     }
     
-    wbquantResult$RappWBanalysis = table
+    wbquantResult$RelDensitiy = table
     
-    output$AUC_rapp <- renderDT(
+    output$AUC_RelDens <- renderDT(
       table,
       filter = 'top',
       server = FALSE,
-      editable = list(target = "column", disable = list(columns = 2:7) ),
+      editable = list(target = "column", disable = list(columns = 1:length(table[1,])) ),
+      options = list(lengthChange = FALSE, autoWidth = TRUE),
+      rownames= FALSE
+    )
+    
+  })
+  observeEvent(list(FlagsWBquant$BothUploaded, input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
+    table =  wbResultsEmpty$AUCdf 
+    
+    if(!is.null(wbquantResult$WBanalysis) & !is.null(wbquantResult$NormWBanalysis)){
+      
+      if(!is.null(wbquantResult$WBanalysis_filtered))
+        tbWB = wbquantResult$WBanalysis_filtered
+      else
+        tbWB = wbquantResult$WBanalysis$AUCdf
+      
+      if(!is.null(wbquantResult$NormWBanalysis_filtered))
+        tbWBnorm = wbquantResult$NormWBanalysis_filtered
+      else
+        tbWBnorm = wbquantResult$NormWBanalysis$AUCdf
+      
+      tbWBnorm = tbWBnorm  %>%
+        rename(AUC_Norm = AUC,
+               Truncation_Norm = Truncation)
+      
+      if(!is.null(tbWBnorm) & !is.null(tbWB) ){
+        table = merge(tbWBnorm,tbWB, by = "Lane",all = T )
+        
+        table$AdjRelDens = table$AUC/table$AUC_Norm
+        table$ExpName = "To set"
+        table = table %>% dplyr::select(ExpName, Lane, Truncation, Truncation_Norm, AUC, AUC_Norm, AdjRelDens)
+      }
+    }
+    
+    wbquantResult$AdjRelDensitiy = table
+    output$AUC_AdjRelDens <- renderDT(
+      table,
+      server = FALSE,
+      editable = list(target = "column", disable = list(columns = 1:length(table[1,])) ),
       options = list(lengthChange = FALSE, autoWidth = TRUE),
       rownames= FALSE
     )
     
   })
   
+  #
   toListenWBquant <- reactive({
-    wbquantResult
+    reactiveValuesToList(wbquantResult)
   })
   observeEvent(toListenWBquant(),{
-    DataAnalysisModule$wbquantResult = wbquantResult
+    DataAnalysisModule$wbquantResult = reactiveValuesToList(wbquantResult)
   })
   
   ### End WB analysis ####
@@ -707,10 +832,13 @@ server <- function(input, output, session) {
   })
   
   ## next buttons
-  
-  observeEvent(input$NextQuantif,{
+  observeEvent(input$NextWBQuantif,{
     updateTabsetPanel(session, "SideTabs",
                       selected = "tablesPCR")
+  })
+  observeEvent(input$NextQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "quantification")
   })
   observeEvent(input$NextpcrPlots,{
     updateTabsetPanel(session, "SideTabs",
@@ -1526,68 +1654,90 @@ server <- function(input, output, session) {
       
       mess = readfile(
         filename = input$IntGImport$datapath,
-        type = "RDsMulti"
+        type = "RDsMulti",
+        namesAll = namesAll
       )
-      
+
       validate(
         need(!setequal(names(mess),c("message","call")) ,
-             paste(mess[["message"]],"\n all the files must be RDs saved from DataIntegrationModule app." ))
+             mess[["message"]]
+        )
       )
       
-      DataIntegrationModule$data = mess
+      DataIntegrationModule$dataLoaded = mess
+      
+      
       "The RDs files are uploaded with success"
     })
   })
-  observe({
-    if(!is.null(DataIntegrationModule$data)){
-      prot = Omics$Data
-      data = DataIntegrationModule$data
-      names(data) = paste0("DataSet",1:length(data))
-      
-      namesAnalysis = c("pcrResult","RappWBanalysis","elisaResult")
-      
-      for(n in namesAnalysis){
-        subdata = lapply(data,"[[",n)
-        subdata = subdata[!sapply(subdata, is.null)]
+  
+  observeEvent(DataIntegrationModule$dataLoaded,{
+    
+    data = list(
+      wbResult = NULL,
+      wbquantResult = NULL,
+      elisaResult = NULL,
+      pcrResult = NULL
+    )
+    DataIntegrationModule$dataLoaded -> mess
+    
+    
+    for( x in 1:length(mess))
+    {
+      if(all(names(mess[[x]]) %in% names(DataAnalysisModule)) )
+        data = mess[[x]]
+      else if( all(names(mess[[x]]) %in% names(wbResult)) )
+        data$wbResult = mess[[x]]
+      else if( all(names(mess[[x]]) %in% names(wbquantResult)) )
+        data$wbquantResult = mess[[x]]
+      else if( all(names(mess[[x]]) %in% names(pcrResult)) )
+        data$pcrResult = mess[[x]]
+      else if( all(names(mess[[x]]) %in% names(elisaResult)))
+        data$elisaResult = mess[[x]]
+    }
+    
+    DataIntegrationModule$data = data
+    ## starting updating the boxes
+    prot = Omics$Data
+    # removing all the null analysis
+    data = data[!sapply(data, is.null)]
+    
+    namesAnalysis = names(data)
+    
+    for(n in namesAnalysis){
+      subdata = data[[n]]
+      print(n)
+      if(n == "pcrResult"){
+        pcrTabs = subdata$CompPRC 
+        updateSelectizeInput(inputId = "SelectGene",
+                             choices = unique(pcrTabs$Gene),
+                             selected = unique(pcrTabs$Gene)[1])
         
-        if(length(subdata)>0){
-          if(n == "pcrResult"){
-            pcrTabs = do.call("rbind",lapply(1:length(subdata),function(x){
-              subdata[[x]]$CompPRC$Dataset =  names(subdata)[[x]]
-              subdata[[x]]$CompPRC
-            })
-            )
-            updateSelectizeInput(inputId = "SelectGene",
-                                 choices = unique(pcrTabs$Gene),
-                                 selected = unique(pcrTabs$Gene)[1])
-            
-            DataIntegrationModule$pcrTabs = pcrTabs
-          }else if(n == "RappWBanalysis"){
-            wbTabs = do.call("rbind",lapply(1:length(subdata),function(x){
-              subdata[[x]]$Dataset =  names(subdata)[[x]]
-              subdata[[x]] %>% dplyr::select(ExpName,Lane,Dataset,Rel.Norm.) %>%
-                group_by(ExpName,Lane) %>%
-                dplyr::mutate(Mean = mean(Rel.Norm., na.omit = T)) %>%
-                ungroup()
-            })
-            )
-            wbTabs1 = wbTabs %>% dplyr::select(-Mean) %>%
-              tidyr::spread(Dataset, Rel.Norm.)
-            wbTabs2 = wbTabs %>% dplyr::select(-Rel.Norm.,-Dataset) %>%
-              distinct()
-            
-            DataIntegrationModule$wbTabs = merge(wbTabs1,wbTabs2)
-            updateSelectizeInput(inputId = "Selectprot_wb",
-                                 choices = c("",unique(prot$Name)),
-                                 selected = "",
-                                 server = T )
-          }else{
-            
-          }
-        }
+        DataIntegrationModule$pcrTabs = pcrTabs
+      }else if(n == "wbquantResult"){
+        wbTabs = subdata$RelDensitiy %>%
+          dplyr::select(ExpName,Lane,RelDens) %>%
+          group_by(ExpName,Lane) %>%
+          dplyr::mutate(Mean = mean(RelDens, na.omit = T)) %>%
+          ungroup()
+        
+        # wbTabs1 = wbTabs %>% dplyr::select(-Mean) %>%
+        #   tidyr::spread(Dataset, RelDens)
+        # wbTabs2 = wbTabs %>% dplyr::select(-RelDens,-Dataset) %>%
+        #   distinct()
+        
+        DataIntegrationModule$wbTabs = wbTabs #merge(wbTabs1,wbTabs2)
+        updateSelectizeInput(inputId = "Selectprot_wb",
+                             choices = c("",unique(prot$Name)),
+                             selected = "",
+                             server = T )
+        
+      }else if(n == "elisaResult"){
+        
       }
     }
   })
+  
   observeEvent(input$SelectGene,{
     if(!is.null(DataIntegrationModule$pcrTabs) && length(input$SelectGene)>0 && input$SelectGene!=""){
       pcrTabs = DataIntegrationModule$pcrTabs
@@ -1762,10 +1912,10 @@ server <- function(input, output, session) {
              "Please select one RDs file generated throught the Data Analysis module." )
       )
       
-      mess = readRDS( input$loadAnalysis_file$datapath)
+      mess = readRDS(input$loadAnalysis_file$datapath)
       
       validate(
-        need(any(names(mess) %in% names(wbResult)) || any(names(mess) %in% names(pcrResult)) || any(names(mess) %in% names(elisaResult)) ,
+        need(all(names(mess) %in% names(wbResult)) || all(names(mess) %in% names(pcrResult)) || all(names(mess) %in% names(elisaResult)) ,
              paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
       )
       
@@ -1981,6 +2131,8 @@ server <- function(input, output, session) {
   
   #### end save files ###
   
+  observe({namesAll <<- unique( c(names(wbResult), names(wbquantResult), names(pcrResult), names(elisaResult)) )})
   
+return()
   
-}
+  }
