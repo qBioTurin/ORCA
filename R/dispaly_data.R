@@ -15,7 +15,20 @@
 InteGreat.run <-function()
 {
   x = T
-  runApp(
-    appDir = system.file("Shiny", package = "InteGreat")
+  
+  Appui <- system.file("Shiny","ui.R", package = "InteGreat")
+  Appserver <- system.file("Shiny","server.R", package = "InteGreat")
+  
+  source(Appui)
+  source(Appserver)
+  
+  shinyApp(ui, server,
+           options =  options(shiny.maxRequestSize=1000*1024^2,
+                              shiny.launch.browser = .rs.invokeShinyWindowExternal)
   )
+  
+  # runApp(
+  #   appDir = system.file("Shiny", package = "InteGreat"),
+  #   launch.browser = T
+  # )
 }
