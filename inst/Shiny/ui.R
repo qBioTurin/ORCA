@@ -57,7 +57,7 @@ ui <- dashboardPage(
                 ),
                 menuItem("Data Analysis",
                          tabName = 'DataAnaslysis',
-                         icon = icon('fa-regular fa-magnifying-glass-chart',verify_fa = FALSE),
+                         icon = icon('chart-line'),
                          menuItem('Western Blot analysis',
                                   tabName = 'wb',
                                   menuSubItem("Upload Image", tabName = "uploadIm"),
@@ -79,14 +79,14 @@ ui <- dashboardPage(
                 ),
                 menuItem('Model Integration',
                          tabName = 'integ',
-                         icon = icon('fa-regular fa-inboxes',verify_fa = FALSE),
+                         icon = icon('file'),
                          menuSubItem("Omics Data", tabName = "Omics_tab"),
                          menuSubItem("WB, RT-qPCR, ELISA ", tabName = "WbPcrElisa_tab"),
                          menuSubItem("IF, and other data ", tabName = "otherData_tab")
                 ),
                 menuItem('Load analysis',
                          tabName = 'LoadAnalysis',
-                         icon = icon('fa-light fa-upload',verify_fa = FALSE)
+                         icon = icon('upload')
                 )
     )
   ),
@@ -133,7 +133,7 @@ ui <- dashboardPage(
                   column(
                     1,
                     actionButton( label = "Load",style = "margin-top: 20px;",
-                                  icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                                  icon = shiny::icon("upload"),
                                   inputId = "loadAnalysis_Button" )
                   )
                 ),
@@ -179,7 +179,7 @@ ui <- dashboardPage(
                       column(1,
                              actionButton(
                                label = "Load",
-                               icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                               icon = shiny::icon("upload"),
                                inputId = "LoadProt_Button" 
                              )
                       ),
@@ -245,7 +245,7 @@ ui <- dashboardPage(
               column(
                 1,
                 actionButton( label = "Load",style = "margin-top: 20px;",
-                              icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                              icon = shiny::icon("upload"),
                               inputId = "LoadIntG_Button" )
               )
             ),
@@ -321,7 +321,7 @@ ui <- dashboardPage(
                      1,
                      actionButton(
                        label = "Load",style = "margin-top: 20px;",
-                       icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                       icon = shiny::icon("upload"),
                        inputId = "LoadOther_Button" 
                      )
                    )
@@ -376,7 +376,7 @@ ui <- dashboardPage(
                 column(1,
                        style = "margin-top: 20px;",
                        actionButton( label = "Load",
-                                     icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                                     icon = shiny::icon("upload"),
                                      inputId = "LoadPCR_Button")
                 )
               ),
@@ -422,7 +422,7 @@ ui <- dashboardPage(
                            actionButton(inputId = "NextQuantif",
                                         label = 'Proceed to Quantification',
                                         align = "right",
-                                        icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
+                                        icon = shiny::icon("forward"))
                     )
                 )
               )
@@ -449,7 +449,7 @@ ui <- dashboardPage(
                        actionButton(inputId = "NextpcrPlots",
                                     label = 'Proceed to Plots',
                                     align = "right",
-                                    icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
+                                    icon = shiny::icon("forward"))
                 ),
                 column(width = 1,offset = 1,
                        downloadButton( label = "Download the analysis", 
@@ -492,7 +492,7 @@ ui <- dashboardPage(
               column(1,style = "margin-top: 20px;",
                      actionButton(
                        label = "Load",
-                       icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                       icon = shiny::icon("upload"),
                        inputId = "LoadELISA_Button"
                      )
               )
@@ -528,7 +528,7 @@ ui <- dashboardPage(
                        actionButton(inputId = "NextElisaQuantif",
                                     label = 'Proceed to Quantification',
                                     align = "right",
-                                    icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
+                                    icon = shiny::icon("forward"))
                 )
               )
           ),
@@ -608,7 +608,7 @@ ui <- dashboardPage(
               fluidRow(
                 box( width = 6,
                      title = tagList(shiny::icon("gear", verify_fa = FALSE), "Protein Band Selection Coordinates"),
-                     tableOutput("PlanesStructureTable")
+                     DTOutput("PlanesStructureTable")
                 ),
                 box( width = 6,
                      actionButton(inputId = "panelSelect_button", label = "Select Protein Bands"),
@@ -671,7 +671,7 @@ ui <- dashboardPage(
                     actionButton(inputId = "NextWBQuantif",
                                  label = 'Proceed to Quantification',
                                  align = "right",
-                                 icon = shiny::icon("fa-solid fa-forward",verify_fa = FALSE))
+                                 icon = shiny::icon("forward"))
                 )
               )
       ),
@@ -693,7 +693,7 @@ ui <- dashboardPage(
                      column(2,
                             actionButton(
                               label = "Load",
-                              icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                              icon = shiny::icon("upload"),
                               width = "100%",
                               inputId = "actionB_loadingNormWB"
                             )
@@ -729,7 +729,7 @@ ui <- dashboardPage(
                      ),
                      column(2,
                             actionButton( label = "Load",
-                                          icon = shiny::icon("fa-regular fa-upload",verify_fa = FALSE),
+                                          icon = shiny::icon("upload"),
                                           width = "100%",
                                           inputId = "actionB_loadingWB"
                             )

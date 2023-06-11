@@ -125,7 +125,8 @@ server <- function(input, output, session) {
   
   ### WB analysis ####
   # DECLARE REACTIVEVALUES FUNCTION HERE
-  PanelData = data.frame(Panel_ID = numeric(),
+  PanelData = data.frame(Panel = character(),
+                         ID = numeric(),
                          xmin = numeric(), ymin = numeric(), 
                          xmax = numeric(), ymax = numeric())
   
@@ -289,15 +290,17 @@ server <- function(input, output, session) {
           if( abs((newH - prevH) + (newW - prevW)) > 1 )
           {
             NumberOfPlanes$N = 1
-            PanelStructures$data <- data.frame(Panel_ID = 1,vals)
+            PanelStructures$data <- data.frame(Panel = "", ID = 1,vals)
           }else{
             PanelStructures$data <- rbind(PanelStructures$data,
-                                          cbind(data.frame(Panel_ID = nrow(PanelStructures$data)+1),
+                                          cbind(data.frame(Panel = "",
+                                                           ID = nrow(PanelStructures$data)+1),
                                                 vals))
           }
         }else{
           PanelStructures$data <- rbind(PanelStructures$data,
-                                        cbind(data.frame(Panel_ID = nrow(PanelStructures$data)+1),
+                                        cbind(data.frame(Panel = "",
+                                                         ID = nrow(PanelStructures$data)+1),
                                               vals))
         }
         prev_vals <<- vals
@@ -329,18 +332,30 @@ server <- function(input, output, session) {
   })
   
   ## Profile plots
-  output$PlanesStructureTable <- renderTable({
-    PanelStructures$data
-  },width = "100%")
+
+  output$PlanesStructureTable <- renderDT(
+      datatable(PanelStructures$data, editable = TRUE),
+      editable = list(target = "column", disable = list(columns = 1:length(PanelStructures$data[1,])) ),
+      options = list(lengthChange = FALSE, autoWidth = TRUE),
+      rownames= FALSE
+    )
+  
+  # check names Planes
+  observeEvent(input$PlanesStructureTable_cell_edit, {
+    row  <- input$PlanesStructureTable_cell_edit$row
+    PanelStructures$data[row, 1] <- input$PlanesStructureTable_cell_edit$value
+    wbResult$Planes = PanelStructures$data
+  })
   
   output$AUC <- renderTable({
     wbResult$AUCdf  %>% dplyr::select(Lane,Truncation, AUC)
   },width = "100%")
-  
-  observeEvent(input$GenLanes,{
+  observeEvent(list(input$GenLanes,wbResult$Planes),{
     if(NumberOfPlanes$N >1){
-      wbResult$Planes = round(PanelStructures$data)
-      print(PanelStructures$data)
+      Planes = PanelStructures$data
+      Planes[,-1] = round(Planes[,-1])
+      wbResult$Planes = Planes
+      print(Planes)
       Flags$LanesCut= T
     }else{
       Flags$LanesCut= F
@@ -364,7 +379,8 @@ server <- function(input, output, session) {
                                      #imageShow(plane)
                                      GreyPlane = apply(plane,1,"mean")
                                      data.frame(Values = GreyPlane - min(GreyPlane),
-                                                ID = paste("Lane",i), Y = 1:length(GreyPlane) )
+                                                ID = paste0(p$ID,". ",p$Panel),
+                                                Y = 1:length(GreyPlane) )
                                    },
                                    im,PanelData)
       )
@@ -546,6 +562,15 @@ server <- function(input, output, session) {
       output$AUC <- renderTable({AUCdf})
       wbResult$AUCdf <- AUCdf
     }
+  })
+  
+  ## next buttons
+  observeEvent(input$NextWBQuantif,{
+    if(!is.null(wbResult$AUCdf))
+      wbquantResult$WBanalysis = reactiveValuesToList(wbResult)
+    
+      updateTabsetPanel(session, "SideTabs",
+                        selected = "quantification")
   })
   
   ## quantification WB
@@ -832,13 +857,9 @@ server <- function(input, output, session) {
   })
   
   ## next buttons
-  observeEvent(input$NextWBQuantif,{
-    updateTabsetPanel(session, "SideTabs",
-                      selected = "tablesPCR")
-  })
   observeEvent(input$NextQuantif,{
     updateTabsetPanel(session, "SideTabs",
-                      selected = "quantification")
+                      selected = "tablesPCR")
   })
   observeEvent(input$NextpcrPlots,{
     updateTabsetPanel(session, "SideTabs",
@@ -1957,9 +1978,14 @@ server <- function(input, output, session) {
             }
           })
           
-          output$PlanesStructureTable <- renderTable({
-            wbResult$Planes
-          },width = "100%")
+          output$PlanesStructureTable <- renderDT(
+            wbResult$Planes,
+            server = FALSE,
+            editable = list(target = "column",
+                            disable = list(columns = 1:length(wbResult$Planes[1,])) ),
+            options = list(lengthChange = FALSE, autoWidth = TRUE),
+            rownames= FALSE
+          )
           
           PanelStructures$data = wbResult$Planes
           
@@ -2061,9 +2087,7 @@ server <- function(input, output, session) {
                           selected = "uploadELISA")
         
       }
-      
       UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
-      
     }
     
   })
