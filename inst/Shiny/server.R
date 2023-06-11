@@ -1415,11 +1415,11 @@ server <- function(input, output, session) {
       elisaTot = merge(elisaV,merge(elisaT,elisaE)) %>%
         filter(exp != "")
       
-      MapBaseline = merge(MapBaseline,elisaTot,by.y = "exp", by.x = "Baseline") %>% 
-        dplyr::select(Baseline,Exp,values,time) %>%
-        rename(BaseValues = values)
+      MapBaseline = merge(MapBaseline,elisaTot,by.y = "exp", by.x = "Baseline")%>% 
+        mutate(BaseValues = mean(values)) %>% 
+        dplyr::select(Baseline,Exp,BaseValues) 
       
-      elisaTot = merge(elisaTot,MapBaseline, by.x = c("exp","time"), by.y = c("Exp","time"))
+      elisaTot = merge(elisaTot,MapBaseline, by.x = c("exp"), by.y = c("Exp"))
       
       elisaResult$data = elisaTot
       
@@ -1448,7 +1448,7 @@ server <- function(input, output, session) {
             labs(x = "Time", y = "Quantifications")
         )
       }else{
-        output$ELISAtables = renderDT(data.frame(Error = "No baseline is associated with the experiment replicants, or the time do not match!"))
+        output$ELISAtables = renderDT(data.frame(Error = "No baseline is associated with the experiment replicants!"))
       }
     }
   })
