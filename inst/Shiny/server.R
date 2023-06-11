@@ -334,10 +334,13 @@ server <- function(input, output, session) {
   ## Profile plots
 
   output$PlanesStructureTable <- renderDT(
-      datatable(PanelStructures$data, editable = TRUE),
-      editable = list(target = "column", disable = list(columns = 1:length(PanelStructures$data[1,])) ),
+    {
+      datatable(PanelStructures$data,
+      editable = T,#list(target = "column", disable = list(columns = 1:length(PanelStructures$data[1,])) ),
       options = list(lengthChange = FALSE, autoWidth = TRUE),
       rownames= FALSE
+      )
+    }
     )
   
   # check names Planes
@@ -1702,7 +1705,8 @@ server <- function(input, output, session) {
     )
     DataIntegrationModule$dataLoaded -> mess
     
-    
+    if(!is.null(mess)){
+
     for( x in 1:length(mess))
     {
       if(all(names(mess[[x]]) %in% names(DataAnalysisModule)) )
@@ -1739,8 +1743,8 @@ server <- function(input, output, session) {
         wbTabs = subdata$RelDensitiy %>%
           dplyr::select(ExpName,Lane,RelDens) %>%
           group_by(ExpName,Lane) %>%
-          dplyr::mutate(Mean = mean(RelDens, na.omit = T)) %>%
-          ungroup()
+
+                    ungroup()
         
         # wbTabs1 = wbTabs %>% dplyr::select(-Mean) %>%
         #   tidyr::spread(Dataset, RelDens)
@@ -1748,14 +1752,15 @@ server <- function(input, output, session) {
         #   distinct()
         
         DataIntegrationModule$wbTabs = wbTabs #merge(wbTabs1,wbTabs2)
-        updateSelectizeInput(inputId = "Selectprot_wb",
+        updatePickerInput(inputId = "Selectprot_wb",
                              choices = c("",unique(prot$Name)),
-                             selected = "",
-                             server = T )
+                             selected = "",session = session)
         
       }else if(n == "elisaResult"){
         
       }
+    }
+    
     }
   })
   
@@ -1798,13 +1803,14 @@ server <- function(input, output, session) {
                  autoWidth = TRUE),
   rownames= FALSE
   )
-  observeEvent(input$Selectprot_wb,{
+  observeEvent(list(input$Selectprot_wb,Omics$Data),{
     if(!is.null(DataIntegrationModule$wbTabs)){
       wbTabs = DataIntegrationModule$wbTabs
       prot = Omics$Data
       if(!is.null(input$Selectprot_wb) && length(input$Selectprot_wb)>0 &&input$Selectprot_wb!= "" ){
         as.numeric(prot[prot$Name == input$Selectprot_wb,"Value"]) -> pr
-        wbTabs = wbTabs %>% dplyr::mutate(`Rel.Prot.` = Mean * pr )
+        wbTabs = wbTabs %>% dplyr::mutate(`Rel.Prot.` = RelDens * pr )
+        wbTabs[paste(input$Selectprot_wb)] = pr
       }
       else
         wbTabs = wbTabs[,ifelse("Rel.Prot." %in% colnames(wbTabs),

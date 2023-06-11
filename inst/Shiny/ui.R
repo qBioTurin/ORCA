@@ -262,13 +262,15 @@ ui <- dashboardPage(
             collapsible = T,
             collapsed = T,
             title = "WB analysis",
-            selectizeInput(
+            pickerInput(
               width = "50%",
               inputId = "Selectprot_wb",
               multiple = F,
-              options = list(maxItems = 1),
               label = "Select the molecule from the omics dataset:",
-              choices = ""
+              choices = "",
+              options = list( maxItems = 1, `live-search` = TRUE),
+              choicesOpt = list(`style` = "btn-info",
+                                `liveSearchPlaceholder`="Search" )
             ),
             DTOutput("Tab_IntG_wb")
           ),
