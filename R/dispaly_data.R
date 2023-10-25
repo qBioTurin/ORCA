@@ -3,8 +3,8 @@
 #'
 #' @param 
 #'
-#' @author Pernice Simone Tortarolo Dora
-#' @import ggplot2 shinydashboard shinyWidgets shiny dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl DT shinyjs
+#' @author Pernice Simone, Tortarolo Dora
+#' @import ggplot2 patchwork shinydashboard shinyWidgets shiny dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl DT shinyjs
 #' 
 #' @examples
 #'\dontrun{

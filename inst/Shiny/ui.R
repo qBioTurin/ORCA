@@ -75,15 +75,25 @@ ui <- dashboardPage(
                                   tabName = 'elisa',
                                   menuSubItem("Upload data", tabName = "uploadELISA"),
                                   menuSubItem("Quantification", tabName = "tablesELISA")
+                         ),
+                         menuItem('Endocytosis assay',
+                                  tabName = 'endoc',
+                                  menuSubItem("Upload data", tabName = "uploadENDOC"),
+                                  menuSubItem("Quantification", tabName = "tablesENDOC")
+                         ),
+                         menuItem('Cytotoxicity assay',
+                                  tabName = 'cytotox',
+                                  menuSubItem("Upload data", tabName = "uploadCYTOTOX"),
+                                  menuSubItem("Quantification", tabName = "tablesCYTOTOX")
                          )
                 ),
-                menuItem('Model Integration',
-                         tabName = 'integ',
-                         icon = icon('file'),
-                         menuSubItem("Omics Data", tabName = "Omics_tab"),
-                         menuSubItem("WB, RT-qPCR, ELISA ", tabName = "WbPcrElisa_tab"),
-                         menuSubItem("IF, and other data ", tabName = "otherData_tab")
-                ),
+                # menuItem('Model Integration',
+                #          tabName = 'integ',
+                #          icon = icon('file'),
+                #          menuSubItem("Omics Data", tabName = "Omics_tab"),
+                #          menuSubItem("WB, RT-qPCR, ENDOC ", tabName = "WbPcrElisa_tab"),
+                #          menuSubItem("IF, and other data ", tabName = "otherData_tab")
+                # ),
                 menuItem('Load analysis',
                          tabName = 'LoadAnalysis',
                          icon = icon('upload')
@@ -225,7 +235,7 @@ ui <- dashboardPage(
               )
       ),
       ## END model integration: Omics
-      ## BEGIN model integration: WB PCR ELISA ####
+      ## BEGIN model integration: WB PCR ENDOC ####
       tabItem(
         tabName = "WbPcrElisa_tab",
         h2("Data harmonization as initial marking into the Petri Net model "),
@@ -293,12 +303,12 @@ ui <- dashboardPage(
             width = 12,
             collapsible = T,
             collapsed = T,
-            title = "ELISA analysis",
-            tableOutput("Tab_IntG_elisa")
+            title = "Endocytosis assay",
+            tableOutput("Tab_IntG_endoc")
           )
         )
       ),
-      ## END model integration: WB PCR ELISA
+      ## END model integration: WB PCR ENDOC
       ## BEGIN model integration: IF..etc  #######
       tabItem( tabName = "otherData_tab",
                h2("Other expertiments"),
@@ -472,7 +482,6 @@ ui <- dashboardPage(
               )
       ),
       ## END data analysis:  RT-PCR 
-      
       ## BEGIN data analysis: ELISA  #######
       tabItem(
         tabName = "uploadELISA",
@@ -511,7 +520,7 @@ ui <- dashboardPage(
           box(width = 12,
               title = "Assign experimental information to values:",
               column(width = 6,
-                     DTOutput("ELISAmatrix")
+                     dataTableOutput("ELISAmatrix")
               ),
               column(width = 6,
                      selectizeInput("ELISAcell_EXP",
@@ -521,9 +530,21 @@ ui <- dashboardPage(
                      selectizeInput("ELISAcell_TIME",label = "Time:",
                                     choices = "",
                                     options = list(create = TRUE)),
-                     checkboxGroupInput(inputId = "ELISA_baselines",
-                                        "Select baselines:")
-                     
+                     fluidRow(
+                       column(4,
+                              checkboxGroupInput(inputId = "ELISA_baselines",
+                                                 "Select baselines:")
+                       ),
+                       column(4,
+                              selectizeInput(inputId = "ELISA_standcurve",
+                                             label = "Select standard curve:",
+                                             choices = NULL)
+                       ),
+                       column(4,
+                              checkboxGroupInput(inputId = "ELISA_blanches",
+                                                 "Select blanches:")
+                       )
+                     )
               ),
               fluidRow(
                 column(width = 1,offset = 9,
@@ -533,27 +554,49 @@ ui <- dashboardPage(
                                     icon = shiny::icon("forward"))
                 )
               )
-          ),
-          plotOutput("ELISAinitplots")
-        )
+          )
+        ),
       ),
       # Second tab content
       tabItem(tabName = "tablesELISA",
               h2("Quantification"),
               fluidRow(
                 tags$head(tags$script(src = "message-handler.js")),
+                box(width = 12,
+                    title = "Linear regression of the standard curve:",
+                    collapsible = TRUE,
+                    fluidRow(
+                      column(6,
+                             DTOutput("ELISA_Table_stdcurve"),
+                             actionButton(inputId = "ELISA_buttonRegression",
+                                          label = 'Linear Regression',
+                                          align = "right")
+                      ),
+                      column(6,
+                             plotOutput("ELISAregression")
+                      )
+                    )
+                  ),
+                box(width= 12,
+                    title = "Select a blanche for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = T,
+                    h4("If time information is associated with the experimental conditions
+                       defined as blanche, then it will be lost during the averaging of its values."),
+                    uiOutput("ElisaBlancheSelection")
+                ),
                 box(width= 12,
                     title = "Select a baseline for the following experimental conditions",
                     collapsible = TRUE,
-                    collapsed = FALSE,
+                    collapsed = T,
                     uiOutput("ElisaBaselineSelection")
                 ),
                 box(width= 12,
                     title = "Quantification",
                     collapsible = TRUE,
                     collapsed = TRUE,
-                    DTOutput("ELISAtables"),
-                    plotOutput("ELISAplots")
+                    plotOutput("ELISAplots"),
+                    DTOutput("ELISAtables")
                 )
               ),
               fluidRow(
@@ -567,6 +610,156 @@ ui <- dashboardPage(
               )
       ),
       ## END data analysis: ELISA
+      
+      ## BEGIN data analysis: ENDOC  #######
+      tabItem(
+        tabName = "uploadENDOC",
+        h2("Load Endocytosis data"),
+        fluidRow(
+          box(
+            width = 12,
+            fluidRow(
+              column(
+                8,
+                fileInput(
+                  inputId = "ENDOCImport",
+                  label = "",
+                  placeholder = "Select an Excel file.",
+                  width = "100%", 
+                  multiple = TRUE
+                )
+              ),
+              column(1,style = "margin-top: 20px;",
+                     actionButton(
+                       label = "Load",
+                       icon = shiny::icon("upload"),
+                       inputId = "LoadENDOC_Button"
+                     )
+              )
+            ),
+            fluidRow(
+              column(
+                width = 10,offset = 1,
+                verbatimTextOutput("LoadingError_ENDOC")
+              )
+            )
+          )
+        ),
+        fluidRow(
+          box(width = 12,
+              title = "Assign experimental information to values:",
+              column(width = 6,
+                     DTOutput("ENDOCmatrix")
+              ),
+              column(width = 6,
+                     selectizeInput("ENDOCcell_EXP",
+                                    label = "Experimental condition:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     selectizeInput("ENDOCcell_TIME",label = "Time:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     fluidRow(
+                       column(6,
+                              checkboxGroupInput(inputId = "ENDOC_baselines",
+                                                 "Select baselines:")
+                       ),
+                       column(6,
+                              checkboxGroupInput(inputId = "ENDOC_blanches",
+                                                 "Select blanches:")
+                       )
+                     )
+              ),
+              fluidRow(
+                column(width = 1,offset = 9,
+                       actionButton(inputId = "NextEndocQuantif",
+                                    label = 'Proceed to Quantification',
+                                    align = "right",
+                                    icon = shiny::icon("forward"))
+                )
+              )
+          ),
+          plotOutput("ENDOCinitplots")
+        )
+      ),
+      # Second tab content
+      tabItem(tabName = "tablesENDOC",
+              h2("Quantification"),
+              fluidRow(
+                tags$head(tags$script(src = "message-handler.js")),
+                box(width= 12,
+                    title = "Select a blanche for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = FALSE,
+                    h4("If time information is associated with the experimental conditions
+                       defined as blanche, then it will be lost during the averaging of its values."),
+                    uiOutput("EndocBlancheSelection")
+                ),
+                box(width= 12,
+                    title = "Select a baseline for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = FALSE,
+                    uiOutput("EndocBaselineSelection")
+                ),
+                box(width= 12,
+                    title = "Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    DTOutput("ENDOCtables"),
+                    plotOutput("ENDOCplots")
+                )
+              ),
+              fluidRow(
+                column(width = 1,offset = 9,
+                       downloadButton( label = "Download the analysis", 
+                                       outputId = "downloadButton_ENDOC",
+                                       #href = "Results.RData",
+                                       #download = "Results.RData",
+                                       icon = icon("download") )
+                )
+              )
+      ),
+      ## END data analysis: ENDOC
+      ## BEGIN data analysis: CYTOTOX  #######
+      tabItem(
+        tabName = "uploadCYTOTOX",
+        h2("Load Cytotoxicity data"),
+        fluidRow(
+          box(
+            width = 12,
+            fluidRow(
+              column(
+                8,
+                fileInput(
+                  inputId = "CYTOTOXImport",
+                  label = "",
+                  placeholder = "Select an Excel file.",
+                  width = "100%", 
+                  multiple = TRUE
+                )
+              ),
+              column(1,style = "margin-top: 20px;",
+                     actionButton(
+                       label = "Load",
+                       icon = shiny::icon("upload"),
+                       inputId = "LoadCYTOTOX_Button"
+                     )
+              )
+            ),
+            fluidRow(
+              column(
+                width = 10,offset = 1,
+                verbatimTextOutput("LoadingError_CYTOTOX")
+              )
+            )
+          )
+        )
+      ),
+      # Second tab content
+      tabItem(tabName = "tablesCYTOTOX",
+              h2("Quantification")
+      ),
+      ## END data analysis: CYTOTOX
       ## BEGIN data analysis: WB  #######
       # First tab content
       tabItem(tabName = "uploadIm",
@@ -609,7 +802,8 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box( width = 6,
-                     title = tagList(shiny::icon("gear", verify_fa = FALSE), "Protein Band Selection Coordinates"),
+                     title = tagList(shiny::icon("gear", verify_fa = FALSE), 
+                                     "Protein Band Selection Coordinates"),
                      DTOutput("PlanesStructureTable")
                 ),
                 box( width = 6,
@@ -662,7 +856,7 @@ ui <- dashboardPage(
                     )
                 ),
                 box(width=6,
-                    tableOutput('AUC'),
+                    DTOutput('AUC'),
                     actionButton( label = "Reset all", 
                                   inputId = "actionButton_ResetPlanes"),
                     downloadButton( label = "Download the analysis", 
@@ -683,7 +877,7 @@ ui <- dashboardPage(
               fluidRow(
                 box( width = 6,
                      title = tagList(shiny::icon("gear", verify_fa = FALSE), "Set the WB analysis as normalizer"),
-                     h5("To remove the not necessary rows just clicking on it."),
+                     h5("To keep the necessary samples (rows) just clicking on it."),
                      column(9,
                             fileInput(
                               inputId = "NormWBImport",
@@ -692,7 +886,7 @@ ui <- dashboardPage(
                               width = "90%"
                             )
                      ),
-                     column(2,
+                     column(3,
                             actionButton(
                               label = "Load",
                               icon = shiny::icon("upload"),
@@ -721,7 +915,7 @@ ui <- dashboardPage(
                 box( width = 6,
                      title = tagList(shiny::icon("gear", verify_fa = FALSE),
                                      "Set the WB analysis to normalize"),
-                     h5("To remove the not necessary rows just clicking on it."),
+                     h5("To keep the necessary samples (rows) just clicking on it."),
                      column(9,
                             fileInput(inputId = "WBImport",
                                       label = "",
@@ -729,7 +923,7 @@ ui <- dashboardPage(
                                       width = "90%"
                             )
                      ),
-                     column(2,
+                     column(3,
                             actionButton( label = "Load",
                                           icon = shiny::icon("upload"),
                                           width = "100%",
@@ -760,10 +954,10 @@ ui <- dashboardPage(
                    h3("Relative Density"),
                    fluidRow(
                      column(
-                       width = 3,
+                       width = 8,
                        selectInput("IdLaneNorm_RelDens",
                                    label = "Select the Lane to use for the relative normalization",
-                                   choices = "")
+                                   choices = "Nothing selected",selected = "Nothing selected")
                      ),
                      column(
                        width = 12,
@@ -776,7 +970,8 @@ ui <- dashboardPage(
                        width = 12,
                        DTOutput('AUC_AdjRelDens')
                      )
-                   )
+                   ),
+                   plotOutput("plot_AdjRelDens")
               ),
               fluidRow(
                 column(width = 1, offset = 9,
@@ -795,20 +990,3 @@ ui <- dashboardPage(
   )
   
 )
-
-
-#   fluidPage(
-#   
-#   # Application title
-#   titlePanel("Gel Analysis Cutting"),
-#   # Show a plot of the generated distribution
-#   mainPanel( 
-#     plotOutput("DataPlot"),
-#     tableOutput('AUC'),
-#     sliderInput(inputId = "truncX", label = h4("Truncation:"),
-#                 min = 0, max = 0, value = c(0,0),step = 1),
-#     actionButton( label = "Truncate", inputId = "TruncateData",
-#                   icon = icon("cut") )
-#   )
-# )
-# 
