@@ -97,6 +97,10 @@ ui <- dashboardPage(
                 menuItem('Load analysis',
                          tabName = 'LoadAnalysis',
                          icon = icon('upload')
+                ),
+                menuItem('Dataverse',
+                         tabName = 'Dataverse_tab',
+                         icon = icon('dataverse')
                 )
     )
   ),
@@ -983,10 +987,45 @@ ui <- dashboardPage(
                        )
                 )
               )
-      )
-    )
+      ),
     ## END data analysis: WB
     ###### END DATA ANALYSIS ####
+    ###### BEGIN DATAVERSE ####
+    tabItem(tabName = "Dataverse_tab",
+            h2("Dataverse"),
+            fluidRow(
+              box(width = 12,
+                  title = "Upload and Maintain",
+                  collapsible = T,
+                  h4(
+                    em(
+                      "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
+                         " for obtaining an account and setting up an API key."
+                       ) 
+                    ),
+                  column(width=6, 
+                         textInput("APIkey",
+                                   value = ifelse(system.file("Data",".APIkey", package = "InteGreat") != "",
+                                                  read.table(paste0(system.file("Data", package = "InteGreat"),
+                                                                    "/.APIkey"),
+                                                             quote="\"",
+                                                             comment.char=""),
+                                                  ""), 
+                                   label = "API key linked to a Dataverse installation account:"))
+              )
+            ),
+            fluidRow(
+              box(width = 12,
+                  title = "Search and Get",
+                  collapsible = T
+              )
+            )
+    )
+    ###### END DATAVERSE ###
+    
+    # Here ends the ui body
+    )
+
   )
   
 )

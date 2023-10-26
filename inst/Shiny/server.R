@@ -1,6 +1,10 @@
 #shiny.maxRequestSize=1000*1024^2
 #shiny.launch.browser = .rs.invokeShinyWindowExternal
 
+Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
+APIkey_path = system.file("Data",".APIkey", package = "InteGreat")
+
+
 pcrTab.generation = function(pcrTabs,SelectedGene)
 {
   output_list <- column(width = 12,
@@ -1475,7 +1479,8 @@ server <- function(input, output, session) {
                                dataFinal = NULL,
                                ENDOCcell_TIME = NULL,
                                ENDOCcell_EXP = NULL,
-                               MapBaseline = NULL)
+                               MapBaseline = NULL,
+                               MapBlanche = NULL)
   
   endocResult0 = list(Initdata= NULL,
                       data = NULL,
@@ -1483,7 +1488,8 @@ server <- function(input, output, session) {
                       dataFinal = NULL,
                       ENDOCcell_TIME = NULL,
                       ENDOCcell_EXP = NULL,
-                      MapBaseline = NULL)
+                      MapBaseline = NULL,
+                      MapBlanche = NULL)
   
   # save everytime there is a change in the results
   ENDOCresultListen <- reactive({
@@ -2916,7 +2922,23 @@ server <- function(input, output, session) {
       }
     }
   })
-  ### End other integration
+  #### End other integration
+  
+  ### DATAVERSE ####
+  
+  observeEvent(input$APIkey,{
+    
+    pathInteGreat <- system.file("Data", package = "InteGreat")
+    
+    # the last key used is saved
+    write(input$APIkey,file = paste0(pathInteGreat,"/.APIkey"))
+
+  })
+  #initiate_sword_dataset()
+  #add_dataset_file()
+  #publish_dataset()
+  
+  #### End DATAVERSE
   
   ### Loading files ####
   UploadDataAnalysisModuleAllFalse  = reactiveValues(FlagALL = F,
