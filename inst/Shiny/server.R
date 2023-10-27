@@ -4,379 +4,9 @@
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "InteGreat")
 
-pcrTab.generation = function(pcrTabs,SelectedGene)
-{
-  output_list <- column(width = 12,
-                        selectizeInput(inputId = paste0("selinp_",SelectedGene),
-                                       choices="",
-                                       options = list(maxItems = 1),
-                                       multiple = F,
-                                       label = "Value for the rescaling"),
-                        DTOutput(outputId=paste0("tab_",SelectedGene),
-                                 width = "80%")
-  )
-  return(output_list)
-}
-readfile <- function(filename,type,colname = T, namesAll = namesAll, allDouble = F) {
-  out <- tryCatch(
-    {
-      if(type == "RDs"){
-        x = readRDS(filename)
-        if(! ( all(names(x) %in% namesAll)) )
-          return(
-            list(message = "The RDs file must be generated from Data Analysis module.",
-                 call = "")
-          )
-        x
-      }else if(type == "RDsMulti"){
-        x = lapply(filename, readRDS)
-        for( i in 1:length(x))
-          if(! (all(names(x) %in% namesAll)))
-            return(
-              list(message = "The RDs file must be generated from Data Analysis module.",
-                   call = "")
-            )
-        x
-      }else if(type == "Excel"){
-        x = readxl::read_excel(filename,col_names = colname)
-        if(allDouble){
-          # we check the presence of not double values to set as NA
-          xstr = which(sapply(1:dim(x)[1], function(i) !is.double(x[[i]])) )
-          if(length(xstr)>0)
-            for(i in xstr)
-              x[[i]] = as.double(x[[i]])
-        }
-        return(x)
-      }else{
-        LoadImage(filename)
-        #imageShow(r2g)
-      }
-      
-    },
-    error=function(cond) {
-      # message(cond)
-      # Choose a return value in case of error
-      return(cond)
-    }
-    # warning=function(cond) {
-    #   # message(cond)
-    #   # Choose a return value in case of warning
-    #   return(cond)
-    # }
-  )    
-  return(out)
-}
+#source(system.file("Shiny","AuxFunctions.R", package = "InteGreat"))
+# source("./inst/Shiny/AuxFunctions.R")
 
-AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,Lane=1,AUCdf.new=NULL){
-  if(is.null(AUCdf.new)){
-    
-    if(length(AUCdf[,1])==1 & AUCdf$AUC[1] == "-")
-    {
-      AUCdf.new <- AUCdf
-    }else{
-      IDLane = Lane
-      AUCdf2 = AUCdf %>% filter(Lane == IDLane)
-      
-      if(length(AUCdf2[,1]) == 0){
-        AUCdf.new = AUCdf2
-        AUCdf.new[1,] = rep(NA,length(names(AUCdf2)))
-        AUCdf.new$Truncation = "-"
-        AUCdf.new$Lane = IDLane
-      }else{
-        AUCdf.new <- AUCdf2[length(AUCdf2$Truncation),]
-      }
-    }
-  }
-  
-  PanelsValue.Lane <- PanelsValue[which(PanelsValue$ID == Lane),]
-  id <- order(PanelsValue.Lane$Y)
-  AUCdf.new$AUC <- round(
-    sum(diff(PanelsValue.Lane$Y[id])*rollmean(PanelsValue.Lane$Values[id],2)),
-    digits = 4)
-  AUCdf.new$Lane <- paste(Lane)
-  
-  if(length(AUCdf[,1])==1 & AUCdf$AUC[1] == "-")
-  {
-    A<-AUCdf.new
-  }else{
-    A<-rbind(AUCdf,AUCdf.new) 
-  }
-  return(unique(A)) 
-}
-LoadImage = function(pathImage){
-  im <- OpenImageR::readImage(pathImage,as.is = T)
-  im = rgb_2gray(im)
-  
-  JpegImage = tempfile(fileext = "jpeg")
-  
-  # unlink()
-  jpeg(file=JpegImage,
-       width = dim(im)[2],
-       height = dim(im)[1],
-       units = "px")
-  imageShow(im)
-  dev.off()
-  
-  img <- jpeg::readJPEG(JpegImage, native = F)
-  
-  return(list(WB = im, RGB = img))
-}
-
-UploadRDs = function(Flag, session, output,
-                     DataAnalysisModule,
-                     Result, FlagsExp,PanelStructures=NULL){
-  if(Flag == "WB"){
-    
-    for(nameList in names(DataAnalysisModule$wbResult)) 
-      Result[[nameList]] <- DataAnalysisModule$wbResult[[nameList]]
-    
-    # update image WB
-    if(!is.null(Result$Im)){
-      im = Result$Im$RGB
-      output$TifPlot2 <- renderPlot({
-        plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
-        rasterImage(im,1,1,dim(im)[2],dim(im)[1])
-        if (nrow(Result$Planes) > 0) {
-          r <- Result$Planes
-          rect(r$xmin, r$ymin, r$xmax, r$ymax, border = "red")
-        }
-      })
-      
-      output$PlanesStructureTable <- renderDT(
-        Result$Planes,
-        server = FALSE,
-        editable = list(target = "column",
-                        disable = list(columns = 1:length(Result$Planes[1,])) ),
-        options = list(lengthChange = FALSE, autoWidth = TRUE),
-        rownames= FALSE
-      )
-      
-      PanelStructures$data = Result$Planes
-      
-    }
-    
-    # update lanes
-    
-    if(!is.null(Result$PanelsValue)){
-      updateSelectInput(session = session, "LaneChoice",
-                        choices = unique(Result$PanelsValue$ID),
-                        selected = 0
-      )
-    }
-    
-    if(!is.null(Result$TruncatedPlots)){
-      output$DataPlot <- renderPlot({Result$TruncatedPlots})
-      FlagsExp$LanesCut = T
-    }else if(!is.null(Result$Plots)){
-      output$DataPlot <- renderPlot({Result$Plots})
-      FlagsExp$LanesCut = T
-    }
-    
-    output$AUC <- renderDT({
-      Result$AUCdf %>% 
-        dplyr::select(ExpName, Lane,Truncation, AUC) %>% 
-        rename(`Sample Name` = ExpName)
-    },
-    selection = 'none',session = session,
-    rownames= FALSE,
-    editable = list(target = "cell", 
-                    disable = list(columns = 1:4))
-    )
-    
-    # output$AUC <- renderTable({
-    #   wbResult$AUCdf  %>% dplyr::select(Lane,Truncation, AUC)
-    # },width = "100%")
-    
-    # change pannel
-    updateTabsetPanel(session = session, "SideTabs",
-                      selected = "grey")
-    
-  }
-  else if(Flag == "PRCC"){
-    
-    for(nameList in names(DataAnalysisModule$pcrResult)) 
-      Result[[nameList]] <- DataAnalysisModule$pcrResult[[nameList]]
-    
-    choices = ""
-    selected = rep("",3)
-    
-    if(!is.null(Result$Initdata)){
-      choices = c("",colnames(Result$Initdata))
-    }
-    
-    if(!is.null(Result$selectPCRcolumns)){
-      selected = Result$selectPCRcolumns
-    }
-    
-    updateSelectInput(session = session,"PCR_gene",
-                      choices = choices,
-                      selected = selected[1]
-    )
-    updateSelectInput(session = session,"PCR_sample",
-                      choices = choices,
-                      selected = selected[2]
-    )
-    updateSelectInput(session = session,"PCR_value",
-                      choices = choices,
-                      selected = selected[3]
-    )
-    
-    
-    if(!is.null(Result$PCRnorm))
-      FlagsExp$norm = T
-    
-    if(!is.null(Result$PCRbaseline))
-      FlagsExp$baseline = T
-    
-    # change pannel
-    updateTabsetPanel(session = session, "SideTabs",
-                      selected = "uploadPCR")
-    
-    
-  }
-  else if(Flag == "ENDOC"){
-    
-    for(nameList in names(DataAnalysisModule$endocResult)) 
-      Result[[nameList]] <- DataAnalysisModule$endocResult[[nameList]]
-    
-    if(!is.null(Result$TablePlot)){
-      output$ENDOCmatrix <- renderDT(
-        Result$TablePlot,
-        server = FALSE
-      )
-    }
-    
-    if(!is.null(Result$ENDOCcell_TIME)){
-      
-      updateSelectizeInput(inputId = "ENDOCcell_TIME",session = session,
-                           choices = unique(c(Result$ENDOCcell_TIME))
-      )
-      
-      updateSelectizeInput(inputId = "ENDOCcell_EXP",session = session,
-                           choices = unique(c(Result$ENDOCcell_EXP))
-      )
-      
-      FlagsExp$AllExp = unique(c(Result$ENDOCcell_EXP))
-    }
-    
-    # change pannel
-    updateTabsetPanel(session = session, "SideTabs",
-                      selected = "uploadENDOC")
-    
-  }
-  else if(Flag == "ELISA"){
-    
-    for(nameList in names(DataAnalysisModule$elisaResult)) 
-      Result[[nameList]] <- DataAnalysisModule$elisaResult[[nameList]]
-    
-    if(!is.null(Result$TablePlot)){
-      output$ELISAmatrix <- renderDT(
-        Result$TablePlot,
-        server = FALSE
-      )
-    }
-    
-    if(!is.null(Result$ELISAcell_EXP)){
-      
-      updateSelectizeInput(inputId = "ELISAcell_EXP",
-                           session = session,
-                           choices = unique(c(Result$ELISAcell_EXP))
-      )
-      
-      updateSelectizeInput(inputId = "ELISAcell_SN",
-                           session =session,
-                           choices = unique(c(Result$ELISAcell_SN))
-      )
-      
-      FlagsExp$AllExp = unique(c(Result$ELISAcell_SN))
-    }
-    if(!is.null(Result$MapBaseline)){
-      FlagsExp$BASEselected = unique(Result$MapBaseline$Baseline)
-    }
-    if(!is.null(Result$MapBlanche)){
-      FlagsExp$BLANCHEselected = unique(Result$MapBlanche$Blanche)
-    }
-    if(!is.null(Result$Tablestandcurve)){
-      output$ELISA_Table_stdcurve <- DT::renderDataTable({
-        DT::datatable( Result$Tablestandcurve,
-                       selection = 'none',
-                       editable = list(target = "cell",
-                                       disable = list(columns = 0:2) ),
-                       options = list(lengthChange = FALSE, autoWidth = TRUE),
-                       rownames= FALSE
-        )
-      })
-      
-      if(length(FlagsExp$AllExp) > 1){
-        exp = FlagsExp$AllExp
-        exp = exp[exp != ""]
-        
-        bool.tmp = exp %in% unique(c(FlagsExp$BLANCHEselected,FlagsExp$BASEselected))
-        if( length(bool.tmp) > 0  )
-          exp = exp[!bool.tmp]
-        
-      updateSelectizeInput(session = session,
-                           inputId = "ELISA_standcurve",
-                               choices = exp,
-                               selected = unique(Result$Tablestandcurve$exp) )
-
-      FlagsExp$STDCselected= unique(Result$Tablestandcurve$exp)
-      }
-    }
-
-    ### updating check boxes
-    if(!is.null(FlagsExp$BLANCHEselected)){
-      exp = FlagsExp$AllExp
-      exp = exp[exp != ""]
-      
-      bool.tmp = exp %in% unique(c(FlagsExp$STDselected,FlagsExp$BASEselected))
-      if( length(bool.tmp) > 0  )
-        exp = exp[!bool.tmp]
-      
-      updateCheckboxGroupInput(session = session,
-                               inputId = "ELISA_blanches",
-                               choices = exp,
-                               selected = unique(FlagsExp$BLANCHEselected) )
-    }
-    if(!is.null(FlagsExp$BASEselected)){
-      exp = FlagsExp$AllExp
-      exp = exp[exp != ""]
-      
-      bool.tmp = exp %in% unique(c(FlagsExp$STDselected,FlagsExp$BLANCHEselected))
-      if( length(bool.tmp) > 0  )
-        exp = exp[!bool.tmp]
-      
-      updateCheckboxGroupInput(session = session,
-                               inputId = "ELISA_baselines",
-                               choices = exp,
-                               selected = unique(FlagsExp$BASEselected) )
-    }
-    ###
-    if(!is.null(Result$LinearRegression)){
-      Result$LinearRegression -> lmStancurve
-      Result$Tablestandcurve -> standcurve
-      infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-                          y = max(standcurve$Measures) + c(2,1.75),
-                          text = c( paste0("y = ", signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
-                                    paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
-      
-      output$ELISAregression <- renderPlot(
-        ggplot(standcurve,aes(Concentrations, Measures)) +
-          geom_point() +
-          geom_smooth(method='lm', col = "red") +
-          geom_text(data= infoLM,
-                    aes(x = x, y = y, label =text ),
-                    vjust = "inward", hjust = "inward" )+
-          theme_bw()
-      )
-    }
-    
-    # change pannel
-    updateTabsetPanel(session = session, "SideTabs",
-                      selected = "uploadELISA")
-    
-  }
-}
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   DataAnalysisModule <- reactiveValues(wbResult = NULL,
@@ -395,8 +25,7 @@ server <- function(input, output, session) {
   
   ### WB analysis ####
   # DECLARE REACTIVEVALUES FUNCTION HERE
-  PanelData = data.frame(Panel = character(),
-                         ID = numeric(),
+  PanelData = data.frame(SampleName = character(),
                          xmin = numeric(), ymin = numeric(), 
                          xmax = numeric(), ymax = numeric())
   
@@ -408,7 +37,7 @@ server <- function(input, output, session) {
                              Plots = NULL,
                              TruncatedPlots = NULL,
                              pl = NULL,
-                             AUCdf=data.frame(ExpName = "-", Truncation = "-", AUC = "-", Lane="-"  ))
+                             AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-"  ))
   
   wbResultsEmpty <- list(Normalizer = NULL,
                          Im = NULL,
@@ -418,7 +47,7 @@ server <- function(input, output, session) {
                          Plots = NULL,
                          TruncatedPlots = NULL,
                          pl = NULL,
-                         AUCdf=data.frame(ExpName = "-", Truncation = "-", AUC = "-", Lane="-"  )
+                         AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-" )
   )
   
   
@@ -479,14 +108,15 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$confirmUpload,{
-    removeModal()
     DataAnalysisModule$wbResult = wbResultsEmpty
+    
+    for(j in names(wbResult))
+      wbResult[[j]] = wbResultsEmpty[[j]]
     
     output$AUC <- renderDT({
       wbResult$AUCdf %>% 
-        dplyr::select(ExpName, Lane,Truncation, AUC) %>% 
-        rename(`Sample Name` = ExpName)},
-      selection = 'none',        
+        dplyr::select(SampleName,Truncation, AUC)},
+      selection = 'none',  
       rownames= FALSE,
       editable = list(target = "cell", 
                       disable = list(columns = 1:4)))
@@ -517,6 +147,7 @@ server <- function(input, output, session) {
       "The image has been uploaded  with success"
     })
     
+    removeModal()
   })
   
   observe({
@@ -566,18 +197,18 @@ server <- function(input, output, session) {
           if( abs((newH - prevH) + (newW - prevW)) > 1 )
           {
             NumberOfPlanes$N = 1
-            PanelStructures$data <- data.frame(Panel = "", ID = 1,vals)
+            PanelStructures$data <- data.frame(SampleName = "1",vals)
           }else{
             PanelStructures$data <- rbind(PanelStructures$data,
-                                          cbind(data.frame(Panel = "",
-                                                           ID = nrow(PanelStructures$data)+1),
-                                                vals))
+                                          cbind(data.frame(
+                                            SampleName = paste(nrow(PanelStructures$data)+1) ),
+                                            vals))
           }
         }else{
           PanelStructures$data <- rbind(PanelStructures$data,
-                                        cbind(data.frame(Panel = "",
-                                                         ID = nrow(PanelStructures$data)+1),
-                                              vals))
+                                        cbind(data.frame(
+                                          SampleName = paste(nrow(PanelStructures$data)+1) ),
+                                          vals))
         }
         prev_vals <<- vals
       }
@@ -611,8 +242,9 @@ server <- function(input, output, session) {
   
   output$PlanesStructureTable <- renderDT(
     {
-      datatable(PanelStructures$data %>% dplyr::select(-Panel),
-                editable = T,#list(target = "column", disable = list(columns = 1:length(PanelStructures$data[1,])) ),
+      datatable(PanelStructures$data,
+                editable = list(target = "cell", 
+                                disable = list(columns = 1:4)),
                 options = list(lengthChange = FALSE, autoWidth = TRUE),
                 rownames= FALSE
       )
@@ -621,25 +253,33 @@ server <- function(input, output, session) {
   
   # check names Planes
   observeEvent(input$PlanesStructureTable_cell_edit, {
-    row  <- input$PlanesStructureTable_cell_edit$row
-    PanelStructures$data[row, 1] <- input$PlanesStructureTable_cell_edit$value
+    cells = input$PlanesStructureTable_cell_edit
+    
+    data = PanelStructures$data %>% filter(SampleName == PanelStructures$data[cells$row,"SampleName"])
+    
+    # we check that the same LANE should not have same names.
+    if(cells$value %in% data$SampleName){
+      k = table(data$SampleName)[cells$value]
+      cells$value = paste0(cells$value, " (",k,")")
+    }
+    cells$col = 1
+    
+    PanelStructures$data <- editData( PanelStructures$data , cells, 'PlanesStructureTable')
     wbResult$Planes = PanelStructures$data
   })
   
   observeEvent(wbResult$AUCdf,{
     output$AUC <-  renderDT({
       wbResult$AUCdf %>%
-        dplyr::select(ExpName, Lane,Truncation, AUC) %>% 
-        rename(`Sample Name` = ExpName)
+        dplyr::select(SampleName,Truncation, AUC)
     },
     selection = 'none',
-    rownames= FALSE,
-    editable = list(target = "cell", 
-                    disable = list(columns = 1:4)))
+    rownames= FALSE)
   })
   
   
-  observeEvent(list(input$GenLanes,wbResult$Planes),{
+  #observeEvent(list(input$GenLanes,wbResult$Planes),{
+  observeEvent(input$GenLanes,{
     if(NumberOfPlanes$N >1){
       Planes = PanelStructures$data
       Planes[,-1] = round(Planes[,-1])
@@ -668,7 +308,7 @@ server <- function(input, output, session) {
                                      #imageShow(plane)
                                      GreyPlane = apply(plane,1,"mean")
                                      data.frame(Values = GreyPlane,# - min(GreyPlane),
-                                                ID = paste0(p$ID,". ",p$Panel),
+                                                ID = paste0(i,". ",p$SampleName),
                                                 Y = 1:length(GreyPlane) )
                                    },
                                    im,PanelData)
@@ -700,12 +340,11 @@ server <- function(input, output, session) {
     wbResult$TruncatedPlots = wbResultsEmpty$TruncatedPlots 
     
     output$AUC <-  renderDT({wbResult$AUCdf %>%
-        dplyr::select(ExpName, Lane,Truncation, AUC) %>% 
-        rename(`Sample Name` = ExpName)},
+        dplyr::select(SampleName,Truncation, AUC)},
         selection = 'none', 
         rownames= FALSE,
-        editable = list(target = "cell", 
-                        disable = list(columns = 1:4))
+        # editable = list(target = "cell", 
+        #                 disable = list(columns = 1:4))
     )
     
     output$DataPlot <- renderPlot({wbResult$Plots})
@@ -734,9 +373,9 @@ server <- function(input, output, session) {
                         max = max(Plots.Lane$X),
                         value = c(min(Plots.Lane$X), max(Plots.Lane$X) ) ) 
       updateSliderInput(session,"truncH",
-                        min = min(Plots.Lane$Y),
-                        max = max(Plots.Lane$Y),
-                        value =min(Plots.Lane$Y) )
+                        min = round(min(Plots.Lane$Y),digits = 3),
+                        max = round(max(Plots.Lane$Y),digits = 3),
+                        value = round(min(Plots.Lane$Y),digits = 3) )
       
     }
     
@@ -775,7 +414,7 @@ server <- function(input, output, session) {
       }else if(Flags$CutTab=="H")
       {
         TruncY<-input$truncH[1]
-        hline.dat <- data.frame(ID=as.factor(PanelsValue$ID), hl =0)
+        hline.dat <- data.frame(ID=as.factor(PanelsValue$ID), hl =min(PanelsValue$Y))
         hline.dat  <-  hline.dat[ hline.dat$ID == IDlane, ]
         hline.dat$hl <- TruncY
         
@@ -785,7 +424,7 @@ server <- function(input, output, session) {
       output$DataPlot <- renderPlot({pl})
       
       ### AUC calculation of the whole lane without cuts:
-      wbResult$AUCdf <- AUCfunction(wbResult$AUCdf,PanelsValue,Lane = IDlane)
+      wbResult$AUCdf <- AUCfunction(wbResult$AUCdf,PanelsValue,SName = IDlane)
     }  
   })
   
@@ -806,17 +445,17 @@ server <- function(input, output, session) {
       
       wbResult$AUCdf -> AUCdf
       AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
-      AUCdf.new$ExpName = "-"
+      #AUCdf.new$ExpName = "-"
       lastTrunc = AUCdf %>% 
-        group_by(Lane) %>%
-        filter(Lane == IDlane, row_number()==n() ) %>%
+        group_by(SampleName) %>%
+        filter(SampleName == IDlane, row_number()==n() ) %>%
         ungroup() %>%
         dplyr::select(Truncation) 
       
       if(length(lastTrunc$Truncation) > 0 & lastTrunc$Truncation != "-")
         AUCdf.new$Truncation <- lastTrunc$Truncation
       
-      AUCdf.new$Lane <- IDlane
+      AUCdf.new$SampleName <- IDlane
       
       if(Flags$CutTab=="V")
       {
@@ -853,37 +492,36 @@ server <- function(input, output, session) {
       wbResult$TruncatedPanelsValue <- PanelsValue
       wbResult$TruncatedPlots <- pl
       output$DataPlot <- renderPlot({pl})
-      AUCdf<-AUCfunction(AUCdf.new=AUCdf.new,wbResult$AUCdf,PanelsValue,Lane = IDlane)
+      AUCdf<-AUCfunction(AUCdf.new=AUCdf.new,wbResult$AUCdf,PanelsValue,SName = IDlane)
       
       output$AUC <- renderDT({
         AUCdf  %>% 
-          dplyr::select(ExpName, Lane,Truncation, AUC) %>% 
-          rename(`Sample Name` = ExpName) 
+          dplyr::select(SampleName,Truncation, AUC) 
       },
       selection = 'none', 
-      rownames= FALSE,
-      editable = list(target = "cell", 
-                      disable = list(columns = 1:4))
+      rownames= FALSE
+      # editable = list(target = "cell", 
+      #                 disable = list(columns = 1:4))
       )
       wbResult$AUCdf <- AUCdf
     }
   })
   
-  # edit AUC sample name
-  observeEvent(input$AUC_cell_edit, {
-    cells = input$AUC_cell_edit
-    wbResult$AUCdf -> AUCdf
-    AUCdf = AUCdf %>% filter(Lane == AUCdf[cells$row,"Lane"])
-    
-    # we check that the same LANE should not have same names.
-    if(cells$value %in% AUCdf$ExpName){
-      k = table(AUCdf$ExpName )[cells$value]
-      cells$value = paste0(cells$value, " (",k,")")
-    }
-    
-    wbResult$AUCdf <- editData( wbResult$AUCdf , cells, 'AUC')
-  })
-  
+  # # edit AUC sample name
+  # observeEvent(input$AUC_cell_edit, {
+  #   cells = input$AUC_cell_edit
+  #   wbResult$AUCdf -> AUCdf
+  #   AUCdf = AUCdf %>% filter(SampleName == AUCdf[cells$row,"SampleName"])
+  #   
+  #   # we check that the same LANE should not have same names.
+  #   if(cells$value %in% AUCdf$ExpName){
+  #     k = table(AUCdf$ExpName )[cells$value]
+  #     cells$value = paste0(cells$value, " (",k,")")
+  #   }
+  #   cells$col = 1
+  #   wbResult$AUCdf <- editData( wbResult$AUCdf , cells, 'AUC')
+  # })
+  # 
   ## next buttons
   observeEvent(input$NextWBQuantif,{
     if(!is.null(wbResult$AUCdf))
@@ -953,7 +591,7 @@ server <- function(input, output, session) {
              "The WB analysis must contain the AUC table")
       )
       
-      choices = paste0(mess$AUCdf$Lane, " with ", mess$AUCdf$Truncation)
+      choices = paste0(mess$AUCdf$SampleName, " with ", mess$AUCdf$Truncation)
       
       wbquantResult$NormWBanalysis  = mess
       
@@ -968,41 +606,41 @@ server <- function(input, output, session) {
   })
   
   # edit AUC_WB and AUC_WBnorm sample name
-  observeEvent(input$AUC_WB_cell_edit, {
-    cells = input$AUC_WB_cell_edit
-    cells$col = cells$col + 1
-    wbquantResult$WBanalysis$AUCdf -> AUCdf
-    AUCdf = AUCdf %>% filter(Lane == AUCdf[cells$row,"Lane"])
-    
-    # we check that the same LANE should not have same names.
-    if(cells$value %in% AUCdf$ExpName){
-      k = table(AUCdf$ExpName )[cells$value]
-      cells$value = paste0(cells$value, " (",k,")")
-    }
-    
-    wbquantResult$WBanalysis$AUCdf <- editData( wbquantResult$WBanalysis$AUCdf ,
-                                                cells, 'AUC_WB')
-  })
-  observeEvent(input$AUC_WBnorm_cell_edit, {
-    cells = input$AUC_WBnorm_cell_edit
-    cells$col = cells$col + 1
-    wbquantResult$NormWBanalysis$AUCdf -> AUCdf
-    AUCdf = AUCdf %>% filter(Lane == AUCdf[cells$row,"Lane"])
-    
-    # we check that the same LANE should not have same names.
-    if(cells$value %in% AUCdf$ExpName){
-      k = table(AUCdf$ExpName )[cells$value]
-      cells$value = paste0(cells$value, " (",k,")")
-    }
-    
-    wbquantResult$NormWBanalysis$AUCdf <- editData( wbquantResult$NormWBanalysis$AUCdf ,
-                                                    cells, 'AUC_WBnorm')
-    updateSelectInput("IdLaneNorm_RelDens",
-                      session = session,
-                      choices = "Nothing selected",
-                      selected = "Nothing selected")
-  })
-  
+  # observeEvent(input$AUC_WB_cell_edit, {
+  #   cells = input$AUC_WB_cell_edit
+  #   cells$col = cells$col + 1
+  #   wbquantResult$WBanalysis$AUCdf -> AUCdf
+  #   AUCdf = AUCdf %>% filter(SampleName == AUCdf[cells$row,"SampleName"])
+  #   
+  #   # we check that the same LANE should not have same names.
+  #   if(cells$value %in% AUCdf$SampleName){
+  #     k = table(AUCdf$SampleName )[cells$value]
+  #     cells$value = paste0(cells$value, " (",k,")")
+  #   }
+  #   
+  #   wbquantResult$WBanalysis$AUCdf <- editData( wbquantResult$WBanalysis$AUCdf ,
+  #                                               cells, 'AUC_WB')
+  # })
+  # observeEvent(input$AUC_WBnorm_cell_edit, {
+  #   cells = input$AUC_WBnorm_cell_edit
+  #   cells$col = cells$col + 1
+  #   wbquantResult$NormWBanalysis$AUCdf -> AUCdf
+  #   AUCdf = AUCdf %>% filter(Lane == AUCdf[cells$row,"Lane"])
+  #   
+  #   # we check that the same LANE should not have same names.
+  #   if(cells$value %in% AUCdf$ExpName){
+  #     k = table(AUCdf$ExpName )[cells$value]
+  #     cells$value = paste0(cells$value, " (",k,")")
+  #   }
+  #   
+  #   wbquantResult$NormWBanalysis$AUCdf <- editData( wbquantResult$NormWBanalysis$AUCdf ,
+  #                                                   cells, 'AUC_WBnorm')
+  #   updateSelectInput("IdLaneNorm_RelDens",
+  #                     session = session,
+  #                     choices = "Nothing selected",
+  #                     selected = "Nothing selected")
+  # })
+  # 
   # update the wb tables
   observe({
     if(is.null(wbquantResult$NormWBanalysis)){
@@ -1011,12 +649,11 @@ server <- function(input, output, session) {
       table = wbquantResult$NormWBanalysis$AUCdf
     }
     output$AUC_WBnorm <- renderDT(
-      table %>% 
-        rename(`Sample Name` = ExpName), 
+      table , 
       #filter = 'top', server = FALSE, 
       selection = "multiple", 
-      editable = list(target = "cell", 
-                      disable = list(columns = 1:3)),
+      # editable = list(target = "cell", 
+      #                 disable = list(columns = 1:3)),
       options = list(lengthChange = FALSE, autoWidth = TRUE),
       rownames= FALSE
     )
@@ -1028,12 +665,11 @@ server <- function(input, output, session) {
       table = wbquantResult$WBanalysis$AUCdf
     }
     output$AUC_WB <- renderDT(
-      table %>% 
-        rename(`Sample Name` = ExpName),
+      table,
       #filter = 'top', server = FALSE, 
       selection = "multiple", 
-      editable = list(target = "cell", 
-                      disable = list(columns = 1:3)),
+      # editable = list(target = "cell", 
+      #                 disable = list(columns = 1:3)),
       options = list(lengthChange = FALSE, autoWidth = TRUE),
       rownames= FALSE
     )
@@ -1060,7 +696,7 @@ server <- function(input, output, session) {
       if(length(indexesWB) > 0){
         wbquantResult$NormWBanalysis_filtered = AUCdf[indexesWB,]
         
-        choices = paste0(AUCdf[indexesWB,]$ExpName,": Lane ", AUCdf[indexesWB,]$Lane, "; truncated ", AUCdf[indexesWB,]$Truncation)
+        choices = paste0( AUCdf[indexesWB,]$SampleName, "; truncated ", AUCdf[indexesWB,]$Truncation)
         selected = input$IdLaneNorm_RelDens
         updateSelectInput("IdLaneNorm_RelDens",
                           session = session,
@@ -1079,15 +715,14 @@ server <- function(input, output, session) {
     if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered)){
       IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
       IdLaneNorm_RelDens = strsplit(IdLaneNorm_RelDens,
-                                    split = "(: Lane )|(; truncated )")[[1]]
+                                    split = "; truncated ")[[1]]
       
       tbWBnorm = wbquantResult$NormWBanalysis_filtered %>%
-        filter(ExpName == IdLaneNorm_RelDens[1],
-               Lane ==IdLaneNorm_RelDens[2],
-               Truncation == IdLaneNorm_RelDens[3]) %>%
+        filter(SampleName ==IdLaneNorm_RelDens[1],
+               Truncation == IdLaneNorm_RelDens[2]) %>%
         rename(AUC_Norm = AUC,
                Truncation_Norm = Truncation,
-               Lane_Norm = Lane)
+               SampleName_Norm = SampleName)
       
       tbWB = wbquantResult$WBanalysis_filtered
       
@@ -1096,15 +731,14 @@ server <- function(input, output, session) {
         table$AUC_Norm = tbWBnorm$AUC_Norm
         table$RelDens = table$AUC/table$AUC_Norm
         table = table %>%
-          dplyr::select(ExpName, Lane, Truncation, AUC, AUC_Norm, RelDens) 
+          dplyr::select(SampleName, Truncation, AUC, AUC_Norm, RelDens) 
       }
     }
     
     wbquantResult$RelDensitiy = table
     
     output$AUC_RelDens <- renderDT(
-      table%>% 
-        rename(`Sample Name` = ExpName) ,
+      table,
       filter = 'top',
       server = FALSE,
       options = list(lengthChange = FALSE, autoWidth = TRUE),
@@ -1113,10 +747,9 @@ server <- function(input, output, session) {
     
   })
   observeEvent(list(FlagsWBquant$BothUploaded, input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
-    table = data.frame(Lane = "-",
-                       ExpName = "-",
+    table = data.frame(SampleName = "-",
                        Truncation = "-",
-                       ExpName_Norm = "-", 
+                       SampleName_Norm = "-", 
                        Truncation_Norm = "-",
                        AUC = "-", 
                        AUC_Norm = "-",
@@ -1128,38 +761,41 @@ server <- function(input, output, session) {
       tbWBnorm = wbquantResult$NormWBanalysis_filtered
       
       tbWBnorm = tbWBnorm  %>%
-        rename(ExpName_Norm = ExpName,
+        rename(SampleName_Norm = SampleName,
                AUC_Norm = AUC,
                Truncation_Norm = Truncation)
       
-      table = left_join(tbWBnorm,tbWB, by = "Lane" ,all = T )
+      table = left_join(tbWBnorm,tbWB, by = "SampleName" ,all = T )
       
       table$AdjRelDens = table$AUC/table$AUC_Norm
       table = table %>% 
-        dplyr::select( Lane,ExpName, Truncation,ExpName_Norm, Truncation_Norm, AUC, AUC_Norm, AdjRelDens) 
+        dplyr::select( SampleName, Truncation,SampleName_Norm, Truncation_Norm, AUC, AUC_Norm, AdjRelDens) 
     }
     
     wbquantResult$AdjRelDensitiy = table
     output$AUC_AdjRelDens <- renderDT(
-      table %>% 
-        rename(`Sample Name` = ExpName,
-               `Sample Name Norm` = ExpName_Norm) ,
+      table ,
       server = FALSE,
       options = list(lengthChange = FALSE, autoWidth = TRUE),
       rownames= FALSE
     )
     
-    output$plot_AdjRelDens <- renderPlot({
-      table %>% 
-        mutate(Normalizer = paste0("Sample: ",ExpName_Norm ),
-               WB = paste0("Sample: ",ExpName))  %>%
+    if(dim(table)[1] > 1 ){
+      barPlotAdjRelDens = table %>% 
+        mutate(Normalizer = paste0("Sample: ",SampleName_Norm ),
+               WB = paste0("Sample: ",SampleName))  %>%
         ggplot() +
-        geom_bar(aes(x = Lane,
+        geom_bar(aes(x = SampleName,
                      y = AdjRelDens,
                      fill = Normalizer ),
                  stat = "identity" ) +
         facet_grid(~WB)+
         theme_bw()
+    }else{
+      barPlotAdjRelDens = ggplot()
+    }
+    output$plot_AdjRelDens <- renderPlot({
+      barPlotAdjRelDens
     })
   })
   
@@ -1261,7 +897,6 @@ server <- function(input, output, session) {
     })
   })
   observeEvent(input$confirmUploadPCR,{
-    removeModal()
     
     pcrResult = pcrResult0
     
@@ -1302,6 +937,8 @@ server <- function(input, output, session) {
                         choices = c("",colnames(pcrResult$Initdata)),
                         selected = ""
       )
+      
+      removeModal()
       
       "The RDs has been uploaded  with success"
     })
@@ -1549,7 +1186,6 @@ server <- function(input, output, session) {
     }
   })
   observeEvent(input$confirmUploadENDOC,{
-    removeModal()
     
     for(nameList in names(endocResult0)) 
       endocResult[[nameList]] <- endocResult0[[nameList]]
@@ -1571,6 +1207,9 @@ server <- function(input, output, session) {
       )
       
       endocResult$Initdata = mess
+      
+      removeModal()
+      
       "The RDs has been uploaded  with success"
     })
   })
@@ -1982,7 +1621,7 @@ server <- function(input, output, session) {
                                MapBlanche = NULL,
                                Tablestandcurve = NULL,
                                LinearRegression = NULL)
-
+  
   elisaResult0 = list(Initdata= NULL,
                       data = NULL,
                       TablePlot = NULL,
@@ -2204,7 +1843,7 @@ server <- function(input, output, session) {
       updateSelectizeInput(session,"ELISA_standcurve",
                            choices = exp,
                            selected = ifelse(FlagsELISA$STDCselected %in% exp,FlagsELISA$STDCselected,"") 
-                           )
+      )
     }
   })
   observeEvent(c(FlagsELISA$AllExp,FlagsELISA$BASEselected,FlagsELISA$STDCselected),{
@@ -2365,7 +2004,7 @@ server <- function(input, output, session) {
           rename( MeanExperiment = meanValues,
                   MeanBaseline = BaseValues ) %>%
           dplyr::mutate(Quantification = (MeanExperiment -q)/m ) %>%
-                          #MeanExperiment/MeanBaseline * 100) %>%
+          #MeanExperiment/MeanBaseline * 100) %>%
           rename(Experiment = exp,Time = time) 
         
         output$ELISAtables = renderDT(elisamean)
@@ -2477,12 +2116,12 @@ server <- function(input, output, session) {
       if(!is.null(elisaResult$Tablestandcurve) && 
          all.equal(elisaResult$Tablestandcurve %>% select(-Concentrations),
                    standcurve  %>% select(-Concentrations) ))
-        {
+      {
         standcurve =  elisaResult$Tablestandcurve
       }else{
         elisaResult$Tablestandcurve = standcurve
       }
-
+      
       
       output$ELISA_Table_stdcurve <- DT::renderDataTable({
         DT::datatable( standcurve,
@@ -2491,8 +2130,8 @@ server <- function(input, output, session) {
                                        disable = list(columns = 0:2) ),
                        options = list(lengthChange = FALSE, autoWidth = TRUE),
                        rownames= FALSE
-      )
-    })
+        )
+      })
     } 
   })
   observeEvent(input$ELISA_Table_stdcurve_cell_edit, {
@@ -2557,7 +2196,7 @@ server <- function(input, output, session) {
       updateSelectizeInput(inputId = "StatAnalysis",choices = c("",Analysis2),selected = "")
     }
     
-    })
+  })
   
   ### End Statistic ####
   
@@ -2962,7 +2601,7 @@ server <- function(input, output, session) {
     
     if(input$APIkey != "") # the last key used is saved
       write(input$APIkey,file = paste0(pathInteGreat,"/.APIkey"))
-
+    
   })
   #initiate_sword_dataset()
   #add_dataset_file()
@@ -2984,7 +2623,7 @@ server <- function(input, output, session) {
                                             FlagELISA = F,
                                             FlagENDOC = F)
   
-
+  
   # upload in the statistic module
   observeEvent(input$loadStatAnalysis_file_Button,{
     output$loadStatAnalysis_Error <- renderText({
@@ -3070,16 +2709,16 @@ server <- function(input, output, session) {
   })
   observeEvent(UploadDataAnalysisModule$FlagUpdate,{
     if(UploadDataAnalysisModule$FlagUpdate){
-    
+      
       if(UploadDataAnalysisModule$FlagWB || UploadDataAnalysisModule$FlagALL){
-          UploadRDs(Flag = "WB",
+        UploadRDs(Flag = "WB",
                   session = session,
                   output = output,
                   DataAnalysisModule = DataAnalysisModule,
                   Result = wbResult, 
                   FlagsExp = Flags,
                   PanelStructures = PanelStructures)
-        }
+      }
       else if(UploadDataAnalysisModule$FlagPRCC || UploadDataAnalysisModule$FlagALL){
         UploadRDs(Flag = "PRCC",
                   session = session,
@@ -3118,7 +2757,7 @@ server <- function(input, output, session) {
       paste('ELISAanalysis-', Sys.Date(), '.xlsx', sep='')
     },
     content = function(file) {
-      
+      saveExcel(filename = file, ResultList=DataAnalysisModule$elisaResult , analysis = "ELISA")
     }
   )
   

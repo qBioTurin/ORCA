@@ -8,7 +8,7 @@ library(OpenImageR)
 library(dplyr)
 library("shinyWidgets")
 library(DT)
-
+library(openxlsx)
 
   
 ui <- dashboardPage(
@@ -99,13 +99,13 @@ ui <- dashboardPage(
                          tabName = 'StatAnalysis_tab',
                          icon = icon('magnifying-glass-chart')
                 ),
-                menuItem('Load analysis',
-                         tabName = 'LoadAnalysis',
-                         icon = icon('upload')
-                ),
                 menuItem('Dataverse',
                          tabName = 'Dataverse_tab',
                          icon = icon('eye')
+                ),
+                menuItem('Load analysis',
+                         tabName = 'LoadAnalysis',
+                         icon = icon('upload')
                 )
     )
   ),
@@ -820,6 +820,7 @@ ui <- dashboardPage(
                 box( width = 6,
                      title = tagList(shiny::icon("gear", verify_fa = FALSE), 
                                      "Protein Band Selection Coordinates"),
+                     h5(em("Click on the SampleName column to associate the lane with a sample name. Let us note that equal sample names are not allowed.")),
                      DTOutput("PlanesStructureTable")
                 ),
                 box( width = 6,
@@ -854,7 +855,7 @@ ui <- dashboardPage(
                 box(width = 6,
                     tabsetPanel(id = "tabs",
                                 tabPanel("Vertical cut", value= "V",textOutput("V"),
-                                         sliderInput(inputId = "truncV", label = h4("Truncation:"),
+                                         sliderInput(inputId = "truncV", label = h4("Vertical truncation:"),
                                                      min = 0, max = 0, value = c(0,0),step = 1
                                          ),
                                          actionButton( 
@@ -864,7 +865,7 @@ ui <- dashboardPage(
                                 ),
                                 tabPanel("Horizontal cut", value= "H",textOutput("H"),
                                          sliderInput(inputId = "truncH", label = h4("Horizontal truncation:"),
-                                                     min = 0, max = 0, value = 0,step = 1),
+                                                     min = 0, max = 0, value = 0),
                                          actionButton( label = "Cut", inputId = "actionButton_TruncH",
                                                        icon = icon("cut") 
                                          )
