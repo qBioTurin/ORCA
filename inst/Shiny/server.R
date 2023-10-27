@@ -4,7 +4,6 @@
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "InteGreat")
 
-
 pcrTab.generation = function(pcrTabs,SelectedGene)
 {
   output_list <- column(width = 12,
@@ -18,7 +17,7 @@ pcrTab.generation = function(pcrTabs,SelectedGene)
   )
   return(output_list)
 }
-readfile <- function(filename,type,colname = T, namesAll = namesAll) {
+readfile <- function(filename,type,colname = T, namesAll = namesAll, allDouble = F) {
   out <- tryCatch(
     {
       if(type == "RDs"){
@@ -40,14 +39,17 @@ readfile <- function(filename,type,colname = T, namesAll = namesAll) {
         x
       }else if(type == "Excel"){
         x = readxl::read_excel(filename,col_names = colname)
-        # we check the presence of not double values to set as NA
-        xstr = which(sapply(1:dim(x)[1], function(i) !is.double(x[[i]])) )
-        if(length(xstr)>0)
-          for(i in xstr)
-            x[[i]] = as.double(x[[i]])
+        if(allDouble){
+          # we check the presence of not double values to set as NA
+          xstr = which(sapply(1:dim(x)[1], function(i) !is.double(x[[i]])) )
+          if(length(xstr)>0)
+            for(i in xstr)
+              x[[i]] = as.double(x[[i]])
+        }
         return(x)
       }else{
         LoadImage(filename)
+        #imageShow(r2g)
       }
       
     },
@@ -103,8 +105,10 @@ AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,Lane=1,AUCdf.ne
 }
 LoadImage = function(pathImage){
   im <- OpenImageR::readImage(pathImage,as.is = T)
+  im = rgb_2gray(im)
   
   JpegImage = tempfile(fileext = "jpeg")
+  
   # unlink()
   jpeg(file=JpegImage,
        width = dim(im)[2],
@@ -272,19 +276,19 @@ UploadRDs = function(Flag, session, output,
       )
     }
     
-    if(!is.null(Result$ELISAcell_TIME)){
-      
-      updateSelectizeInput(inputId = "ELISAcell_TIME",
-                           session = session,
-                           choices = unique(c(Result$ELISAcell_TIME))
-      )
+    if(!is.null(Result$ELISAcell_EXP)){
       
       updateSelectizeInput(inputId = "ELISAcell_EXP",
-                           session =session,
+                           session = session,
                            choices = unique(c(Result$ELISAcell_EXP))
       )
       
-      FlagsExp$AllExp = unique(c(Result$ELISAcell_EXP))
+      updateSelectizeInput(inputId = "ELISAcell_SN",
+                           session =session,
+                           choices = unique(c(Result$ELISAcell_SN))
+      )
+      
+      FlagsExp$AllExp = unique(c(Result$ELISAcell_SN))
     }
     if(!is.null(Result$MapBaseline)){
       FlagsExp$BASEselected = unique(Result$MapBaseline$Baseline)
@@ -660,10 +664,10 @@ server <- function(input, output, session) {
                                      p = PanelData[i,]
                                      Nrow = dim(im)[1]
                                      Ncol= dim(im)[2]
-                                     plane = im[(Nrow-p$ymax):(Nrow-p$ymin),p$xmin:p$xmax]
+                                     plane = abs(im[(Nrow-p$ymax):(Nrow-p$ymin),p$xmin:p$xmax]-1)
                                      #imageShow(plane)
                                      GreyPlane = apply(plane,1,"mean")
-                                     data.frame(Values = GreyPlane - min(GreyPlane),
+                                     data.frame(Values = GreyPlane,# - min(GreyPlane),
                                                 ID = paste0(p$ID,". ",p$Panel),
                                                 Y = 1:length(GreyPlane) )
                                    },
@@ -1517,6 +1521,7 @@ server <- function(input, output, session) {
       mess = readfile(
         filename = input$ENDOCImport$datapath,
         type = "Excel",
+        allDouble = T,
         colname = F
       )
       
@@ -1971,8 +1976,8 @@ server <- function(input, output, session) {
                                data = NULL,
                                TablePlot = NULL,
                                dataFinal = NULL,
-                               ELISAcell_TIME = NULL,
                                ELISAcell_EXP = NULL,
+                               ELISAcell_SN = NULL,
                                MapBaseline = NULL,
                                MapBlanche = NULL,
                                Tablestandcurve = NULL,
@@ -1982,8 +1987,8 @@ server <- function(input, output, session) {
                       data = NULL,
                       TablePlot = NULL,
                       dataFinal = NULL,
-                      ELISAcell_TIME = NULL,
                       ELISAcell_EXP = NULL,
+                      ELISAcell_SN = NULL,
                       MapBaseline = NULL,
                       MapBlanche = NULL,
                       Tablestandcurve = NULL,
@@ -2016,6 +2021,7 @@ server <- function(input, output, session) {
       mess = readfile(
         filename = input$ELISAImport$datapath,
         type = "Excel",
+        allDouble = T,
         colname = F
       )
       
@@ -2111,13 +2117,13 @@ server <- function(input, output, session) {
       #   #rownames= FALSE
       # )
       
-      ELISAcell_EXP <- ELISAcell_TIME <- matrix(
+      ELISAcell_SN <- ELISAcell_EXP <- matrix(
         "",
         nrow = length(ELISA[,1]),
         ncol = length(ELISA[1,])
       )
-      elisaResult$ELISAcell_EXP <- ELISAcell_EXP
-      elisaResult$ELISAcell_TIME<- ELISAcell_TIME
+      elisaResult$ELISAcell_SN <- ELISAcell_SN
+      elisaResult$ELISAcell_EXP<- ELISAcell_EXP
       elisaResult$TablePlot = ELISAtb
     }
   })
@@ -2126,37 +2132,37 @@ server <- function(input, output, session) {
       cellSelected= as.numeric(input$ELISAmatrix_cell_clicked)
       FlagsELISA$cellCoo = cellCoo = c(cellSelected[1],cellSelected[2]+1)
       print(cellCoo)
-      print(elisaResult$ELISAcell_TIME[ cellCoo[1],cellCoo[2] ])
-      print(elisaResult$ELISAcell_EXP[ cellCoo[1], cellCoo[2] ])
-      updateSelectizeInput(inputId = "ELISAcell_TIME",
-                           selected = ifelse(is.null(elisaResult$ELISAcell_TIME[cellCoo[1],cellCoo[2]]),
-                                             "",
-                                             elisaResult$ELISAcell_TIME[cellCoo[1],cellCoo[2]])
-      )
+      print(elisaResult$ELISAcell_EXP[ cellCoo[1],cellCoo[2] ])
+      print(elisaResult$ELISAcell_SN[ cellCoo[1], cellCoo[2] ])
       updateSelectizeInput(inputId = "ELISAcell_EXP",
                            selected = ifelse(is.null(elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]]),
                                              "",
                                              elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]])
       )
+      updateSelectizeInput(inputId = "ELISAcell_SN",
+                           selected = ifelse(is.null(elisaResult$ELISAcell_SN[cellCoo[1],cellCoo[2]]),
+                                             "",
+                                             elisaResult$ELISAcell_SN[cellCoo[1],cellCoo[2]])
+      )
     }
   })
   
-  observeEvent(input$ELISAcell_TIME,{
-    if(!is.null(elisaResult$ELISAcell_TIME)){
-      cellCoo = FlagsELISA$cellCoo
-      elisaResult$ELISAcell_TIME[cellCoo[1],cellCoo[2]] = input$ELISAcell_TIME
-    }
-  })
   observeEvent(input$ELISAcell_EXP,{
     if(!is.null(elisaResult$ELISAcell_EXP)){
+      cellCoo = FlagsELISA$cellCoo
+      elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]] = input$ELISAcell_EXP
+    }
+  })
+  observeEvent(input$ELISAcell_SN,{
+    if(!is.null(elisaResult$ELISAcell_SN)){
       ELISAtb = elisaResult$TablePlot
       cellCoo = FlagsELISA$cellCoo
       if(!is.null(cellCoo)){
-        elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]] = input$ELISAcell_EXP
-        ELISAtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = input$ELISAcell_EXP
+        elisaResult$ELISAcell_SN[cellCoo[1],cellCoo[2]] = input$ELISAcell_SN
+        ELISAtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = input$ELISAcell_SN
         
-        if(! input$ELISAcell_EXP %in% FlagsELISA$AllExp){
-          FlagsELISA$AllExp = unique(c(FlagsELISA$AllExp,input$ELISAcell_EXP))
+        if(! input$ELISAcell_SN %in% FlagsELISA$AllExp){
+          FlagsELISA$AllExp = unique(c(FlagsELISA$AllExp,input$ELISAcell_SN))
           print(FlagsELISA$AllExp)
         }
         
@@ -2269,9 +2275,9 @@ server <- function(input, output, session) {
     }
     
     if(length(listReturn) == 0){
-      return(list("Nothing",elisaResult$ELISAcell_TIME,elisaResult$ELISAcell_EXP))
+      return(list("Nothing",elisaResult$ELISAcell_EXP,elisaResult$ELISAcell_SN))
     }else{
-      return(c(listReturn,list(elisaResult$ELISAcell_TIME,elisaResult$ELISAcell_EXP)) )
+      return(c(listReturn,list(elisaResult$ELISAcell_EXP,elisaResult$ELISAcell_SN)) )
     }
   })
   observeEvent(toListen_elisa(),{
@@ -2311,11 +2317,11 @@ server <- function(input, output, session) {
       elisaV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
         rowwise() %>%
         mutate(values = mat[Var1, Var2])
-      matTime =  as.matrix(elisaResult$ELISAcell_TIME)
+      matTime =  as.matrix(elisaResult$ELISAcell_EXP)
       elisaT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
         rowwise() %>%
         mutate(time = matTime[Var1, Var2])
-      matExp =  as.matrix(elisaResult$ELISAcell_EXP)
+      matExp =  as.matrix(elisaResult$ELISAcell_SN)
       elisaE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
         rowwise() %>%
         mutate(exp = matExp[Var1, Var2])
@@ -2424,14 +2430,14 @@ server <- function(input, output, session) {
       do.call(tagList, select_output_list)
     })
   })
-  observeEvent(c(elisaResult$TablePlot,elisaResult$ELISAcell_TIME),
+  observeEvent(c(elisaResult$TablePlot,elisaResult$ELISAcell_EXP),
                {
                  ELISAtb = elisaResult$TablePlot
                  output$ELISAmatrix <-renderDataTable({ELISAtb})
                  
                  ##### Plot the values selected!
-                 matTime =  as.matrix(elisaResult$ELISAcell_TIME)
-                 matExp =  as.matrix(elisaResult$ELISAcell_EXP)
+                 matTime =  as.matrix(elisaResult$ELISAcell_EXP)
+                 matExp =  as.matrix(elisaResult$ELISAcell_SN)
                  
                  if( !( all(matTime == "")  || all(matExp == "") ) ){
                    mat = as.matrix(elisaResult$Initdata)
@@ -2530,6 +2536,30 @@ server <- function(input, output, session) {
   })
   
   ### End ELISA analysis ####
+  
+  
+  ### Start Statistic ####
+  DataStatisticModule = reactiveValues(WB = list(File1 = NULL, File2 = NULL),
+                                       PRCC = list(File1 = NULL, File2 = NULL),
+                                       ELISA = list(File1 = NULL, File2 = NULL),
+                                       ENDOC = list(File1 = NULL, File2 = NULL))
+  
+  observeEvent(DataStatisticModule,{
+    
+    Analysis1 = sapply( sapply(reactiveValuesToList(DataStatisticModule),"[[",1  ), is.null)
+    Analysis2 = sapply( sapply(reactiveValuesToList(DataStatisticModule),"[[",2  ), is.null)
+    
+    # consider the analysis different from NULL
+    Analysis1 = sort(names(Analysis1)[!Analysis1])
+    Analysis2 = sort(names(Analysis2)[!Analysis2])
+    
+    if( isTRUE(all.equal(Analysis1,Analysis2)) ){ # there are equal analysis
+      updateSelectizeInput(inputId = "StatAnalysis",choices = c("",Analysis2),selected = "")
+    }
+    
+    })
+  
+  ### End Statistic ####
   
   ### Omics ####
   
@@ -2930,8 +2960,8 @@ server <- function(input, output, session) {
     
     pathInteGreat <- system.file("Data", package = "InteGreat")
     
-    # the last key used is saved
-    write(input$APIkey,file = paste0(pathInteGreat,"/.APIkey"))
+    if(input$APIkey != "") # the last key used is saved
+      write(input$APIkey,file = paste0(pathInteGreat,"/.APIkey"))
 
   })
   #initiate_sword_dataset()
@@ -2954,6 +2984,48 @@ server <- function(input, output, session) {
                                             FlagELISA = F,
                                             FlagENDOC = F)
   
+
+  # upload in the statistic module
+  observeEvent(input$loadStatAnalysis_file_Button,{
+    output$loadStatAnalysis_Error <- renderText({
+      validate(
+        need(!is.null(input$loadStatAnalysis_file) && file.exists(input$loadStatAnalysis_file$datapath) ,
+             "Please select one RDs file generated throught the Data Analysis module." )
+      )
+      
+      mess = readRDS(input$loadStatAnalysis_file$datapath)
+      
+      validate(
+        need(all(names(mess) %in% names(DataAnalysisModule)) ||
+               all(names(mess) %in% names(elisaResult)) ||
+               all(names(mess) %in% names(wbResult)) || 
+               all(names(mess) %in% names(pcrResult)) || 
+               all(names(mess) %in% names(endocResult)) ,
+             paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
+      )
+      
+      if(all(names(mess) %in% names(DataAnalysisModule)) ){
+        DataStatisticModule$WB$File1 <- mess
+        DataAnalysisModule$PRCC$File1 <- mess
+        DataAnalysisModule$ENDOC$File1 <- mess
+        DataAnalysisModule$ELISA$File1 <- mess
+      }
+      else if( all(names(mess) %in% names(wbResult)) ){
+        DataStatisticModule$WB$File1 <- mess
+      }else if( all(names(mess) %in% names(pcrResult)) ){
+        DataAnalysisModule$PRCC$File1 <- mess
+      }else if(all(names(mess) %in% names(endocResult)) ){
+        DataAnalysisModule$ENDOC$File1 <- mess
+      }else if(all(names(mess) %in% names(elisaResult)) ){
+        DataAnalysisModule$ELISA$File1 <- mess
+      }
+      
+      "The RDs file has been uploaded  with success."
+      
+    })
+  })
+  
+  # general upload in the app
   observeEvent(input$loadAnalysis_Button,{
     output$loadAnalysis_Error <- renderText({
       validate(
@@ -2996,7 +3068,6 @@ server <- function(input, output, session) {
       
     })
   })
-  
   observeEvent(UploadDataAnalysisModule$FlagUpdate,{
     if(UploadDataAnalysisModule$FlagUpdate){
     
@@ -3041,6 +3112,15 @@ server <- function(input, output, session) {
     
   })
   ### Download files ####
+  
+  output$downloadButtonExcel_ELISA <- downloadHandler(
+    filename = function() {
+      paste('ELISAanalysis-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      
+    }
+  )
   
   output$downloadRDSwholeAnalysis <- downloadHandler(
     filename = function() {

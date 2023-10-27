@@ -10,6 +10,7 @@ library("shinyWidgets")
 library(DT)
 
 
+  
 ui <- dashboardPage(
   #theme = shinytheme("paper"),
   dashboardHeader(title = "InteGREAT",
@@ -94,13 +95,17 @@ ui <- dashboardPage(
                 #          menuSubItem("WB, RT-qPCR, ENDOC ", tabName = "WbPcrElisa_tab"),
                 #          menuSubItem("IF, and other data ", tabName = "otherData_tab")
                 # ),
+                menuItem('Statistical analysis',
+                         tabName = 'StatAnalysis_tab',
+                         icon = icon('magnifying-glass-chart')
+                ),
                 menuItem('Load analysis',
                          tabName = 'LoadAnalysis',
                          icon = icon('upload')
                 ),
                 menuItem('Dataverse',
                          tabName = 'Dataverse_tab',
-                         icon = icon('dataverse')
+                         icon = icon('eye')
                 )
     )
   ),
@@ -527,22 +532,22 @@ ui <- dashboardPage(
                      dataTableOutput("ELISAmatrix")
               ),
               column(width = 6,
-                     selectizeInput("ELISAcell_EXP",
-                                    label = "Experimental condition:",
+                     selectizeInput("ELISAcell_SN",
+                                    label = "Sample name:",
                                     choices = "",
                                     options = list(create = TRUE)),
-                     selectizeInput("ELISAcell_TIME",label = "Time:",
+                     selectizeInput("ELISAcell_EXP",label = "Experimental condition:",
                                     choices = "",
                                     options = list(create = TRUE)),
                      fluidRow(
                        column(4,
-                              checkboxGroupInput(inputId = "ELISA_baselines",
-                                                 "Select baselines:")
-                       ),
-                       column(4,
                               selectizeInput(inputId = "ELISA_standcurve",
                                              label = "Select standard curve:",
                                              choices = NULL)
+                       ),
+                       column(4,
+                              checkboxGroupInput(inputId = "ELISA_baselines",
+                                                 "Select control:")
                        ),
                        column(4,
                               checkboxGroupInput(inputId = "ELISA_blanches",
@@ -605,8 +610,15 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 column(width = 1,offset = 9,
-                       downloadButton( label = "Download the analysis", 
+                       downloadButton( label = "Download the RDs", 
                                        outputId = "downloadButton_ELISA",
+                                       #href = "Results.RData",
+                                       #download = "Results.RData",
+                                       icon = icon("download") )
+                ),
+                column(width = 1,offset = 7,
+                       downloadButton( label = "Download xlsx", 
+                                       outputId = "downloadButtonExcel_ELISA",
                                        #href = "Results.RData",
                                        #download = "Results.RData",
                                        icon = icon("download") )
@@ -990,7 +1002,58 @@ ui <- dashboardPage(
       ),
     ## END data analysis: WB
     ###### END DATA ANALYSIS ####
-    ###### BEGIN DATAVERSE ####
+    ###### BEGIN Statistic ####
+    tabItem(tabName = "StatAnalysis_tab",
+            h2("Statistical analysis"),
+            fluidRow(
+              box(width = 12,
+                  title = "Upload the analysis",
+                  fluidRow(
+                    column(
+                      10,
+                      fileInput(
+                        inputId = "loadStatAnalysis_file",
+                        label = "",
+                        placeholder = "Select the RDs files storing InteGreat analyses",
+                        width = "80%", 
+                        multiple = TRUE)
+                    ),
+                    column(
+                      1,
+                      actionButton( label = "Load",style = "margin-top: 20px;",
+                                    icon = shiny::icon("upload"),
+                                    inputId = "loadStatAnalysis_file_Button" )
+                    )
+                  )
+                  )
+            ),
+            fluidRow(
+              column(
+                width = 10,
+                offset = 1,
+                verbatimTextOutput("loadStatAnalysis_Error")
+              )
+            ),
+            box(
+              width = 12,
+              collapsible = T,
+              collapsed = T,
+              title = "Comparison analysis",
+              selectizeInput("StatAnalysis",
+                             label = "Select the analysis:",
+                             choices = ""),
+              fluidRow(
+                column(6,
+                       DTOutput("Tab_file1")
+                       ),
+                column(6,
+                       DTOutput("Tab_file2")
+                )
+              )
+            )
+    ),
+    ###### END Statitcs ###
+    ###### BEGIN DATAVERSE #####
     tabItem(tabName = "Dataverse_tab",
             h2("Dataverse"),
             fluidRow(
@@ -1003,16 +1066,43 @@ ui <- dashboardPage(
                          " for obtaining an account and setting up an API key."
                        ) 
                     ),
-                  column(width=6, 
-                         textInput("APIkey",
-                                   value = ifelse(system.file("Data",".APIkey", package = "InteGreat") != "",
-                                                  read.table(paste0(system.file("Data", package = "InteGreat"),
-                                                                    "/.APIkey"),
-                                                             quote="\"",
-                                                             comment.char=""),
-                                                  ""), 
-                                   label = "API key linked to a Dataverse installation account:"))
-              )
+                  fluidRow(
+                    column(width=6, 
+                           textInput("APIkey",
+                                     value = ifelse(system.file("Data",".APIkey", package = "InteGreat") != "",
+                                                    read.table(paste0(system.file("Data", package = "InteGreat"),
+                                                                      "/.APIkey"),
+                                                               quote="\"",
+                                                               comment.char=""),
+                                                    ""), 
+                                     label = "API key linked to a Dataverse installation account:")),
+                    column(2,
+                           selectizeInput("selectAnalysis_DV",
+                                          label = "Select the analysis:",
+                                          choices = "")
+                    )
+                    ),
+                    fluidRow(
+                    column(3,
+                           textInput("Title_DV",
+                                     label = "Title:",
+                                     value=""
+                           )
+                    ),
+                    column(3,
+                           textInput("Creator_DV",
+                                     label = "Creator:",
+                                     value=""
+                           )
+                    ),
+                    column(4,
+                           textInput("Description_DV",
+                                     label = "Description:",
+                                     value=""
+                           )
+                    )
+                  )
+            )
             ),
             fluidRow(
               box(width = 12,
@@ -1021,7 +1111,7 @@ ui <- dashboardPage(
               )
             )
     )
-    ###### END DATAVERSE ###
+    ####### END DATAVERSE ####
     
     # Here ends the ui body
     )
