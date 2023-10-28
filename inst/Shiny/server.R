@@ -727,11 +727,16 @@ server <- function(input, output, session) {
       tbWB = wbquantResult$WBanalysis_filtered
       
       if(!is.null(tbWBnorm) & !is.null(tbWB) & dim(tbWBnorm)[1]==1 ){
+        if(!all(table(tbWB$SampleName)==1) ){
+          output$LoadingErrorWB <- renderText({"No rows with equal sample name are allowed"})
+        }
+        else{ # we admit only one SampleName
         table = tbWB
         table$AUC_Norm = tbWBnorm$AUC_Norm
         table$RelDens = table$AUC/table$AUC_Norm
         table = table %>%
           dplyr::select(SampleName, Truncation, AUC, AUC_Norm, RelDens) 
+        }
       }
     }
     
@@ -746,10 +751,10 @@ server <- function(input, output, session) {
     )
     
   })
+  
   observeEvent(list(FlagsWBquant$BothUploaded, input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
     table = data.frame(SampleName = "-",
-                       Truncation = "-",
-                       SampleName_Norm = "-", 
+                       Truncation = "-", 
                        Truncation_Norm = "-",
                        AUC = "-", 
                        AUC_Norm = "-",
@@ -760,43 +765,50 @@ server <- function(input, output, session) {
       tbWB = wbquantResult$WBanalysis_filtered
       tbWBnorm = wbquantResult$NormWBanalysis_filtered
       
-      tbWBnorm = tbWBnorm  %>%
-        rename(SampleName_Norm = SampleName,
-               AUC_Norm = AUC,
-               Truncation_Norm = Truncation)
-      
-      table = left_join(tbWBnorm,tbWB, by = "SampleName" ,all = T )
-      
-      table$AdjRelDens = table$AUC/table$AUC_Norm
-      table = table %>% 
-        dplyr::select( SampleName, Truncation,SampleName_Norm, Truncation_Norm, AUC, AUC_Norm, AdjRelDens) 
+      if(!all(table(tbWBnorm$SampleName)==1) ){
+        output$LoadingErrorNormWB <- renderText({"No rows with equal sample name are allowed"})
+      }else if(!all(table(tbWB$SampleName)==1) ){
+        output$LoadingErrorWB <- renderText({"No rows with equal sample name are allowed"})
+      }
+      else{ # we admit only one SampleName
+        
+        tbWBnorm = tbWBnorm  %>%
+          rename(AUC_Norm = AUC,
+                 Truncation_Norm = Truncation)
+        
+        table = merge(tbWBnorm,tbWB, by = "SampleName" ,all = T )
+        
+        table$AdjRelDens = table$AUC/table$AUC_Norm
+        table = table %>% 
+          dplyr::select( SampleName, Truncation, Truncation_Norm, AUC, AUC_Norm, AdjRelDens) 
+        
+        wbquantResult$AdjRelDensitiy = table
+        output$AUC_AdjRelDens <- renderDT(
+          table ,
+          server = FALSE,
+          options = list(lengthChange = FALSE, autoWidth = TRUE),
+          rownames= FALSE
+        )
+        
+        if(dim(table)[1] > 1 ){
+          barPlotAdjRelDens = table %>% 
+            mutate(Normalizer = paste0("Sample: ",SampleName ),
+                   WB = paste0("Sample: ",SampleName))  %>%
+            ggplot() +
+            geom_bar(aes(x = SampleName,
+                         y = AdjRelDens,
+                         fill = Normalizer ),
+                     stat = "identity" ) +
+            #facet_grid(~WB)+
+            theme_bw()
+        }else{
+          barPlotAdjRelDens = ggplot()
+        }
+        output$plot_AdjRelDens <- renderPlot({
+          barPlotAdjRelDens
+        })
+      }
     }
-    
-    wbquantResult$AdjRelDensitiy = table
-    output$AUC_AdjRelDens <- renderDT(
-      table ,
-      server = FALSE,
-      options = list(lengthChange = FALSE, autoWidth = TRUE),
-      rownames= FALSE
-    )
-    
-    if(dim(table)[1] > 1 ){
-      barPlotAdjRelDens = table %>% 
-        mutate(Normalizer = paste0("Sample: ",SampleName_Norm ),
-               WB = paste0("Sample: ",SampleName))  %>%
-        ggplot() +
-        geom_bar(aes(x = SampleName,
-                     y = AdjRelDens,
-                     fill = Normalizer ),
-                 stat = "identity" ) +
-        facet_grid(~WB)+
-        theme_bw()
-    }else{
-      barPlotAdjRelDens = ggplot()
-    }
-    output$plot_AdjRelDens <- renderPlot({
-      barPlotAdjRelDens
-    })
   })
   
   #
@@ -2178,420 +2190,55 @@ server <- function(input, output, session) {
   
   
   ### Start Statistic ####
-  DataStatisticModule = reactiveValues(WB = list(File1 = NULL, File2 = NULL),
-                                       PRCC = list(File1 = NULL, File2 = NULL),
-                                       ELISA = list(File1 = NULL, File2 = NULL),
-                                       ENDOC = list(File1 = NULL, File2 = NULL))
+  DataStatisticModule = reactiveValues(WB = list(),
+                                       PRCC = list(),
+                                       ELISA = list(),
+                                       ENDOC = list(),
+                                       Flag = F)
   
-  observeEvent(DataStatisticModule,{
+  DataStatisticresultListen <- reactive({
+    reactiveValuesToList(DataStatisticModule)
+  })
+  
+  observeEvent(DataStatisticresultListen(),{
     
-    Analysis1 = sapply( sapply(reactiveValuesToList(DataStatisticModule),"[[",1  ), is.null)
-    Analysis2 = sapply( sapply(reactiveValuesToList(DataStatisticModule),"[[",2  ), is.null)
-    
-    # consider the analysis different from NULL
-    Analysis1 = sort(names(Analysis1)[!Analysis1])
-    Analysis2 = sort(names(Analysis2)[!Analysis2])
-    
-    if( isTRUE(all.equal(Analysis1,Analysis2)) ){ # there are equal analysis
-      updateSelectizeInput(inputId = "StatAnalysis",choices = c("",Analysis2),selected = "")
+    if(DataStatisticModule$Flag){
+      AnalysisNames = names(DataStatisticModule)[names(DataStatisticModule) != "Flag"]
+      Analysis = rep(F,length(AnalysisNames) )
+      names(Analysis) = AnalysisNames
+      for(j in AnalysisNames)
+          Analysis[j] = all(sapply(DataStatisticModule[[j]], is.null))
+      
+      AnalysisNames = AnalysisNames[!Analysis]
+      
+      updateSelectizeInput(inputId = "StatAnalysis",
+                           choices = c("",AnalysisNames),
+                           selected = "")
+      
+      DataStatisticModule$Flag = F
     }
     
+  })
+  
+  observeEvent(input$StatAnalysis,{
+    
+    if(input$StatAnalysis != ""){
+      DataStatisticModule[[input$StatAnalysis]] -> results
+      do.call(rbind,results) -> results
+      
+      if(input$StatAnalysis == "WB"){
+        res = results %>%
+          select(DataSet,SampleName,AdjRelDens) %>%
+          tidyr::spread(key = DataSet,value = AdjRelDens ) 
+        
+        res$Mean = apply(res[,paste(unique(results$DataSet))],1,mean)
+      }
+      
+      output$TabStat = renderDT({res})
+    }
   })
   
   ### End Statistic ####
-  
-  ### Omics ####
-  
-  Omics = reactiveValues(Default = NULL, User = NULL, Data = NULL)
-  
-  # default
-  protfile = system.file("Data/Omics","pmic13104Simplified.xlsx", package = "InteGreat")
-  if(protfile == ""){
-    # In this case it means that we are inside the docker
-    protfile = "~/../home/data/Examples/Omics/pmic13104Simplified.xlsx"
-  }
-  Default = readxl::read_excel(protfile)
-  Omics$Default = Default
-  Omics$Data = Default %>%
-    dplyr::select(`Protein name`,iBAQ) %>%
-    rename(Value = iBAQ, Name = `Protein name`)
-  
-  output$OmicsDefault_table <- renderDT(
-    Omics$Default,
-    filter = 'top',
-    server = FALSE,
-    options = list(lengthChange = FALSE,
-                   autoWidth = FALSE,
-                   columnDefs = list(list(
-                     width = "125px",
-                     targets = "_all"
-                   )) ),
-    rownames= FALSE
-  )
-  
-  # user
-  observeEvent(input$LoadProt_Button,{
-    output$LoadingError_Prot <- renderText({
-      validate(
-        need(!is.null(input$ProtImport) && all(file.exists(input$ProtImport$datapath)) ,
-             "Please select an excel files!!" )
-      )
-      
-      mess = readfile(
-        filename = input$ProtImport$datapath,
-        type = "Excel"
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             paste(mess[["message"]],"\n all the files must be RDs saved from DataIntegrationModule app." ))
-      )
-      
-      
-      colmns = colnames(mess[,sapply(mess, is.numeric)])
-      validate(
-        need(length(colmns) > 0 ,
-             "At least one column should be numeric."
-        )
-      )
-      
-      updateSelectInput(inputId = "RescalingColms_User",
-                        choices = colmns ) 
-      Omics$User = mess
-      "The excel file has been uploaded  with success"
-    })
-  })
-  observeEvent(input$ResetProt_Button,{
-    Omics$User = NULL
-    Omics$Default -> Default
-    Omics$Data = Default %>%
-      dplyr::select(`Protein name`,iBAQ) %>%
-      rename(Value = iBAQ, Name = `Protein name`)
-    
-  })
-  
-  output$OmicsUser_table <- renderDT(
-    Omics$User,
-    filter = 'top',
-    server = FALSE,
-    selection = list(target = 'column'),
-    options = list(lengthChange = FALSE,
-                   autoWidth = FALSE,
-                   columnDefs = list(list(
-                     width = "125px", targets = "_all"
-                   )) ),
-    rownames= FALSE
-  )
-  
-  observeEvent(input$OmicsUser_table_columns_selected,
-               {
-                 if(!is.null(Omics$User)){
-                   output$LoadingError_Prot <- renderText({
-                     
-                     validate(
-                       need(length(input$OmicsUser_table_columns_selected) == 2 ,
-                            "Please select only two columns (one numeric and one character)." )
-                     )
-                     
-                     prot = Omics$User[,input$OmicsUser_table_columns_selected+1]
-                     validate(
-                       need(all(sapply(prot, class) %in% c("character", "numeric")),
-                            "Please select only two columns (one numeric and one character)." )
-                     )
-                     
-                     protType = sapply(prot, class)
-                     names(prot)[protType == "numeric"] = "Value"
-                     names(prot)[protType == "character"] = "Name"
-                     Omics$Data = prot
-                   })
-                 }
-               })
-  # rescaling
-  observeEvent(input$InputDefault_rescaling,{
-    validate(
-      need(input$InputDefault_rescaling > 0 ,
-           "Please the rescaling factor should be > 0" )
-    )
-    
-    if(!is.null(Omics$Default)){
-      Omics$Default$iBAQ = Omics$Default$iBAQ/input$InputDefault_rescaling
-    }
-    
-  })
-  observeEvent(input$InputUser_rescaling,{
-    validate(
-      need(input$InputUser_rescaling > 0 ,
-           "Please the rescaling factor should be > 0." )
-    )
-    
-    validate(
-      need(length(input$RescalingColms_User)>0,
-           "Please select at least one numeric column.")
-    )
-    
-    colms = input$RescalingColms_User
-    if(!is.null(Omics$User)){
-      Omics$User[,colms] = Omics$User[,colms]/input$InputUser_rescaling
-    }
-    
-  })
-  
-  ### end Omics ###
-  
-  ### integration ####
-  
-  observeEvent(input$LoadIntG_Button,{
-    output$LoadingError_IntG <- renderText({
-      validate(
-        need(!is.null(input$IntGImport) && all(file.exists(input$IntGImport$datapath)) ,
-             "Please select one or more RDs files!!" )
-      )
-      
-      mess = readfile(
-        filename = input$IntGImport$datapath,
-        type = "RDsMulti",
-        namesAll = namesAll
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]]
-        )
-      )
-      
-      DataIntegrationModule$dataLoaded = mess
-      
-      
-      "The RDs files are uploaded with success"
-    })
-  })
-  
-  observeEvent(DataIntegrationModule$dataLoaded,{
-    
-    data = list(
-      wbResult = NULL,
-      wbquantResult = NULL,
-      endocResult = NULL,
-      pcrResult = NULL
-    )
-    DataIntegrationModule$dataLoaded -> mess
-    
-    if(!is.null(mess)){
-      
-      for( x in 1:length(mess))
-      {
-        if(all(names(mess[[x]]) %in% names(DataAnalysisModule)) )
-          data = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(wbResult)) )
-          data$wbResult = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(wbquantResult)) )
-          data$wbquantResult = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(pcrResult)) )
-          data$pcrResult = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(endocResult)))
-          data$endocResult = mess[[x]]
-      }
-      
-      DataIntegrationModule$data = data
-      ## starting updating the boxes
-      prot = Omics$Data
-      # removing all the null analysis
-      data = data[!sapply(data, is.null)]
-      
-      namesAnalysis = names(data)
-      
-      for(n in namesAnalysis){
-        subdata = data[[n]]
-        print(n)
-        if(n == "pcrResult"){
-          pcrTabs = subdata$CompPRC 
-          updateSelectizeInput(inputId = "SelectGene",
-                               choices = unique(pcrTabs$Gene),
-                               selected = unique(pcrTabs$Gene)[1])
-          
-          DataIntegrationModule$pcrTabs = pcrTabs
-        }else if(n == "wbquantResult"){
-          wbTabs = subdata$RelDensitiy %>%
-            dplyr::select(ExpName,Lane,RelDens) %>%
-            group_by(ExpName,Lane) %>%
-            
-            ungroup()
-          
-          # wbTabs1 = wbTabs %>% dplyr::select(-Mean) %>%
-          #   tidyr::spread(Dataset, RelDens)
-          # wbTabs2 = wbTabs %>% dplyr::select(-RelDens,-Dataset) %>%
-          #   distinct()
-          
-          DataIntegrationModule$wbTabs = wbTabs #merge(wbTabs1,wbTabs2)
-          updatePickerInput(inputId = "Selectprot_wb",
-                            choices = c("",unique(prot$Name)),
-                            selected = "",session = session)
-          
-        }else if(n == "endocResult"){
-          
-        }
-      }
-      
-    }
-  })
-  
-  observeEvent(input$SelectGene,{
-    if(!is.null(DataIntegrationModule$pcrTabs) && length(input$SelectGene)>0 && input$SelectGene!=""){
-      pcrTabs = DataIntegrationModule$pcrTabs
-      SelectedGene = input$SelectGene
-      output$tables_IntG_pcr <- renderUI({fluidRow(pcrTab.generation(pcrTabs,SelectedGene)) })
-      prot = Omics$Data
-      SelInname = paste0("selinp_",SelectedGene)
-      updateSelectizeInput(inputId = SelInname,
-                           choices = unique(prot$Name),
-                           server =T)
-      
-      local({
-        output[[paste0("tab_",SelectedGene)]] <- renderDT({
-          pcrTabs %>% filter(Gene == SelectedGene) %>%
-            group_by(Sample,Norm) %>%
-            dplyr::summarize(Qnorm=Qnorm,
-                             Mean = mean(Qnorm),
-                             Sd = sd(Qnorm),
-                             Norm.Prot = ifelse(length(input[[SelInname]]) > 0,
-                                                Mean*prot[prot$Name == input[[SelInname]],"Value"],
-                                                Mean)
-            ) %>%
-            ungroup() %>%
-            #tidyr::spread(Dataset,Qnorm) %>%
-            arrange(Norm)
-        })
-      })
-    }
-  })
-  
-  output$Tab_IntG_wb <- renderDT({
-    DataIntegrationModule$wbTabs
-  },
-  filter = 'top',
-  server = FALSE,
-  options = list(lengthChange = FALSE,
-                 autoWidth = TRUE),
-  rownames= FALSE
-  )
-  observeEvent(list(input$Selectprot_wb,Omics$Data),{
-    if(!is.null(DataIntegrationModule$wbTabs)){
-      wbTabs = DataIntegrationModule$wbTabs
-      prot = Omics$Data
-      if(!is.null(input$Selectprot_wb) && length(input$Selectprot_wb)>0 &&input$Selectprot_wb!= "" ){
-        as.numeric(prot[prot$Name == input$Selectprot_wb,"Value"]) -> pr
-        wbTabs = wbTabs %>% dplyr::mutate(`Rel.Prot.` = RelDens * pr )
-        wbTabs[paste(input$Selectprot_wb)] = pr
-      }
-      else
-        wbTabs = wbTabs[,ifelse("Rel.Prot." %in% colnames(wbTabs),
-                                colnames(wbTabs)[!"Rel.Prot." %in% colnames(wbTabs)],
-                                colnames(wbTabs) )]
-    }
-    else{
-      wbTabs = NULL
-    }
-    DataIntegrationModule$wbTabs <- wbTabs 
-  })
-  #### end integration ###
-  
-  ### Other integration ####
-  observeEvent(input$LoadOther_Button,{
-    output$LoadingError_Other <- renderText({
-      validate(
-        need(!is.null(input$OtherImport) && all(file.exists(input$OtherImport$datapath)) ,
-             "Please select one excel files!!" )
-      )
-      
-      mess = readfile(
-        filename = input$OtherImport$datapath,
-        type = "Excel"
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]]
-        )
-      )
-      
-      validate(
-        need(all(c("character", "numeric") %in% sapply(mess, class)),
-             "Please, the excel file must have two columns: one numeric and one character." )
-      )
-      
-      DataIntegrationModule$otherTabs = mess
-      "The excel file has been uploaded  with success"
-    })
-  })
-  
-  observe({
-    if(!is.null(DataIntegrationModule$otherTabs)){
-      
-      updateSelectizeInput(inputId = "Selectprot_other",
-                           choices = c("",unique(Omics$Data$Name)),
-                           selected = "",
-                           server = T )
-    }
-  })
-  
-  output$Other_table <- renderDT({
-    DataIntegrationModule$otherTabs
-  },
-  filter = 'top',
-  server = FALSE,
-  selection = list(target = 'column'),
-  options = list(lengthChange = FALSE,
-                 autoWidth = TRUE),
-  rownames= FALSE
-  )
-  
-  output$Other_tableMean <- renderDT({
-    DataIntegrationModule$otherTabsMean
-  },
-  filter = 'top',
-  server = FALSE,
-  options = list(lengthChange = FALSE,
-                 autoWidth = TRUE),
-  rownames= FALSE
-  )
-  
-  observeEvent(input$Other_table_columns_selected,{
-    if(!is.null(DataIntegrationModule$otherTabs) && !is.null(input$Other_table_columns_selected) && length(input$Other_table_columns_selected)>0){
-      
-      prot = Omics$Data
-      data = DataIntegrationModule$otherTabs
-      colmns = colnames(data)[input$Other_table_columns_selected + 1]
-      colmns = names(sapply(data[,colmns], class)[ sapply(data[,colmns], class) == "character"])
-      
-      # check at leat one column selected is character
-      if(length(colmns) > 0){
-        colmnsNumeric = colnames(data)[-which(colnames(data) %in% colmns)]
-        colmnsNumeric = colmnsNumeric[which(sapply(data[,colmnsNumeric], class) %in% "numeric" )]
-        
-        otherTabs = data %>% 
-          tidyr::gather(colmnsNumeric, value = "Value", key= "Numeric Columns") %>%
-          group_by_at(c("Numeric Columns",colmns)) %>%
-          dplyr::summarise(Mean = mean(Value) ) %>%
-          ungroup()
-        
-        DataIntegrationModule$otherTabsMean = otherTabs
-      }
-    }
-  })
-  
-  observeEvent(input$Selectprot_other,{
-    if(!is.null(DataIntegrationModule$otherTabsMean)){
-      if(input$Selectprot_other != ""){
-        prot = Omics$Data
-        as.numeric(prot[prot$Name == input$Selectprot_other,"Value"]) -> pr
-        
-        DataIntegrationModule$otherTabsMean$`Rel.Prot.`  = DataIntegrationModule$otherTabsMean$Mean * pr
-      }else{
-        DataIntegrationModule$otherTabsMean$`Rel.Prot.`  = DataIntegrationModule$otherTabsMean$Mean
-      }
-    }
-  })
-  #### End other integration
   
   ### DATAVERSE ####
   
@@ -2628,38 +2275,38 @@ server <- function(input, output, session) {
   observeEvent(input$loadStatAnalysis_file_Button,{
     output$loadStatAnalysis_Error <- renderText({
       validate(
-        need(!is.null(input$loadStatAnalysis_file) && file.exists(input$loadStatAnalysis_file$datapath) ,
+        need(!is.null(input$loadStatAnalysis_file) && all(file.exists(input$loadStatAnalysis_file$datapath)) ,
              "Please select one RDs file generated throught the Data Analysis module." )
       )
       
-      mess = readRDS(input$loadStatAnalysis_file$datapath)
-      
-      validate(
-        need(all(names(mess) %in% names(DataAnalysisModule)) ||
-               all(names(mess) %in% names(elisaResult)) ||
-               all(names(mess) %in% names(wbResult)) || 
-               all(names(mess) %in% names(pcrResult)) || 
-               all(names(mess) %in% names(endocResult)) ,
-             paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
-      )
-      
-      if(all(names(mess) %in% names(DataAnalysisModule)) ){
-        DataStatisticModule$WB$File1 <- mess
-        DataAnalysisModule$PRCC$File1 <- mess
-        DataAnalysisModule$ENDOC$File1 <- mess
-        DataAnalysisModule$ELISA$File1 <- mess
+      datapaths = input$loadStatAnalysis_file$datapath
+      for(dpath in 1:length(datapaths)){
+        mess = readRDS(datapaths[dpath])
+        
+        validate(
+          need(all(names(mess) %in% names(DataAnalysisModule)) ||
+                 all(names(mess) %in% names(elisaResult)) ||
+                 all(names(mess) %in% names(wbquantResult)) || 
+                 all(names(mess) %in% names(pcrResult)) || 
+                 all(names(mess) %in% names(endocResult)) ,
+               paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
+        )
+        
+        DataStatisticModule$Flag = T
+        
+        if( all(names(mess) %in% names(wbquantResult)) || all(names(mess) %in% names(DataAnalysisModule)) ){
+          DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
+        }else if( all(names(mess) %in% names(pcrResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+          DataAnalysisModule$PRCC[[dpath]]  <- mess
+        }else if(all(names(mess) %in% names(endocResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+          DataAnalysisModule$ENDOC$File1 <- mess
+        }else if(all(names(mess) %in% names(elisaResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+          DataAnalysisModule$ENDOC[[dpath]]  <- mess
+        }
+        
       }
-      else if( all(names(mess) %in% names(wbResult)) ){
-        DataStatisticModule$WB$File1 <- mess
-      }else if( all(names(mess) %in% names(pcrResult)) ){
-        DataAnalysisModule$PRCC$File1 <- mess
-      }else if(all(names(mess) %in% names(endocResult)) ){
-        DataAnalysisModule$ENDOC$File1 <- mess
-      }else if(all(names(mess) %in% names(elisaResult)) ){
-        DataAnalysisModule$ELISA$File1 <- mess
-      }
       
-      "The RDs file has been uploaded  with success."
+      "The RDs files have been uploaded  with success."
       
     })
   })

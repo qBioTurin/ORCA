@@ -988,17 +988,17 @@ ui <- dashboardPage(
                        DTOutput('AUC_AdjRelDens')
                      )
                    ),
-                   plotOutput("plot_AdjRelDens")
-              ),
-              fluidRow(
-                column(width = 1, offset = 9,
-                       downloadButton( label = "Download the analysis", 
-                                       outputId = "downloadButton_WBquant",
-                                       #href = "Results.RData",
-                                       #download = "Results.RData",
-                                       icon = icon("download") 
-                       )
-                )
+                   plotOutput("plot_AdjRelDens"),
+                   fluidRow(
+                     column(width = 1, offset = 9,
+                            downloadButton( label = "Download the analysis", 
+                                            outputId = "downloadButton_WBquant",
+                                            #href = "Results.RData",
+                                            #download = "Results.RData",
+                                            icon = icon("download") 
+                            )
+                     )
+                   )
               )
       ),
     ## END data analysis: WB
@@ -1044,12 +1044,9 @@ ui <- dashboardPage(
                              label = "Select the analysis:",
                              choices = ""),
               fluidRow(
-                column(6,
-                       DTOutput("Tab_file1")
-                       ),
-                column(6,
-                       DTOutput("Tab_file2")
-                )
+                column(12,
+                       DTOutput("TabStat")
+                       )
               )
             )
     ),
