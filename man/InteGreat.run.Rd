@@ -15,5 +15,5 @@ InteGreat.run()
 }
 }
 \author{
-Pernice Simone Tortarolo Dora
+Pernice Simone, Tortarolo Dora
 }
