@@ -23,7 +23,7 @@ class Json:
         self.dataset_contact_name = values['dataset_contact_name']
         self.dataset_contact_email = values['dataset_contact_email']
         self.ds_description = values['dataset_description']
-        self.subject = values['subject']  # this param should be an array
+        #self.subject = values['subject']  # this param should be an array
 
     def add_strain(self, values):
         self.strain_id = str(values['strainid*'])
@@ -37,7 +37,7 @@ class Json:
         return {'fields': [strain_id, collection, accession_number], 'displayName': 'Strain'}
 
     def citation_metadata(self):
-        subject = create_value_dict(self.subject, True, 'controlledVocabulary', 'subject')
+        subject = create_value_dict(["Medicine, Health and Life Sciences"], True, 'controlledVocabulary', 'subject')
 
         ds_description = {'value': [
             {'dsDescriptionValue': create_value_dict(self.ds_description, False, 'primitive', 'dsDescriptionValue')}],
