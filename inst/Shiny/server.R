@@ -13,12 +13,14 @@ server <- function(input, output, session) {
                                        wbquantResult = NULL,
                                        endocResult = NULL,
                                        elisaResult = NULL,
-                                       pcrResult = NULL)
+                                       pcrResult = NULL,
+                                       cytotoxResult = NULL)
   
   DataIntegrationModule <- reactiveValues(dataLoaded = NULL,
                                           data = NULL,
                                           wbTabs = NULL, 
                                           pcrTabs = NULL,
+                                          cytotoxTabs= NULL,
                                           endocTabs=NULL,
                                           otherTabs = NULL,
                                           otherTabsMean = NULL)
@@ -731,11 +733,11 @@ server <- function(input, output, session) {
           output$LoadingErrorWB <- renderText({"No rows with equal sample name are allowed"})
         }
         else{ # we admit only one SampleName
-        table = tbWB
-        table$AUC_Norm = tbWBnorm$AUC_Norm
-        table$RelDens = table$AUC/table$AUC_Norm
-        table = table %>%
-          dplyr::select(SampleName, Truncation, AUC, AUC_Norm, RelDens) 
+          table = tbWB
+          table$AUC_Norm = tbWBnorm$AUC_Norm
+          table$RelDens = table$AUC/table$AUC_Norm
+          table = table %>%
+            dplyr::select(SampleName, Truncation, AUC, AUC_Norm, RelDens) 
         }
       }
     }
@@ -1632,7 +1634,7 @@ server <- function(input, output, session) {
                                MapBaseline = NULL,
                                MapBlanche = NULL,
                                Tablestandcurve = NULL,
-                               LinearRegression = NULL)
+                               Regression = NULL)
   
   elisaResult0 = list(Initdata= NULL,
                       data = NULL,
@@ -1643,7 +1645,7 @@ server <- function(input, output, session) {
                       MapBaseline = NULL,
                       MapBlanche = NULL,
                       Tablestandcurve = NULL,
-                      LinearRegression = NULL)
+                      Regression = NULL)
   
   # save everytime there is a change in the results
   ELISAresultListen <- reactive({
@@ -2006,11 +2008,12 @@ server <- function(input, output, session) {
       
       elisaResult$data = elisaTot
       
-      if(length(elisaTot_base[,1]) != 0 && !is.null(elisaResult$LinearRegression) ){
+      if(length(elisaTot_base[,1]) != 0 && !is.null(elisaResult$Regression) ){
         
         # y = m*x + q
-        q = elisaResult$LinearRegression$coefficients[1]
-        m = elisaResult$LinearRegression$coefficients[2]
+        
+        q = elisaResult$Regression$data$coefficients[1]
+        m = elisaResult$Regression$data$coefficients[2]
         
         elisamean = elisaTot_base %>%
           rename( MeanExperiment = meanValues,
@@ -2157,21 +2160,60 @@ server <- function(input, output, session) {
     standcurve = elisaResult$Tablestandcurve
     if(!is.null(standcurve)){
       standcurve = standcurve %>% na.omit()
-      lmStancurve = lm(Measures~Concentrations, data = standcurve)
       
-      infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-                          y = max(standcurve$Measures) + c(2,1.75),
-                          text = c( paste0("y = ", signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
-                                    paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
+      
       regressionPlot = ggplot(standcurve,aes(Concentrations, Measures)) +
         geom_point() +
-        geom_smooth(method='lm', col = "red") +
-        geom_text(data= infoLM,
-                  aes(x = x, y = y, label =text ),
-                  vjust = "inward", hjust = "inward" )+
         theme_bw()
       
-      elisaResult$LinearRegression = lmStancurve
+      if(input$regressionType == "Linear"){
+        lmStancurve = lm(Measures~Concentrations, data = standcurve)
+        
+        infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
+                            y = max(standcurve$Measures) + c(2,1.75),
+                            text = c( paste0("y = ", signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
+                                      paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
+        
+        regressionPlot =  regressionPlot +
+          geom_smooth(method='lm', col = "red") 
+        
+      }else if(input$regressionType == "Quadratic"){
+        standcurve$Concentrations2 = standcurve$Concentrations^2
+        lmStancurve = lm(Measures~Concentrations+Concentrations2, data = standcurve)
+        
+        infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
+                            y = max(standcurve$Measures) + c(2,1.75),
+                            text = c( paste0("y = ", signif(lmStancurve$coef[[3]], 5), "x^2 + ",
+                                             signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
+                                      paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
+        regressionPlot =  regressionPlot  +
+          geom_point() +
+          stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1,col="red")
+      }
+      else{
+        standcurve$Concentrations2 = standcurve$Concentrations^2
+        standcurve$Concentrations3 = standcurve$Concentrations^3
+        lmStancurve = lm(Measures~Concentrations+Concentrations2+Concentrations3, data = standcurve)
+        
+        infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
+                            y = max(standcurve$Measures) + c(2,1.75),
+                            text = c( paste0("y = ", signif(lmStancurve$coef[[3]], 5), "x^2 + ",
+                                             signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
+                                      paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
+        
+        regressionPlot =  regressionPlot  +
+          geom_point() +
+          stat_smooth(method = "lm", formula = y ~ x + I(x^2)+ I(x^3), size = 1,col="red")
+        
+      }
+
+      regressionPlot =  regressionPlot +
+        geom_text(data= infoLM,
+                  aes(x = x, y = y, label =text ),
+                  vjust = "inward", hjust = "inward" )
+      
+      elisaResult$Regression = list(data = lmStancurve, plot = regressionPlot)
+      
     }else{
       regressionPlot = ggplot()
     }
@@ -2188,12 +2230,305 @@ server <- function(input, output, session) {
   
   ### End ELISA analysis ####
   
+  ### CYTOTOX analysis ####
+  
+  # next buttons
+  observeEvent(input$NextCytotoxQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "tablesCYTOTOX")
+  })
+  #
+  
+  cytotoxResult = reactiveValues(Initdata= NULL,
+                                 data = NULL,
+                                 TablePlot = NULL,
+                                 dataFinal = NULL,
+                                 CYTOTOXcell_EXP = NULL,
+                                 CYTOTOXcell_REP = NULL,
+                                 CYTOTOXcell_SN = NULL,
+                                 MapBaseline = NULL)
+  
+  cytotoxResult0 = list(Initdata= NULL,
+                        data = NULL,
+                        TablePlot = NULL,
+                        dataFinal = NULL,
+                        CYTOTOXcell_EXP = NULL,
+                        CYTOTOXcell_REP = NULL,
+                        CYTOTOXcell_SN = NULL,
+                        MapBaseline = NULL)
+  
+  
+  # save everytime there is a change in the results
+  CYTOTOXresultListen <- reactive({
+    reactiveValuesToList(cytotoxResult)
+  })
+  observeEvent(CYTOTOXresultListen(), {
+    DataAnalysisModule$cytotoxResult = reactiveValuesToList(cytotoxResult)
+  })
+  
+  ##
+  FlagsCYTOTOX <- reactiveValues(cellCoo = NULL,
+                                 AllExp = "",
+                                 BASEselected = "",
+                                 EXPselected = "",
+                                 EXPcol = NULL)
+  
+  observeEvent(input$LoadCYTOTOX_Button,{
+    output$LoadingError_CYTOTOX <- renderText({
+      validate(
+        need(!is.null(input$CYTOTOXImport) && file.exists(input$CYTOTOXImport$datapath) ,
+             "Please select an CYTOTOX excel file!!" )
+      )
+      
+      mess = readfile(
+        filename = input$CYTOTOXImport$datapath,
+        type = "Excel",
+        allDouble = T,
+        colname = F,
+        colors = T
+      )
+      
+      validate(
+        need(!setequal(names(mess),c("message","call")) ,
+             mess[["message"]] )
+      )
+      
+      cytotoxResult$Initdata = mess$x
+      FlagsCYTOTOX$EXPcol = mess$fill
+      cytotoxResult$CYTOTOXcell_SN = mess$SNtable
+      
+      "The CYTOTOX excel has been uploaded  with success"
+    })
+    
+    if( !is.null(cytotoxResult$Initdata) )
+    { ### alert!!! if it is already present! 
+      showModal(modalDialog(
+        title = "Important message",
+        "Do you want to update the CYTOTOX data already present?",
+        easyClose = TRUE,
+        footer= tagList(actionButton("confirmUploadCYTOTOX", "Update"),
+                        modalButton("Cancel")
+        )
+      ))
+      
+    }
+  })
+  observeEvent(input$confirmUploadCYTOTOX,{
+    removeModal()
+    
+    for(nameList in names(cytotoxResult0)) 
+      cytotoxResult[[nameList]] <- cytotoxResult0[[nameList]]
+    
+    output$LoadingError_CYTOTOX <- renderText({
+      validate(
+        need(!is.null(input$CYTOTOXImport) && file.exists(input$CYTOTOXImport$datapath) ,
+             "Please select an CYTOTOX excel file!!" )
+      )
+      
+      mess = readfile(
+        filename = input$CYTOTOXImport$datapath,
+        type = "Excel"
+      )
+      
+      validate(
+        need(!setequal(names(mess),c("message","call")) ,
+             mess[["message"]])
+      )
+      
+      cytotoxResult$Initdata = mess
+      "The RDs has been uploaded  with success"
+    })
+  })
+  observe({
+    if( !is.null(cytotoxResult$Initdata) && is.null(cytotoxResult$TablePlot) ){
+      
+      tableExcelColored(session = session,
+                        Result = cytotoxResult, 
+                        FlagsExp = FlagsCYTOTOX,
+                        type = "Initialize")
+      
+      output$CYTOTOXmatrix <-renderDataTable({cytotoxResult$TablePlot})
+    }
+  })
+  observeEvent(input$CYTOTOXmatrix_cell_clicked,{
+    if(length(input$CYTOTOXmatrix_cell_clicked)!=0){
+      cellSelected= as.numeric(input$CYTOTOXmatrix_cell_clicked)
+      FlagsCYTOTOX$cellCoo = cellCoo = c(cellSelected[1],cellSelected[2]+1)
+      print(cellCoo)
+      print(cytotoxResult$CYTOTOXcell_EXP[ cellCoo[1],cellCoo[2] ])
+      print(cytotoxResult$CYTOTOXcell_SN[ cellCoo[1], cellCoo[2] ])
+      updateSelectizeInput(inputId = "CYTOTOXcell_EXP",
+                           selected = ifelse(is.null(cytotoxResult$CYTOTOXcell_EXP[cellCoo[1],cellCoo[2]]),
+                                             "",
+                                             cytotoxResult$CYTOTOXcell_EXP[cellCoo[1],cellCoo[2]])
+      )
+      updateSelectizeInput(inputId = "CYTOTOXcell_SN",
+                           selected = ifelse(is.null(cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]]),
+                                             "",
+                                             cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]])
+      )
+      updateSelectizeInput(inputId = "CYTOTOXcell_REP",
+                           selected = ifelse(is.null(cytotoxResult$CYTOTOXcell_REP[cellCoo[1],cellCoo[2]]),
+                                             "",
+                                             cytotoxResult$CYTOTOXcell_REP[cellCoo[1],cellCoo[2]])
+      )
+    }
+  })
+  
+  observeEvent(input$CYTOTOXcell_EXP,{
+    if(!is.null(cytotoxResult$CYTOTOXcell_EXP)){
+      cellCoo = FlagsCYTOTOX$cellCoo
+      cytotoxResult$CYTOTOXcell_EXP[cellCoo[1],cellCoo[2]] = input$CYTOTOXcell_EXP
+    }
+  })
+  observeEvent(input$CYTOTOXcell_REP,{
+    if(!is.null(cytotoxResult$CYTOTOXcell_REP)){
+      cellCoo = FlagsCYTOTOX$cellCoo
+      cytotoxResult$CYTOTOXcell_REP[cellCoo[1],cellCoo[2]] = input$CYTOTOXcell_REP
+    }
+  })
+  observeEvent(input$CYTOTOXcell_SN,{
+    if(!is.null(cytotoxResult$CYTOTOXcell_SN)){
+      CYTOTOXtb = cytotoxResult$TablePlot
+      cellCoo = FlagsCYTOTOX$cellCoo
+      
+      if(!is.null(cellCoo)){
+        value.bef = cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]] 
+        value.now = input$CYTOTOXcell_SN
+        
+        # if the value does not change or it is still "Color " then the matrix is not update
+        if( !grep(x = value.bef,pattern = "Color ",value = F) && value.now!=value.bef){
+          cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]] = value.now
+          CYTOTOXtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = value.now
+          
+          if(! input$CYTOTOXcell_SN %in% FlagsCYTOTOX$AllExp){
+            FlagsCYTOTOX$AllExp = unique(c(FlagsCYTOTOX$AllExp,input$CYTOTOXcell_SN))
+            print(FlagsCYTOTOX$AllExp)
+          }
+          
+          ## updating table and colors definition depending on the cell fill 
+          tableExcelColored(session = session,
+                            Result = cytotoxResult, 
+                            FlagsExp = FlagsCYTOTOX,
+                            type = "Update")
+          #####
+          output$CYTOTOXmatrix <-renderDataTable({cytotoxResult$TablePlot})
+        }
+      }
+    }
+  })
+  
+  ## update Baselines checkBox
+  observeEvent(FlagsCYTOTOX$AllExp,{
+    if(length(FlagsCYTOTOX$AllExp) > 1){
+      exp = FlagsCYTOTOX$AllExp
+      exp = exp[exp != ""]
+      
+      exp_selec = input$CYTOTOX_baselines
+      
+      updateSelectizeInput(session,"CYTOTOX_baselines",
+                               choices = exp,
+                               selected = FlagsCYTOTOX$BASEselected )
+    }
+  })
+  
+  ## select the baselines
+  observeEvent(input$CYTOTOX_baselines,{
+    FlagsCYTOTOX$BASEselected = input$CYTOTOX_baselines
+    FlagsCYTOTOX$EXPselected = FlagsCYTOTOX$AllExp[! FlagsCYTOTOX$AllExp %in% FlagsCYTOTOX$BASEselected]
+  },ignoreNULL = F)
+
+  toListen_cytotox <- reactive({
+    return( list(cytotoxResult$CYTOTOXcell_EXP,cytotoxResult$CYTOTOXcell_SN,FlagsCYTOTOX$BASEselected) )
+  })
+  observeEvent(toListen_cytotox(),{
+    baselines = FlagsCYTOTOX$BASEselected
+    baselines = baselines[baselines != ""]
+    if(length(baselines) > 0 )
+    {
+      CYTOTOXcell_value = data.frame(
+        row = c(t(row(cytotoxResult$Initdata))),
+        col = c(t(col(cytotoxResult$Initdata))),
+        Val = c(t(cytotoxResult$Initdata))
+      ) 
+      CYTOTOXcell_SN = data.frame(
+        row = c(t(row(cytotoxResult$CYTOTOXcell_SN))),
+        col = c(t(col(cytotoxResult$CYTOTOXcell_SN))),
+        SN = c(t(cytotoxResult$CYTOTOXcell_SN))
+      ) 
+      CYTOTOXcell_EXP = data.frame(
+        row = c(t(row(cytotoxResult$CYTOTOXcell_EXP))),
+        col = c(t(col(cytotoxResult$CYTOTOXcell_EXP))),
+        EXP = c(t(cytotoxResult$CYTOTOXcell_EXP))
+      ) 
+      CYTOTOXcell_REP = data.frame(
+        row = c(t(row(cytotoxResult$CYTOTOXcell_REP))),
+        col = c(t(col(cytotoxResult$CYTOTOXcell_REP))),
+        REP = c(t(cytotoxResult$CYTOTOXcell_REP))
+      ) 
+     
+      CYTOTOXcell = merge(merge(merge(CYTOTOXcell_REP,CYTOTOXcell_EXP) , CYTOTOXcell_SN), CYTOTOXcell_value) %>%
+        group_by(SN,EXP,REP) %>%
+        summarise(MeanV = mean(Val,na.rm = T)) %>%
+        ungroup()
+      
+      CYTOTOXcell_base = CYTOTOXcell %>%
+        filter(SN == baselines) %>%
+        rename(MeanBaseV = MeanV, Baseline = SN) 
+      # if no exp conditions is used for the baseline then we repeat  exp given for the other SN
+      # in thius way the same baseline is used for each SN
+      if(all(CYTOTOXcell_base$EXP == "") ) {
+        CYTOTOXcell_base = do.call("rbind", lapply(unique(CYTOTOXcell$EXP), function(x) CYTOTOXcell_base %>% mutate(EXP = x) ) )
+      }
+      
+      CYTOTOXcell = CYTOTOXcell %>%  filter(SN != baselines)
+      CYTOTOXcell = merge(CYTOTOXcell_base,CYTOTOXcell,by= c("REP","EXP"),all.y = T)
+      CYTOTOXcell = CYTOTOXcell %>% mutate(Res = (MeanV-MeanBaseV)/(100-MeanBaseV)*100)
+      
+      cytotoxResult$data =  CYTOTOXcell
+      cytotoxResult$dataFinal =  CYTOTOXcell %>%
+        select(-Baseline, - MeanBaseV, - MeanV ) %>%
+        tidyr::spread(key= "REP", value = "Res") %>%
+        rename(`Sample Name` = SN,
+               `Experimental Condition` = EXP)
+      
+      output$CYTOTOXtables = renderDT({
+        datatable(
+          cytotoxResult$dataFinal,
+        rownames= FALSE,
+        options = list(
+          scrollX = TRUE,
+          lengthChange = FALSE,
+          dom = 't')
+        )
+      })
+      
+      output$CYTOTOXplots = renderPlot({
+        CYTOTOXcell %>% ggplot() +
+          geom_boxplot(aes(x = as.factor(EXP),y = Res,fill = SN, col = SN),alpha = 0.4) +
+          theme_bw() +
+          labs(x = "Experimental condition", y= "% Values w.r.t \nthe baseline cell death",
+               col="Sample Name",fill="Sample Name")
+      })
+      
+      }
+  })
+  # save everytime there is a change in the results
+  CYTOTOXresultListen <- reactive({
+    reactiveValuesToList(cytotoxResult)
+  })
+  observeEvent(CYTOTOXresultListen(), {
+    DataAnalysisModule$cytotoxResult = reactiveValuesToList(cytotoxResult)
+  })
+  
+  ### End CYTOTOX analysis ####
   
   ### Start Statistic ####
   DataStatisticModule = reactiveValues(WB = list(),
                                        PRCC = list(),
                                        ELISA = list(),
                                        ENDOC = list(),
+                                       CYTOTOX = list(),
                                        Flag = F)
   
   DataStatisticresultListen <- reactive({
@@ -2207,7 +2542,7 @@ server <- function(input, output, session) {
       Analysis = rep(F,length(AnalysisNames) )
       names(Analysis) = AnalysisNames
       for(j in AnalysisNames)
-          Analysis[j] = all(sapply(DataStatisticModule[[j]], is.null))
+        Analysis[j] = all(sapply(DataStatisticModule[[j]], is.null))
       
       AnalysisNames = AnalysisNames[!Analysis]
       
@@ -2262,12 +2597,14 @@ server <- function(input, output, session) {
                                                      FlagWB = F,
                                                      FlagPRCC = F,
                                                      FlagELISA = F,
+                                                     FlagCYTOTOX = F,
                                                      FlagENDOC = F)
   UploadDataAnalysisModule = reactiveValues(FlagALL = F,
                                             FlagUpdate = F,
                                             FlagWB = F,
                                             FlagPRCC = F,
                                             FlagELISA = F,
+                                            FlagCYTOTOX = F,
                                             FlagENDOC = F)
   
   
@@ -2287,7 +2624,8 @@ server <- function(input, output, session) {
           need(all(names(mess) %in% names(DataAnalysisModule)) ||
                  all(names(mess) %in% names(elisaResult)) ||
                  all(names(mess) %in% names(wbquantResult)) || 
-                 all(names(mess) %in% names(pcrResult)) || 
+                 all(names(mess) %in% names(pcrResult)) ||
+                 all(names(mess) %in% names(cytotoxResult)) ||
                  all(names(mess) %in% names(endocResult)) ,
                paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
         )
@@ -2299,9 +2637,11 @@ server <- function(input, output, session) {
         }else if( all(names(mess) %in% names(pcrResult)) || all(names(mess) %in% names(DataAnalysisModule))){
           DataAnalysisModule$PRCC[[dpath]]  <- mess
         }else if(all(names(mess) %in% names(endocResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-          DataAnalysisModule$ENDOC$File1 <- mess
-        }else if(all(names(mess) %in% names(elisaResult)) || all(names(mess) %in% names(DataAnalysisModule))){
           DataAnalysisModule$ENDOC[[dpath]]  <- mess
+        }else if(all(names(mess) %in% names(elisaResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+          DataAnalysisModule$ELISA[[dpath]]  <- mess
+        }else if(all(names(mess) %in% names(cytotoxResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+          DataAnalysisModule$CYTOTOX[[dpath]]  <- mess
         }
         
       }
@@ -2325,7 +2665,8 @@ server <- function(input, output, session) {
         need(all(names(mess) %in% names(DataAnalysisModule)) ||
                all(names(mess) %in% names(elisaResult)) ||
                all(names(mess) %in% names(wbResult)) || 
-               all(names(mess) %in% names(pcrResult)) || 
+               all(names(mess) %in% names(pcrResult)) ||
+               all(names(mess) %in% names(cytotoxResult)) ||
                all(names(mess) %in% names(endocResult)) ,
              paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
       )
@@ -2346,6 +2687,9 @@ server <- function(input, output, session) {
       }else if(all(names(mess) %in% names(elisaResult)) ){
         DataAnalysisModule$elisaResult <- mess
         UploadDataAnalysisModule$FlagELISA = T
+      }else if(all(names(mess) %in% names(citotoxResult)) ){
+        DataAnalysisModule$citotoxResult <- mess
+        UploadDataAnalysisModule$FlagCYTOTOX = T
       }
       
       UploadDataAnalysisModule$FlagUpdate = T
@@ -2392,6 +2736,16 @@ server <- function(input, output, session) {
                   FlagsExp = FlagsELISA)
         
       }
+      else if(UploadDataAnalysisModule$FlagCYTOTOX || UploadDataAnalysisModule$FlagALL){
+        
+        UploadRDs(Flag = "CYTOTX",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = cytotoxResult, 
+                  FlagsExp = FlagsCYTOTOX)
+        
+      }
       
       UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
     }
@@ -2405,6 +2759,24 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       saveExcel(filename = file, ResultList=DataAnalysisModule$elisaResult , analysis = "ELISA")
+    }
+  )
+  
+  output$downloadButtonExcel_CYTOTOX <- downloadHandler(
+    filename = function() {
+      paste('CYTOTOXanalysis-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "CYTOTOX")
+    }
+  )
+  
+  output$downloadButtonExcel_ENDOC <- downloadHandler(
+    filename = function() {
+      paste('ENDOCanalysis-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "ENDOC")
     }
   )
   
@@ -2464,6 +2836,17 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       results = DataAnalysisModule$endocResult
+      saveRDS(results, file = file)
+    }
+  )
+  
+  
+  output$downloadButton_CYTOTOX <- downloadHandler(
+    filename = function() {
+      paste('CYTOTOXanalysis-', Sys.Date(), '.RDs', sep='')
+    },
+    content = function(file) {
+      results = DataAnalysisModule$cytotoxResult
       saveRDS(results, file = file)
     }
   )

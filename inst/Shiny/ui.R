@@ -10,7 +10,7 @@ library("shinyWidgets")
 library(DT)
 library(openxlsx)
 
-  
+
 ui <- dashboardPage(
   #theme = shinytheme("paper"),
   dashboardHeader(title = "InteGREAT",
@@ -564,7 +564,7 @@ ui <- dashboardPage(
                 )
               )
           )
-        ),
+        )
       ),
       # Second tab content
       tabItem(tabName = "tablesELISA",
@@ -572,10 +572,13 @@ ui <- dashboardPage(
               fluidRow(
                 tags$head(tags$script(src = "message-handler.js")),
                 box(width = 12,
-                    title = "Linear regression of the standard curve:",
+                    title = "Regression of the standard curve:",
                     collapsible = TRUE,
                     fluidRow(
                       column(6,
+                             selectizeInput("regressionType",
+                                            label="Select the regression:",
+                                            choices = c("Linear","Quadratic","Cubic")),
                              DTOutput("ELISA_Table_stdcurve"),
                              actionButton(inputId = "ELISA_buttonRegression",
                                           label = 'Linear Regression',
@@ -585,7 +588,7 @@ ui <- dashboardPage(
                              plotOutput("ELISAregression")
                       )
                     )
-                  ),
+                ),
                 box(width= 12,
                     title = "Select a blanche for the following experimental conditions",
                     collapsible = TRUE,
@@ -605,23 +608,23 @@ ui <- dashboardPage(
                     collapsible = TRUE,
                     collapsed = TRUE,
                     plotOutput("ELISAplots"),
-                    DTOutput("ELISAtables")
-                )
-              ),
-              fluidRow(
-                column(width = 1,offset = 9,
-                       downloadButton( label = "Download the RDs", 
-                                       outputId = "downloadButton_ELISA",
-                                       #href = "Results.RData",
-                                       #download = "Results.RData",
-                                       icon = icon("download") )
-                ),
-                column(width = 1,offset = 7,
-                       downloadButton( label = "Download xlsx", 
-                                       outputId = "downloadButtonExcel_ELISA",
-                                       #href = "Results.RData",
-                                       #download = "Results.RData",
-                                       icon = icon("download") )
+                    DTOutput("ELISAtables"),
+                    fluidRow(
+                      column(width = 1,offset = 9,
+                             downloadButton( label = "Download the RDs", 
+                                             outputId = "downloadButton_ELISA",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      ),
+                      column(width = 1,offset = 7,
+                             downloadButton( label = "Download xlsx", 
+                                             outputId = "downloadButtonExcel_ELISA",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      )
+                    )
                 )
               )
       ),
@@ -722,16 +725,23 @@ ui <- dashboardPage(
                     collapsible = TRUE,
                     collapsed = TRUE,
                     DTOutput("ENDOCtables"),
-                    plotOutput("ENDOCplots")
-                )
-              ),
-              fluidRow(
-                column(width = 1,offset = 9,
-                       downloadButton( label = "Download the analysis", 
-                                       outputId = "downloadButton_ENDOC",
-                                       #href = "Results.RData",
-                                       #download = "Results.RData",
-                                       icon = icon("download") )
+                    plotOutput("ENDOCplots"),
+                    fluidRow(
+                      column(width = 1,offset = 9,
+                             downloadButton( label = "Download the RDs", 
+                                             outputId = "downloadButton_ENDOC",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      ),
+                      column(width = 1,offset = 7,
+                             downloadButton( label = "Download xlsx", 
+                                             outputId = "downloadButtonExcel_ENDOC",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      )
+                    )
                 )
               )
       ),
@@ -767,13 +777,83 @@ ui <- dashboardPage(
                 width = 10,offset = 1,
                 verbatimTextOutput("LoadingError_CYTOTOX")
               )
+            ),
+            fluidRow(
+              box(width = 12,
+                  title = "Assign experimental information to values:",
+                  column(width = 6,
+                         dataTableOutput("CYTOTOXmatrix")
+                  ),
+                  column(width = 6,
+                         selectizeInput("CYTOTOXcell_SN",
+                                        label = "Sample name:",
+                                        choices = "",
+                                        options = list(create = TRUE)),
+                         selectizeInput("CYTOTOXcell_EXP",
+                                        label = "Experimental condition:",
+                                        choices = "",
+                                        options = list(create = TRUE)),
+                         selectizeInput("CYTOTOXcell_REP",
+                                        label = "Replicate number:",
+                                        choices = "",
+                                        options = list(create = TRUE)),
+                         fluidRow(
+                           column(4,
+                                  selectizeInput(inputId = "CYTOTOX_baselines",
+                                                     "Select baseline cell:",
+                                                 choices = "")
+                           )
+                         )
+                  ),
+                  fluidRow(
+                    column(width = 1,offset = 9,
+                           actionButton(inputId = "NextCytotoxQuantif",
+                                        label = 'Proceed to Quantification',
+                                        align = "right",
+                                        icon = shiny::icon("forward"))
+                    )
+                  )
+              )
             )
           )
         )
       ),
       # Second tab content
       tabItem(tabName = "tablesCYTOTOX",
-              h2("Quantification")
+              h2("Quantification"),
+              # fluidRow(
+              #   box(width= 12,
+              #       title = "Select a baseline for the following experimental conditions",
+              #       collapsible = TRUE,
+              #       collapsed = T,
+              #       uiOutput("CytotoxBaselineSelection")
+              #   )
+              # ),
+              fluidRow(
+                box(width= 12,
+                    title = "Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    plotOutput("CYTOTOXplots"),
+                    DTOutput("CYTOTOXtables"),
+                    fluidRow(
+                      column(width = 1,
+                             downloadButton( label = "Download the RDs", 
+                                             outputId = "downloadButton_CYTOTOX",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      ),
+                      column(width = 1,offset = 2,
+                             downloadButton( label = "Download xlsx", 
+                                             outputId = "downloadButtonExcel_CYTOTOX",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      )
+                    )
+                )
+              )
       ),
       ## END data analysis: CYTOTOX
       ## BEGIN data analysis: WB  #######
@@ -1001,119 +1081,119 @@ ui <- dashboardPage(
                    )
               )
       ),
-    ## END data analysis: WB
-    ###### END DATA ANALYSIS ####
-    ###### BEGIN Statistic ####
-    tabItem(tabName = "StatAnalysis_tab",
-            h2("Statistical analysis"),
-            fluidRow(
-              box(width = 12,
-                  title = "Upload the analysis",
-                  fluidRow(
-                    column(
-                      10,
-                      fileInput(
-                        inputId = "loadStatAnalysis_file",
-                        label = "",
-                        placeholder = "Select the RDs files storing InteGreat analyses",
-                        width = "80%", 
-                        multiple = TRUE)
-                    ),
-                    column(
-                      1,
-                      actionButton( label = "Load",style = "margin-top: 20px;",
-                                    icon = shiny::icon("upload"),
-                                    inputId = "loadStatAnalysis_file_Button" )
-                    )
-                  )
-                  )
-            ),
-            fluidRow(
-              column(
-                width = 10,
-                offset = 1,
-                verbatimTextOutput("loadStatAnalysis_Error")
-              )
-            ),
-            box(
-              width = 12,
-              collapsible = T,
-              collapsed = T,
-              title = "Comparison analysis",
-              selectizeInput("StatAnalysis",
-                             label = "Select the analysis:",
-                             choices = ""),
+      ## END data analysis: WB
+      ###### END DATA ANALYSIS ####
+      ###### BEGIN Statistic ####
+      tabItem(tabName = "StatAnalysis_tab",
+              h2("Statistical analysis"),
               fluidRow(
-                column(12,
-                       DTOutput("TabStat")
-                       )
-              )
-            )
-    ),
-    ###### END Statitcs ###
-    ###### BEGIN DATAVERSE #####
-    tabItem(tabName = "Dataverse_tab",
-            h2("Dataverse"),
-            fluidRow(
-              box(width = 12,
-                  title = "Upload and Maintain",
-                  collapsible = T,
-                  h4(
-                    em(
-                      "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
-                         " for obtaining an account and setting up an API key."
-                       ) 
-                    ),
-                  fluidRow(
-                    column(width=6, 
-                           textInput("APIkey",
-                                     value = ifelse(system.file("Data",".APIkey", package = "InteGreat") != "",
-                                                    read.table(paste0(system.file("Data", package = "InteGreat"),
-                                                                      "/.APIkey"),
-                                                               quote="\"",
-                                                               comment.char=""),
-                                                    ""), 
-                                     label = "API key linked to a Dataverse installation account:")),
-                    column(2,
-                           selectizeInput("selectAnalysis_DV",
-                                          label = "Select the analysis:",
-                                          choices = "")
+                box(width = 12,
+                    title = "Upload the analysis",
+                    fluidRow(
+                      column(
+                        10,
+                        fileInput(
+                          inputId = "loadStatAnalysis_file",
+                          label = "",
+                          placeholder = "Select the RDs files storing InteGreat analyses",
+                          width = "80%", 
+                          multiple = TRUE)
+                      ),
+                      column(
+                        1,
+                        actionButton( label = "Load",style = "margin-top: 20px;",
+                                      icon = shiny::icon("upload"),
+                                      inputId = "loadStatAnalysis_file_Button" )
+                      )
                     )
+                )
+              ),
+              fluidRow(
+                column(
+                  width = 10,
+                  offset = 1,
+                  verbatimTextOutput("loadStatAnalysis_Error")
+                )
+              ),
+              box(
+                width = 12,
+                collapsible = T,
+                collapsed = T,
+                title = "Comparison analysis",
+                selectizeInput("StatAnalysis",
+                               label = "Select the analysis:",
+                               choices = ""),
+                fluidRow(
+                  column(12,
+                         DTOutput("TabStat")
+                  )
+                )
+              )
+      ),
+      ###### END Statitcs ###
+      ###### BEGIN DATAVERSE #####
+      tabItem(tabName = "Dataverse_tab",
+              h2("Dataverse"),
+              fluidRow(
+                box(width = 12,
+                    title = "Upload and Maintain",
+                    collapsible = T,
+                    h4(
+                      em(
+                        "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
+                        " for obtaining an account and setting up an API key."
+                      ) 
                     ),
                     fluidRow(
-                    column(3,
-                           textInput("Title_DV",
-                                     label = "Title:",
-                                     value=""
-                           )
+                      column(width=6, 
+                             textInput("APIkey",
+                                       value = ifelse(system.file("Data",".APIkey", package = "InteGreat") != "",
+                                                      read.table(paste0(system.file("Data", package = "InteGreat"),
+                                                                        "/.APIkey"),
+                                                                 quote="\"",
+                                                                 comment.char=""),
+                                                      ""), 
+                                       label = "API key linked to a Dataverse installation account:")),
+                      column(2,
+                             selectizeInput("selectAnalysis_DV",
+                                            label = "Select the analysis:",
+                                            choices = "")
+                      )
                     ),
-                    column(3,
-                           textInput("Creator_DV",
-                                     label = "Creator:",
-                                     value=""
-                           )
-                    ),
-                    column(4,
-                           textInput("Description_DV",
-                                     label = "Description:",
-                                     value=""
-                           )
+                    fluidRow(
+                      column(3,
+                             textInput("Title_DV",
+                                       label = "Title:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             textInput("Creator_DV",
+                                       label = "Creator:",
+                                       value=""
+                             )
+                      ),
+                      column(4,
+                             textInput("Description_DV",
+                                       label = "Description:",
+                                       value=""
+                             )
+                      )
                     )
-                  )
-            )
-            ),
-            fluidRow(
-              box(width = 12,
-                  title = "Search and Get",
-                  collapsible = T
+                )
+              ),
+              fluidRow(
+                box(width = 12,
+                    title = "Search and Get",
+                    collapsible = T
+                )
               )
-            )
+      )
+      ####### END DATAVERSE ####
+      
+      # Here ends the ui body
     )
-    ####### END DATAVERSE ####
     
-    # Here ends the ui body
-    )
-
   )
   
 )

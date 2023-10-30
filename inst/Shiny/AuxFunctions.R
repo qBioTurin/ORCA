@@ -11,7 +11,7 @@ pcrTab.generation = function(pcrTabs,SelectedGene)
   )
   return(output_list)
 }
-readfile <- function(filename,type,colname = T, namesAll = namesAll, allDouble = F) {
+readfile <- function(filename,type,colname = T, namesAll = namesAll, allDouble = F, colors = F) {
   out <- tryCatch(
     {
       if(type == "RDs"){
@@ -35,11 +35,47 @@ readfile <- function(filename,type,colname = T, namesAll = namesAll, allDouble =
         x = readxl::read_excel(filename,col_names = colname)
         if(allDouble){
           # we check the presence of not double values to set as NA
-          xstr = which(sapply(1:dim(x)[1], function(i) !is.double(x[[i]])) )
+          xstr = which(sapply(1:dim(x)[2], function(i) !is.double(x[[i]])) )
           if(length(xstr)>0)
             for(i in xstr)
               x[[i]] = as.double(x[[i]])
         }
+        
+        if(colors){
+          wb =loadWorkbook(filename)
+          sheetName = wb$sheet_names[1]
+          
+          l = lapply(wb$styleObjects, function(x){
+            if(x$sheet == sheetName){
+              if( all(areColors( paste0("#",unname(x$style$fill$fillFg)))) ){
+                color = paste0("#",unname(x$style$fill$fillFg))
+              }else{
+                color = randomcoloR::randomColor(1)
+              }
+              df = data.frame(row = x$rows, col = x$cols,
+                         fill = ifelse(length(x$style$fill$fillFg) > 0 , 
+                                       color,
+                                       "white" ) )
+            }
+          })
+          l = do.call(rbind, l[lengths(l) > 0])
+          SN = table(l$fill)
+          l$SN = paste0("Color ", match(l$fill ,names(SN)) )
+          
+          tb.SN = matrix("",nrow = max(l$row),ncol = max(l$col))
+          
+          for(j in 1:ncol(tb.SN)){
+            fill_col = l %>% filter(col == j)
+            tb.SN[fill_col$row,j] = fill_col$SN
+          }
+          
+          col = l %>% select(fill,SN) %>% distinct()
+          vectcol = col$fill
+          names(vectcol) = col$SN
+          
+          return(list(x = x, SNtable = tb.SN, fill =vectcol ))
+        }
+        
         return(x)
       }else{
         LoadImage(filename)
@@ -59,6 +95,13 @@ readfile <- function(filename,type,colname = T, namesAll = namesAll, allDouble =
     # }
   )    
   return(out)
+}
+
+areColors <- function(x) {
+  sapply(x, function(X) {
+    tryCatch(is.matrix(col2rgb(X)), 
+             error = function(e) FALSE)
+  })
 }
 
 AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,SName="1",AUCdf.new=NULL){
@@ -343,22 +386,12 @@ UploadRDs = function(Flag, session, output,
                                selected = unique(FlagsExp$BASEselected) )
     }
     ###
-    if(!is.null(Result$LinearRegression)){
-      Result$LinearRegression -> lmStancurve
+    if(!is.null(Result$Regression)){
+      Result$Regression$data -> lmStancurve
       Result$Tablestandcurve -> standcurve
-      infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-                          y = max(standcurve$Measures) + c(2,1.75),
-                          text = c( paste0("y = ", signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
-                                    paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
       
       output$ELISAregression <- renderPlot(
-        ggplot(standcurve,aes(Concentrations, Measures)) +
-          geom_point() +
-          geom_smooth(method='lm', col = "red") +
-          geom_text(data= infoLM,
-                    aes(x = x, y = y, label =text ),
-                    vjust = "inward", hjust = "inward" )+
-          theme_bw()
+        Result$Regression$plot
       )
     }
     
@@ -368,8 +401,6 @@ UploadRDs = function(Flag, session, output,
     
   }
 }
-
-
 
 saveExcel = function(filename,ResultList,analysis){
   
@@ -384,19 +415,9 @@ saveExcel = function(filename,ResultList,analysis){
     ## Linear regression analysis
     addWorksheet(wb,"standard curve")
     standcurve = ResultList[["Tablestandcurve"]]
-    lmStancurve = ResultList[["LinearRegression"]]
-    infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-                        y = max(standcurve$Measures) + c(2,1.75),
-                        text = c( paste0("y = ", signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
-                                  paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
-    regressionPlot = ggplot(standcurve,aes(Concentrations, Measures)) +
-      geom_point() +
-      geom_smooth(method='lm', col = "red") +
-      geom_text(data= infoLM,
-                aes(x = x, y = y, label =text ),
-                vjust = "inward", hjust = "inward" )+
-      theme_bw()
-    print(regressionPlot)
+    lmStancurve = ResultList[["Regression"]]$data
+    print(ResultList[["Regression"]]$plot)
+    
     writeDataTable(wb,standcurve, sheet="standard curve")
     insertPlot(wb = wb,  sheet="standard curve",
                startCol=dim(standcurve)[2]+ 2)
@@ -414,8 +435,135 @@ saveExcel = function(filename,ResultList,analysis){
     insertPlot(wb = wb,  sheet="Analysis",
                startCol=dim(ResultList[["dataFinal"]] )[2]+ 2)
   }
+  else if(analysis == "CYTOTOX"){
+    ## Create a new workbook
+    wb <- createWorkbook("CYTOTOX")
+    
+    ## initial data
+    addWorksheet(wb,"TablePlot")
+    writeDataTable(wb, sheet = "TablePlot", ResultList[["TablePlot"]]$x$data)
+    
+    ## Analysis
+    addWorksheet(wb,"Results Analysis")
+    data = ResultList[["data"]]
+    finaldata = ResultList[["dataFinal"]]
+    print(
+      data %>% ggplot() +
+            geom_boxplot(aes(x = as.factor(EXP), y = Res, fill = SN, col = SN),alpha = 0.4) +
+            theme_bw() +
+            labs(x = "Experimental condition", y= "% Values w.r.t \nthe baseline cell death",
+                 col="Sample Name",fill="Sample Name")
+          )
+    writeDataTable(wb,finaldata, sheet="Results Analysis")
+    insertPlot(wb = wb,  sheet="Results Analysis",
+               startCol=dim(finaldata)[2]+ 2)
+  }else if(analysis =="ENDOC"){
+    ## Create a new workbook
+    wb <- createWorkbook("ENDOC")
+    
+    ## initial data
+    addWorksheet(wb,"TablePlot")
+    writeDataTable(wb, sheet = "TablePlot", ResultList[["TablePlot"]]$x$data)
+    
+    ## Analysis
+    addWorksheet(wb,"Results Analysis")
+    finaldata = ResultList[["dataFinal"]]
+    writeDataTable(wb,finaldata, sheet="Results Analysis")
+  }
   
   ## Save it
   saveWorkbook(wb, filename)
+  
+}
+
+tableExcelColored = function(session, output,Result, FlagsExp, type){
+  
+  if(type == "Initialize"){
+    ExpDataTable = Result$Initdata
+    
+    if(is.null(FlagsExp$EXPcol)){
+      ExpDataTable.colors = matrix("",nrow = nrow(ExpDataTable),ncol=ncol(ExpDataTable))
+    }else{
+      ExpDataTable.colors = Result[[grep(x=names(Result), pattern = "cell_SN", value = T)]]
+    }
+    completeExpDataTable = cbind(ExpDataTable,ExpDataTable.colors)
+    
+    cols.keep <- paste0('V',1:length(ExpDataTable[1,])) 
+    cols.color <- paste0('Col',1:length(ExpDataTable[1,]))
+    colnames(completeExpDataTable) = c(cols.keep,cols.color)
+    
+    if(is.null(FlagsExp$EXPcol)){
+      EXPcol = ""
+      names(EXPcol) = "white"
+    }else{
+      EXPcol = FlagsExp$EXPcol
+    }
+    
+    ExpDataTable = datatable(completeExpDataTable,
+                          filter = 'none',
+                          #server = FALSE,
+                          selection = list(mode = 'single', target = 'cell'),
+                          rownames= FALSE,
+                          options = list(
+                            lengthChange = FALSE,
+                            scrollX = TRUE,
+                            scrollY = TRUE,
+                            columnDefs = list(list(targets = cols.color, 
+                                                   visible = FALSE))
+                          )) %>%
+      formatStyle(cols.keep,
+                  cols.color,
+                  backgroundColor = styleEqual(names(EXPcol), EXPcol) )
+    
+    cell_SN <- ExpDataTable.colors
+    cell_EXP <- cell_REP <- matrix(
+      "",
+      nrow = length(ExpDataTable$x$data[,1]),
+      ncol = length(ExpDataTable$x$data[1,])
+    )
+    
+    Result[[grep(x=names(Result),pattern = "cell_SN", value = T)]] <- cell_SN
+    Result[[grep(x=names(Result),pattern = "cell_EXP", value = T)]]<- cell_EXP
+    Result[[grep(x=names(Result),pattern = "cell_REP", value = T)]]<- cell_REP
+    Result$TablePlot = ExpDataTable
+  }
+  else if(type == "Update"){
+    ColorsSN = rainbow(n = 50,alpha = 0.5)[sample(50,x=1:50,replace = F)]
+    
+    EXPcol = FlagsExp$EXPcol
+    if(is.null(EXPcol)){
+      EXPcol = ColorsSN[1:c(FlagsExp$AllExp)]
+      names(EXPcol) = FlagsExp$AllExp
+      EXPcol[names(EXPcol) == ""] = "white"
+      FlagsExp$EXPcol = EXPcol
+    }else{
+      SNnew = FlagsExp$AllExp[! FlagsExp$AllExp %in%  names(EXPcol)]
+      if(length(SNnew)>0){
+        colNew = ColorsSN[! ColorsSN %in% EXPcol][1:length(SNnew)]
+        names(colNew) = SNnew
+        EXPcol = c(EXPcol,colNew)
+        EXPcol[names(EXPcol) == ""] = "white"
+        FlagsExp$EXPcol = EXPcol
+      }
+    }
+    ExpDataTable = Result$TablePlot$x$data
+    completeExpDataTable = cbind(Result$Initdata,Result$CYTOTOXcell_SN)
+    colnames(completeExpDataTable) = colnames(ExpDataTable)
+    cols.color = grep(x = colnames(ExpDataTable),pattern = "Col",value = T)
+    cols.keep = grep(x = colnames(ExpDataTable),pattern = "V",value = T)
+    Result$TablePlot = datatable(completeExpDataTable,
+                                        filter = 'none',
+                                        #server = FALSE,
+                                        selection = list(mode = 'single', target = 'cell'),
+                                        rownames= FALSE,
+                                        options = list(
+                                          scrollX = TRUE,
+                                          lengthChange = FALSE,
+                                          columnDefs = list(list(targets = cols.color, visible = FALSE))
+                                        )) %>%
+      formatStyle(cols.keep,
+                  cols.color,
+                  backgroundColor = styleEqual(names(EXPcol), EXPcol))
+  }
   
 }
