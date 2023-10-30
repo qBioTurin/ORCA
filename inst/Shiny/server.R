@@ -25,13 +25,17 @@ server <- function(input, output, session) {
                                           otherTabs = NULL,
                                           otherTabsMean = NULL)
   
+  MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity") 
+  names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult") 
+  
   ### WB analysis ####
   # DECLARE REACTIVEVALUES FUNCTION HERE
   PanelData = data.frame(SampleName = character(),
                          xmin = numeric(), ymin = numeric(), 
                          xmax = numeric(), ymax = numeric())
   
-  wbResult <- reactiveValues(Normalizer = NULL,
+  wbResult <- reactiveValues(
+                             Normalizer = NULL,
                              Im = NULL,
                              Planes = NULL,
                              TruncatedPanelsValue = NULL,
@@ -41,7 +45,8 @@ server <- function(input, output, session) {
                              pl = NULL,
                              AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-"  ))
   
-  wbResultsEmpty <- list(Normalizer = NULL,
+  wbResult0 <- list(
+                         Normalizer = NULL,
                          Im = NULL,
                          Planes = NULL,
                          TruncatedPanelsValue = NULL,
@@ -110,10 +115,10 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$confirmUpload,{
-    DataAnalysisModule$wbResult = wbResultsEmpty
+    DataAnalysisModule$wbResult = wbResult0
     
     for(j in names(wbResult))
-      wbResult[[j]] = wbResultsEmpty[[j]]
+      wbResult[[j]] = wbResult0[[j]]
     
     output$AUC <- renderDT({
       wbResult$AUCdf %>% 
@@ -337,9 +342,9 @@ server <- function(input, output, session) {
   # reset all the truncation analysis
   observeEvent(input$actionButton_ResetPlanes,{
     
-    wbResult$AUCdf = wbResultsEmpty$AUCdf
-    wbResult$TruncatedPanelsValue = wbResultsEmpty$TruncatedPanelsValue
-    wbResult$TruncatedPlots = wbResultsEmpty$TruncatedPlots 
+    wbResult$AUCdf = wbResult0$AUCdf
+    wbResult$TruncatedPanelsValue = wbResult0$TruncatedPanelsValue
+    wbResult$TruncatedPlots = wbResult0$TruncatedPlots 
     
     output$AUC <-  renderDT({wbResult$AUCdf %>%
         dplyr::select(SampleName,Truncation, AUC)},
@@ -541,6 +546,13 @@ server <- function(input, output, session) {
                                  RelDensitiy = NULL,
                                  AdjRelDensitiy = NULL
   )
+  wbquantResult0 = list(NormWBanalysis = NULL,
+                                 NormWBanalysis_filtered = NULL,
+                                 WBanalysis = NULL,
+                                 WBanalysis_filtered = NULL,
+                                 RelDensitiy = NULL,
+                                 AdjRelDensitiy = NULL
+  )
   FlagsWBquant = reactiveValues(BothUploaded = F)
   
   # load the two wb analyses
@@ -646,7 +658,7 @@ server <- function(input, output, session) {
   # update the wb tables
   observe({
     if(is.null(wbquantResult$NormWBanalysis)){
-      table = wbResultsEmpty$AUCdf
+      table = wbResult0$AUCdf
     }else{
       table = wbquantResult$NormWBanalysis$AUCdf
     }
@@ -662,7 +674,7 @@ server <- function(input, output, session) {
   })
   observe({
     if(is.null(wbquantResult$WBanalysis)){
-      table = wbResultsEmpty$AUCdf
+      table = wbResult0$AUCdf
     }else{
       table = wbquantResult$WBanalysis$AUCdf
     }
@@ -712,7 +724,7 @@ server <- function(input, output, session) {
   
   # the relative density and adjusted is calculated
   observeEvent(list(FlagsWBquant$BothUploaded, input$IdLaneNorm_RelDens,input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
-    table =  wbResultsEmpty$AUCdf 
+    table =  wbResult0$AUCdf 
     
     if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered)){
       IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
@@ -825,14 +837,16 @@ server <- function(input, output, session) {
   
   #### PCR analysis ####
   
-  pcrResult = reactiveValues(Initdata = NULL,
+  pcrResult = reactiveValues(
+                             Initdata = NULL,
                              selectPCRcolumns = NULL,
                              data = NULL,
                              PCRnorm = NULL,
                              BaselineExp = NULL,
                              CompPRC = NULL,
                              NewPCR = NULL)
-  pcrResult0 = list(Initdata = NULL,
+  pcrResult0 = list(
+                    Initdata = NULL,
                     selectPCRcolumns = NULL,
                     data = NULL,
                     PCRnorm = NULL,
@@ -1113,6 +1127,7 @@ server <- function(input, output, session) {
       
     }
   })
+  
   observe({
     DataAnalysisModule$pcrResult = reactiveValuesToList(pcrResult)
   })
@@ -1128,7 +1143,8 @@ server <- function(input, output, session) {
   })
   #
   
-  endocResult = reactiveValues(Initdata= NULL,
+  endocResult = reactiveValues(
+                               Initdata= NULL,
                                data = NULL,
                                TablePlot = NULL,
                                dataFinal = NULL,
@@ -1137,7 +1153,8 @@ server <- function(input, output, session) {
                                MapBaseline = NULL,
                                MapBlanche = NULL)
   
-  endocResult0 = list(Initdata= NULL,
+  endocResult0 = list(
+                      Initdata= NULL,
                       data = NULL,
                       TablePlot = NULL,
                       dataFinal = NULL,
@@ -1625,7 +1642,8 @@ server <- function(input, output, session) {
   })
   #
   
-  elisaResult = reactiveValues(Initdata= NULL,
+  elisaResult = reactiveValues(
+                               Initdata= NULL,
                                data = NULL,
                                TablePlot = NULL,
                                dataFinal = NULL,
@@ -1636,7 +1654,8 @@ server <- function(input, output, session) {
                                Tablestandcurve = NULL,
                                Regression = NULL)
   
-  elisaResult0 = list(Initdata= NULL,
+  elisaResult0 = list(
+                      Initdata= NULL,
                       data = NULL,
                       TablePlot = NULL,
                       dataFinal = NULL,
@@ -2175,9 +2194,13 @@ server <- function(input, output, session) {
                                       paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
         
         regressionPlot =  regressionPlot +
-          geom_smooth(method='lm', col = "red") 
+          geom_smooth(method='lm', col = "red") +
+          geom_text(data= infoLM,
+                    aes(x = x, y = y, label =text ),
+                    vjust = "inward", hjust = "inward" )
         
       }else if(input$regressionType == "Quadratic"){
+        #this is not implemented
         standcurve$Concentrations2 = standcurve$Concentrations^2
         lmStancurve = lm(Measures~Concentrations+Concentrations2, data = standcurve)
         
@@ -2188,29 +2211,51 @@ server <- function(input, output, session) {
                                       paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
         regressionPlot =  regressionPlot  +
           geom_point() +
-          stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1,col="red")
+          stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1,col="red")+
+          geom_text(data= infoLM,
+                    aes(x = x, y = y, label =text ),
+                    vjust = "inward", hjust = "inward" )
       }
-      else{
-        standcurve$Concentrations2 = standcurve$Concentrations^2
-        standcurve$Concentrations3 = standcurve$Concentrations^3
-        lmStancurve = lm(Measures~Concentrations+Concentrations2+Concentrations3, data = standcurve)
+      else if(input$regressionType == "Hyperbola"){
         
-        infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-                            y = max(standcurve$Measures) + c(2,1.75),
-                            text = c( paste0("y = ", signif(lmStancurve$coef[[3]], 5), "x^2 + ",
-                                             signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
-                                      paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
+        outNLreg = tryCatch(
+          {
+            nlmStancurve<-nls(
+              Measures ~ a*Concentrations/(b+Concentrations), 
+              data = standcurve, #%>% group_by(Concentrations) %>% summarise(Measures = mean(Measures)),
+              start = list(a = 1,b = 1)
+             )
+          }, 
+          error = function(e){
+            return(e)
+          })
         
-        regressionPlot =  regressionPlot  +
-          geom_point() +
-          stat_smooth(method = "lm", formula = y ~ x + I(x^2)+ I(x^3), size = 1,col="red")
-        
+        if(!is.null(outNLreg$mess)){
+          nlmStancurve = NULL
+          regressionPlot = ggplot()+ geom_text(data = data.frame(x = 1,y =1,text = paste0("Error: ",outNLreg$mess)),
+                                               aes(x,y,label = text),color = "red")
+        }else{
+          nlmStancurve = outNLreg
+          coef = nlmStancurve$m$getPars()
+          r2 = 1- sum(nlmStancurve$m$resid()^2)/(sum(( mean(standcurve$Measures) - nlmStancurve$m$predict() )^2))
+          
+          infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
+                              y = max(standcurve$Measures) + c(2,1.75),
+                              text = c( paste0("y = ", signif(coef["a"], 5), "x / ( ",
+                                               signif(coef["b"], 5), " + x ) "),
+                                        paste0("R2 = ",signif(r2, 5))) )
+          
+          dfHyperbola = data.frame(x = seq(min(standcurve$Concentrations),max(standcurve$Concentrations),length.out = 20)) %>%
+            mutate(y = (coef["a"]*x/((coef["b"]+x)) ) )
+          
+          regressionPlot =  regressionPlot  +
+            geom_point() +
+            geom_line(data = dfHyperbola,aes(x = x,y = y),size = 1,col="red" )+
+            geom_text(data= infoLM,
+                      aes(x = x, y = y, label =text ),
+                      vjust = "inward", hjust = "inward" )
+        }
       }
-
-      regressionPlot =  regressionPlot +
-        geom_text(data= infoLM,
-                  aes(x = x, y = y, label =text ),
-                  vjust = "inward", hjust = "inward" )
       
       elisaResult$Regression = list(data = lmStancurve, plot = regressionPlot)
       
@@ -2239,7 +2284,8 @@ server <- function(input, output, session) {
   })
   #
   
-  cytotoxResult = reactiveValues(Initdata= NULL,
+  cytotoxResult = reactiveValues(
+                                 Initdata= NULL,
                                  data = NULL,
                                  TablePlot = NULL,
                                  dataFinal = NULL,
@@ -2248,7 +2294,8 @@ server <- function(input, output, session) {
                                  CYTOTOXcell_SN = NULL,
                                  MapBaseline = NULL)
   
-  cytotoxResult0 = list(Initdata= NULL,
+  cytotoxResult0 = list(
+                        Initdata= NULL,
                         data = NULL,
                         TablePlot = NULL,
                         dataFinal = NULL,
@@ -2561,15 +2608,44 @@ server <- function(input, output, session) {
       DataStatisticModule[[input$StatAnalysis]] -> results
       do.call(rbind,results) -> results
       
+      res = resTTest = NULL
+      resplot = ggplot()
+      
       if(input$StatAnalysis == "WB"){
-        res = results %>%
+        resTTest = res = results %>%
           select(DataSet,SampleName,AdjRelDens) %>%
+          mutate(SampleName = gsub(pattern = "^[0-9]. ",x = SampleName,replacement = "")) %>%
           tidyr::spread(key = DataSet,value = AdjRelDens ) 
         
         res$Mean = apply(res[,paste(unique(results$DataSet))],1,mean)
-      }
+        res$Sd = apply(res[,paste(unique(results$DataSet))],1,sd)
+
+        resplot =ggplot(res, aes(x = SampleName,
+                                 y = Mean)) + 
+          geom_bar(stat="identity", color="black", fill = "#BAE1FF",
+                          position=position_dodge()) +
+          geom_errorbar(aes(ymin=Mean-Sd, ymax=Mean+Sd), width=.2,
+                        position=position_dodge(.9)) +
+          theme_bw()
+        
+        combo = expand.grid(resTTest$SampleName,resTTest$SampleName)
+        combo = combo[combo$Var1 != combo$Var2, ]
+        resTTest = do.call(rbind,
+                           lapply(1:dim(combo)[1],function(x){
+          sn = combo[x,]
+          ttest = t.test(resTTest[resTTest$SampleName == sn$Var1, -1],resTTest[resTTest$SampleName == sn$Var2, -1]) 
+          data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
+                     pValue = ttest$p.value,
+                     conf.int = paste(ttest$conf.int,collapse = ";")
+                    )
+          })
+        )
+        
+        }
       
       output$TabStat = renderDT({res})
+      output$PlotStat = renderDT({resplot})
+      output$TabTTest = renderDT({resTTest})
     }
   })
   
@@ -2578,13 +2654,88 @@ server <- function(input, output, session) {
   ### DATAVERSE ####
   
   observeEvent(input$APIkey,{
-    
     pathInteGreat <- system.file("Data", package = "InteGreat")
     
     if(input$APIkey != "") # the last key used is saved
       write(input$APIkey,file = paste0(pathInteGreat,"/.APIkey"))
-    
+
   })
+  
+  DataAnalysisModule0 <- list(wbResult = wbResult0,
+                              wbquantResult = wbquantResult0,
+                              endocResult = endocResult0,
+                              elisaResult = elisaResult0,
+                              pcrResult = pcrResult0,
+                              cytotoxResult = cytotoxResult0)
+  
+  observe({
+    listDataAnalysisModule = reactiveValuesToList(DataAnalysisModule)
+    namesAnalysis = sapply(names(listDataAnalysisModule), function(x){
+      if(x == "wbquantResult"){
+        if(! all.equal(DataAnalysisModule[[x]]$NormWBanalysis,DataAnalysisModule0[[x]]$NormWBanalysis) )
+           return(x)
+        else
+          return("")
+      }
+      else if(!is.null(DataAnalysisModule[[x]]$Initdata) || !all.equal(DataAnalysisModule[[x]]$Initdata,DataAnalysisModule0[[x]]$Initdata) )
+        return(x)
+      else
+        return("")
+      })
+    namesAnalysis = namesAnalysis[namesAnalysis!= ""]
+    if(length(namesAnalysis)>0)
+      updateSelectizeInput(inputId = "selectAnalysis_DV",
+                          choices = MapAnalysisNames[namesAnalysis])
+  })
+  
+  observeEvent(input$DataverseUpload_Button,{
+
+    if(input$selectAnalysis_DV != ""){
+  
+      if(input$Title_DV == "" && input$Author_DV == "" && input$Description_DV == "" &&
+         input$AuthorAff_DV== "" && input$ContactN_DV == "" && input$ContactEmail_DV == "")
+          output$LoadingError_DATAVERSE = renderText("Error: missing information")
+      else{
+        # creation of a temporary folder
+        tempfolder = paste0(tempdir(check = T),"/InteGreat")
+        system(paste0("mkdir ",tempfolder))
+  
+        # create the metadata
+        result <- fromJSON(file = system.file("docker","metadata.json", package = "InteGreat") )
+        result$dataset_title = input$Title_DV
+        result$dataset_description = paste0(input$Description_DV,"\n This dataset has
+                                            been obtained using the InteGreat application,
+                                            specifically the module: ", input$selectAnalysis_DV)
+        result$author_name = input$Author_DV
+        result$author_affiliation= input$AuthorAff_DV
+        result$dataset_contact_name = input$ContactN_DV
+        result$dataset_contact_email = input$ContactEmail_DV
+        # result$subject = as.vector(result$subject)
+        write(toJSON(result), file=paste0(tempfolder,"/metadata.json") )
+  
+        # move the file in the temporary folder
+  
+        saveExcel(filename = paste0(tempfolder,"/dataset/",
+                                    gsub(pattern = " ", 
+                                         x = input$selectAnalysis_DV,
+                                         replacement = ""),".xlsx"),
+                  ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
+                  analysis = input$selectAnalysis_DV )
+        
+        saveRDS(file = paste0(tempfolder,"/dataset/InteGreat_",
+                                         gsub(pattern = " ", 
+                                              x = input$selectAnalysis_DV,
+                                              replacement = ""),".RDs"))
+        # docker run
+        docker.run(params = paste0("--volume ", tempfolder,
+                   ":/Results/ -d qbioturin/integreat-uploaddataverse python3 main.py /Results/metadata.json /Results/dataset") 
+        )
+  
+      }
+    
+    }
+  })
+  
   #initiate_sword_dataset()
   #add_dataset_file()
   #publish_dataset()
@@ -2767,7 +2918,7 @@ server <- function(input, output, session) {
       paste('CYTOTOXanalysis-', Sys.Date(), '.xlsx', sep='')
     },
     content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "CYTOTOX")
+      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "Cytotoxicity")
     }
   )
   
@@ -2776,7 +2927,7 @@ server <- function(input, output, session) {
       paste('ENDOCanalysis-', Sys.Date(), '.xlsx', sep='')
     },
     content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "ENDOC")
+      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "Endocytosis")
     }
   )
   

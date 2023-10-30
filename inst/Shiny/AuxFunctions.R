@@ -435,7 +435,7 @@ saveExcel = function(filename,ResultList,analysis){
     insertPlot(wb = wb,  sheet="Analysis",
                startCol=dim(ResultList[["dataFinal"]] )[2]+ 2)
   }
-  else if(analysis == "CYTOTOX"){
+  else if(analysis == "Cytotoxicity"){
     ## Create a new workbook
     wb <- createWorkbook("CYTOTOX")
     
@@ -457,7 +457,8 @@ saveExcel = function(filename,ResultList,analysis){
     writeDataTable(wb,finaldata, sheet="Results Analysis")
     insertPlot(wb = wb,  sheet="Results Analysis",
                startCol=dim(finaldata)[2]+ 2)
-  }else if(analysis =="ENDOC"){
+  }
+  else if(analysis =="Endocytosis"){
     ## Create a new workbook
     wb <- createWorkbook("ENDOC")
     
@@ -469,6 +470,71 @@ saveExcel = function(filename,ResultList,analysis){
     addWorksheet(wb,"Results Analysis")
     finaldata = ResultList[["dataFinal"]]
     writeDataTable(wb,finaldata, sheet="Results Analysis")
+  }
+  else if(analysis =="RT-qPCR"){
+    ## Create a new workbook
+    wb <- createWorkbook("RTqPCR")
+    
+    ## initial data
+    addWorksheet(wb,"Table")
+    writeDataTable(wb, sheet = "Data", ResultList[["Initdata"]])
+
+    ## Norm Analysis
+    addWorksheet(wb,"Norm PRC")
+    writeDataTable(wb,ResultList[["NewPCR"]], sheet="Norm PRC")
+    
+    ## Comp Analysis
+    addWorksheet(wb,"Comparison PRC")
+    writeDataTable(wb,ResultList[["CompPRC"]], sheet="Comparison PRC")
+    print( ggplot(data =  ResultList[["CompPRC"]],
+                  aes(x= Gene, y = Qnorm, fill = Sample)) + 
+             facet_wrap(~Norm, ncol = 1) +
+             geom_bar(stat = "identity",position = "dodge")
+           )
+    
+    insertPlot(wb = wb,  sheet="Comparison PRC",
+               startCol=dim(ResultList[["CompPRC"]] )[2]+ 2)
+  
+  }
+  else if(analysis =="WB"){
+    ## Create a new workbook
+    wb <- createWorkbook("WB")
+    
+    ### initial data
+    addWorksheet(wb,"WBimage")
+    ResultList[["Im"]] -> ListIm 
+    im = ListIm$RGB
+    
+    plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
+    rasterImage(im,1,1,dim(im)[2],dim(im)[1])
+    insertPlot(wb = wb,  sheet="WBimage")
+    
+    ### Analysis
+    addWorksheet(wb,"Plot")
+    print(ResultList[["Plots"]])
+    insertPlot(wb = wb,  sheet="Plot")
+    
+    addWorksheet(wb,"Truncated Plot")
+    print(ResultList[["TruncatedPlots"]])
+    insertPlot(wb = wb,  sheet="Plot")
+    
+    addWorksheet(wb,"AUC")
+    finaldata = ResultList[["AUCdf"]]
+    writeDataTable(wb,finaldata, sheet="AUC")
+    
+  }
+  else if(analysis =="WB comparison"){
+    ## Create a new workbook
+    wb <- createWorkbook("WB comparison")
+    
+    ## initial data
+    # addWorksheet(wb,"Table")
+    # writeDataTable(wb, sheet = "Data", ResultList[["Initdata"]])
+    # 
+    # ## Analysis
+    # addWorksheet(wb,"Results Analysis")
+    # finaldata = ResultList[["dataFinal"]]
+    # writeDataTable(wb,finaldata, sheet="Results Analysis")
   }
   
   ## Save it

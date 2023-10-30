@@ -115,22 +115,38 @@ ui <- dashboardPage(
       tabItem(
         tabName = "Home",
         h1("InteGreat"),
-        h2(em("A framework for cellular biology data analysis and integration for computational modelling.")),
-        h4("The InteGreat workflow provides an exhaustive platform where scientists
-	          can experience the discovery process from the analysis of a single datum to
-	          the creation of a complex computational model."),
-        h4("InteGreat consists of two modules:"),
+        h2(em("A cellular biologist’s toolbox for data analysis.")),
+        h4("InteGreat  provides an exhaustive platform where scientists can analyze raw:"),
         tags$ol(
           tags$li(
-            h4("The ", strong("Data Analysis module"), "includes tools specifically developed or adapted for the elaboration
-           of raw Western Blot (WB), Reverse Transcription-quantitative PCR (RT-qPCR) and Enzyme-Linked ImmunoSorbent Assay (ELISA) experiments.")
+            h4(strong("Western Blot")," (WB), ")
           ),
           tags$li(
-            h4("The ",strong("Model Integration module"),"supports scientists in the process of integration of lab data resulting from any type of experiment into a computational model.")
+            h4(strong("Reverse Transcription-quantitative PCR ")," (RT-qPCR),")
+          ),
+          tags$li(
+            h4(strong("Enzyme-Linked ImmunoSorbent Assay ")," (ELISA),")
+          ),
+          tags$li(
+            h4(strong("Endocytosis")," and,")
+          ),
+          tags$li(
+            h4(strong("Cytotoxicity experiments"),".")
           )
         ),
-        h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the InteGreat framework, or ",
-              a("here", href="https://www.google.com/"),"to download the user guide.")),
+        
+        # h4("InteGreat consists of two modules:"),
+        # tags$ol(
+        #   tags$li(
+        #     h4("The ", strong("Data Analysis module"), "includes tools specifically developed or adapted for the elaboration
+        #    of raw Western Blot (WB), Reverse Transcription-quantitative PCR (RT-qPCR) and Enzyme-Linked ImmunoSorbent Assay (ELISA) experiments.")
+        #   ),
+        #   tags$li(
+        #     h4("The ",strong("Model Integration module"),"supports scientists in the process of integration of lab data resulting from any type of experiment into a computational model.")
+        #   )
+        # ),
+        # h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the InteGreat framework, or ",
+        #       a("here", href="https://www.google.com/"),"to download the user guide.")),
         p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
       ),
       
@@ -1125,7 +1141,9 @@ ui <- dashboardPage(
                                choices = ""),
                 fluidRow(
                   column(12,
-                         DTOutput("TabStat")
+                         plotOutput("PlotStat"),
+                         DTOutput("TabStat"),
+                         DTOutput("TabTTest")
                   )
                 )
               )
@@ -1143,6 +1161,12 @@ ui <- dashboardPage(
                         "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
                         " for obtaining an account and setting up an API key."
                       ) 
+                    ),
+                    fluidRow(
+                      column(
+                        width = 10,offset = 1,
+                        verbatimTextOutput("LoadingError_DATAVERSE")
+                      )
                     ),
                     fluidRow(
                       column(width=6, 
@@ -1167,17 +1191,45 @@ ui <- dashboardPage(
                                        value=""
                              )
                       ),
-                      column(3,
-                             textInput("Creator_DV",
-                                       label = "Creator:",
-                                       value=""
-                             )
-                      ),
                       column(4,
                              textInput("Description_DV",
                                        label = "Description:",
                                        value=""
                              )
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             textInput("Author_DV",
+                                       label = "Author name:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             textInput("AuthorAff_DV",
+                                       label = "Author affiliation:",
+                                       value=""
+                             )
+                      )
+                      ),
+                    fluidRow(
+                      column(3,
+                             textInput("ContactN_DV",
+                                       label = "Contact name:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             textInput("ContactEmail_DV",
+                                       label = "Contact email:",
+                                       value=""
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      actionButton(
+                        label = "Upload",
+                        inputId = "DataverseUpload_Button" 
                       )
                     )
                 )

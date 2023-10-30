@@ -3,28 +3,147 @@ title: "Report"
 date: "`r Sys.Date()`"
 output: pdf_document
 params:
-   Plots: x
-   TruncatedPlots: x
-   pl: x
-   CutTab: x
-   IDlane: x
-   AUCdf: x
+   ResultList: x
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
-
-
-```{r, echo=FALSE}
 library(ggplot2)
-pl<-params$Plots
-pl
+library(DT)
+
 ```
+
+## ELISA
+
+### Initial Data
+
+```{r, echo=FALSE}
+ResultList$elisaResult[["TablePlot"]]
+```
+
+### Regression analysis
+
+```{r, echo=FALSE}
+ResultList$elisaResult[["Tablestandcurve"]]
+ResultList$elisaResult[["Regression"]]$data
+ResultList$elisaResult[["Regression"]]$plot
+```
+
+
+### Analysis
 
 ```{r, echo=FALSE}
 
-AUCdf<-params$AUCdf
-AUCdf
+ResultList$elisaResult[["dataFinal"]]
+
+ResultList$elisaResult[["dataFinal"]] %>%
+            ggplot( aes(x = Time, y = Quantification,
+                        fill= Experiment, group = Experiment ) )+
+            geom_bar(position = "dodge",stat = "identity")+
+            theme_bw()+
+            labs(x = "Time", col = "Experiments",
+                 y = "Average quantifications obtained\n from the lm ")
+
 ```
 
+## Cytotoxicity
+
+### initial data
+
+```{r, echo=FALSE}
+ResultList$cytotoxResult[["TablePlot"]]
+```
+
+### Analysis
+
+```{r, echo=FALSE}
+
+data = ResultList$cytotoxResult[["data"]]
+ResultList$cytotoxResult[["dataFinal"]]
+
+data %>% ggplot() +
+            geom_boxplot(aes(x = as.factor(EXP), y = Res, fill = SN, col = SN),alpha = 0.4) +
+            theme_bw() +
+            labs(x = "Experimental condition", y= "% Values w.r.t \nthe baseline cell death",
+                 col="Sample Name",fill="Sample Name")
+
+```
+
+
+## Endocytosis
+
+### Initial data
+
+```{r, echo=FALSE} 
+  ResultList$endocResult[["TablePlot"]]
+```
+
+### Analysis
+```{r, echo=FALSE}    
+ResultList$endocResult[["dataFinal"]]
+```
+
+## RT-qPCR
+
+### Initial data
+
+```{r, echo=FALSE}
+ ResultList$pcrResult[["Initdata"]]
+```
+
+## Norm Analysis
+
+```{r, echo=FALSE}
+
+ResultList$pcrResult[["NewPCR"]]
+```
+
+### Comp Analysis
+
+```{r, echo=FALSE}
+
+ResultList$pcrResult[["CompPRC"]]
+
+ggplot(data =  ResultList$pcrResult[["CompPRC"]],
+                  aes(x= Gene, y = Qnorm, fill = Sample)) + 
+             facet_wrap(~Norm, ncol = 1) +
+             geom_bar(stat = "identity",position = "dodge")
+
+  
+```
+
+### WB
+
+### Initial data
+
+```{r, echo=FALSE}
+  ### initial data
+    addWorksheet(wb,"WBimage")
+    ResultList[["Im"]] -> ListIm 
+    im = ListIm$RGB
+    
+    plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
+    rasterImage(im,1,1,dim(im)[2],dim(im)[1])
+    insertPlot(wb = wb,  sheet="WBimage")
+    
+    ### Analysis
+    addWorksheet(wb,"Plot")
+    print(ResultList[["Plots"]])
+    insertPlot(wb = wb,  sheet="Plot")
+    
+    addWorksheet(wb,"Truncated Plot")
+    print(ResultList[["TruncatedPlots"]])
+    insertPlot(wb = wb,  sheet="Plot")
+    
+    addWorksheet(wb,"AUC")
+    finaldata = ResultList[["AUCdf"]]
+    writeDataTable(wb,finaldata, sheet="AUC")
+```
+
+### WB comparison
+
+### initial data
+
+```{r, echo=FALSE}
+
+```

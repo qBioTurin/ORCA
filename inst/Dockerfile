@@ -1,13 +1,27 @@
-FROM rocker/shiny:4.0.5
+FROM rocker/r-ver:4.2.1
+
+ENV S6_VERSION=v2.1.0.2
+ENV RSTUDIO_VERSION=daily
+ENV DEFAULT_USER=rstudio
+ENV PANDOC_VERSION=default
+ENV PATH=/usr/lib/rstudio-server/bin:$PATH
+
+RUN /rocker_scripts/install_rstudio.sh
+RUN /rocker_scripts/install_pandoc.sh
 
 # system libraries
 RUN apt-get update && apt-get install -y \
     libcurl4-gnutls-dev \
-    libssl-dev
+    libssl-dev \
+    libz-dev \
+    libpng-dev\
+    libtiff5-dev
   
 
 # install R packages required 
 RUN R -e 'install.packages(c(\
+              "rjson", \ 
+              "openxlsx", \
               "shiny", \
               "shinydashboard", \
               "ggplot2", \
@@ -38,6 +52,6 @@ COPY ./Data/ ./home/data/Examples/
 EXPOSE 3838
 
 # Define default command.
-#CMD ["bash"]
+# CMD ["bash"]
 # run app on container start
 CMD ["R", "-e", "shiny::runApp('/app', host = '0.0.0.0', port = 3838)"]
