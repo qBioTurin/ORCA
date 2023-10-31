@@ -13,8 +13,8 @@ library(openxlsx)
 
 ui <- dashboardPage(
   #theme = shinytheme("paper"),
-  dashboardHeader(title = "OCA",
-                  tags$li(a(onclick = "onclick =window.open('https://github.com/qBioTurin/OCA')",
+  dashboardHeader(title = "ORCA",
+                  tags$li(a(onclick = "onclick =window.open('https://github.com/qBioTurin/ORCA')",
                             href = NULL,
                             icon("github"),
                             title = "GitHub",
@@ -114,9 +114,9 @@ ui <- dashboardPage(
       ## HOME ####
       tabItem(
         tabName = "Home",
-        h1("OCA: OmniCellAnalysis"),
+        h1("ORCA: Omni Reproducible Cell Analysis"),
         h2(em("A cellular biologist’s toolbox for data analysis.")),
-        h4("OCA  provides an exhaustive platform where scientists can analyze raw:"),
+        h4("ORCA  provides an exhaustive platform where scientists can analyze raw:"),
         tags$ol(
           tags$li(
             h4(strong("Western Blot")," (WB), ")
@@ -135,7 +135,7 @@ ui <- dashboardPage(
           )
         ),
         p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
-        # h4("OCA consists of two modules:"),
+        # h4("ORCA consists of two modules:"),
         # tags$ol(
         #   tags$li(
         #     h4("The ", strong("Data Analysis module"), "includes tools specifically developed or adapted for the elaboration
@@ -145,7 +145,7 @@ ui <- dashboardPage(
         #     h4("The ",strong("Model Integration module"),"supports scientists in the process of integration of lab data resulting from any type of experiment into a computational model.")
         #   )
         # ),
-        # h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the OCA framework, or ",
+        # h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the ORCA framework, or ",
         #       a("here", href="https://www.google.com/"),"to download the user guide.")),
       ),
       
@@ -160,7 +160,7 @@ ui <- dashboardPage(
                     fileInput(
                       inputId = "loadAnalysis_file",
                       label = "",
-                      placeholder = "Select the RDs files storing OCA analyses",
+                      placeholder = "Select the RDs files storing ORCA analyses",
                       width = "80%", 
                       multiple = TRUE)
                   ),
@@ -272,7 +272,7 @@ ui <- dashboardPage(
                 fileInput(
                   inputId = "IntGImport",
                   label = "",
-                  placeholder = "Select the RDs files storing OCA analyses",
+                  placeholder = "Select the RDs files storing ORCA analyses",
                   width = "80%", 
                   multiple = TRUE)
               ),
@@ -427,19 +427,24 @@ ui <- dashboardPage(
                     column(width = 6,
                            h2("Select the columns to assign"),
                            fluidRow(
-                             column(width = 4,
+                             column(width = 3,
                                     selectInput(inputId = "PCR_gene",
                                                 label = "Gene names:",
                                                 choices = "" )
                              ),
-                             column(width = 4,
+                             column(width = 3,
                                     selectInput(inputId = "PCR_sample",
                                                 label = "Sample names:",
                                                 choices = "" )
                              ),
-                             column(width = 4,
+                             column(width = 3,
                                     selectInput(inputId = "PCR_value",
-                                                label = "Value names:",
+                                                label = "Values:",
+                                                choices = "" )
+                             ),
+                             column(width = 3,
+                                    selectInput(inputId = "PCR_time",
+                                                label = "Times:",
                                                 choices = "" )
                              )
                            ),
@@ -451,7 +456,7 @@ ui <- dashboardPage(
                     ),
                     column(width = 3,
                            selectInput(inputId = "PCRbaseline",
-                                       label = "Select control sample:",
+                                       label = "Select baseline sample:",
                                        choices = "ID" )
                     ),
                     column(width = 3,offset = 9,
@@ -1139,7 +1144,7 @@ ui <- dashboardPage(
                         fileInput(
                           inputId = "loadStatAnalysis_file",
                           label = "",
-                          placeholder = "Select the RDs files storing OCA analyses",
+                          placeholder = "Select the RDs files storing ORCA analyses",
                           width = "80%", 
                           multiple = TRUE)
                       ),
@@ -1199,8 +1204,8 @@ ui <- dashboardPage(
                     fluidRow(
                       column(width=6, 
                              textInput("APIkey",
-                                       value = ifelse(system.file("Data",".APIkey", package = "OCA") != "",
-                                                      read.table(paste0(system.file("Data", package = "OCA"),
+                                       value = ifelse(system.file("Data",".APIkey", package = "ORCA") != "",
+                                                      read.table(paste0(system.file("Data", package = "ORCA"),
                                                                         "/.APIkey"),
                                                                  quote="\"",
                                                                  comment.char=""),

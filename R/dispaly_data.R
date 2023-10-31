@@ -1,23 +1,26 @@
-#' @title Run OCA
-#' @description function to lunch the OCA shiny application.
+#' @title Run ORCA
+#' @description function to lunch the ORCA shiny application.
 #'
 #' @param 
 #'
-#' @author Pernice Simone, Tortarolo Dora
-#' @import rjson openxlsx ggplot2 patchwork shinydashboard shinyWidgets shiny dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl DT shinyjs
+#' @author Beccuti Marco, Pernice Simone, Tortarolo Dora
+#' @import rjson openxlsx ggplot2 patchwork shinydashboard   dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl shinyjs
+#' @rawNamespace import(DT, except=c(dataTableOutput,renderDataTable))
+#' @rawNamespace import(shiny,except=runExample)
+#' @rawNamespace import(shinyWidgets,except=alert)
 #' 
 #' @examples
 #'\dontrun{
-#' OCA.run()
+#' InteGreat.run()
 #' }
 #' @export
 
-OCA.run <-function()
+ORCA.run <-function()
 {
   x = T
   
-  Appui <- system.file("Shiny","ui.R", package = "OCA")
-  Appserver <- system.file("Shiny","server.R", package = "OCA")
+  Appui <- system.file("Shiny","ui.R", package = "ORCA")
+  Appserver <- system.file("Shiny","server.R", package = "ORCA")
   
   source(Appui)
   source(Appserver)
@@ -28,7 +31,7 @@ OCA.run <-function()
   )
   
   # runApp(
-  #   appDir = system.file("Shiny", package = "OCA"),
+  #   appDir = system.file("Shiny", package = "ORCA"),
   #   launch.browser = T
   # )
 }

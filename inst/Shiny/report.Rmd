@@ -1,5 +1,5 @@
 ---
-title: "Report"
+title: "Report Omni Reproducible Cell Analysis"
 date: "`r Sys.Date()`"
 output: pdf_document
 params:

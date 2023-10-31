@@ -1,6 +1,6 @@
 # 
-# Appui <- system.file("Shiny","ui.R", package = "OCA")
-# Appserver <- system.file("Shiny","server.R", package = "OCA")
+# Appui <- system.file("Shiny","ui.R", package = "ORCA")
+# Appserver <- system.file("Shiny","server.R", package = "ORCA")
 # 
 # source("inst/Shiny/server.R")
 # source("inst/Shiny/ui.R")

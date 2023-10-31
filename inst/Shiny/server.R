@@ -2,9 +2,9 @@
 #shiny.launch.browser = .rs.invokeShinyWindowExternal
 
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
-APIkey_path = system.file("Data",".APIkey", package = "OCA")
+APIkey_path = system.file("Data",".APIkey", package = "ORCA")
 
-#source(system.file("Shiny","AuxFunctions.R", package = "OCA"))
+#source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
 # source("./inst/Shiny/AuxFunctions.R")
 
 # Define server logic required to draw a histogram
@@ -920,7 +920,10 @@ server <- function(input, output, session) {
                         choices = c("",colnames(pcrResult$Initdata)),
                         selected = ""
       )
-      
+      updateSelectInput(session,"PCR_time",
+                        choices = c("",colnames(pcrResult$Initdata)),
+                        selected = ""
+      )
       "The RT-qPCR excel has been uploaded  with success"
     })
   })
@@ -965,6 +968,10 @@ server <- function(input, output, session) {
                         choices = c("",colnames(pcrResult$Initdata)),
                         selected = ""
       )
+      updateSelectInput(session,"PCR_time",
+                        choices = c("",colnames(pcrResult$Initdata)),
+                        selected = ""
+      )
       
       removeModal()
       
@@ -973,9 +980,9 @@ server <- function(input, output, session) {
   })
   
   
-  observeEvent(list(input$PCR_value,input$PCR_gene,input$PCR_sample),{
+  observeEvent(list(input$PCR_value,input$PCR_gene,input$PCR_sample,input$PCR_time),{
     if( !is.null(pcrResult$Initdata) ){
-      selectPCRcolumns = c(input$PCR_gene,input$PCR_sample,input$PCR_value)
+      selectPCRcolumns = c(input$PCR_gene,input$PCR_sample,input$PCR_value,input$PCR_time)
       selectPCRcolumns = selectPCRcolumns[selectPCRcolumns!= ""]
       
       PCR = pcrResult$Initdata
@@ -983,7 +990,7 @@ server <- function(input, output, session) {
       output$PCRpreview = renderTable({
         if(length(selectPCRcolumns)!=0 ){
           tmp = PCR[,selectPCRcolumns]
-          colnames(tmp) = c("Gene", "Sample", "Value")[1:length(colnames(tmp))]
+          #colnames(tmp) = c("Gene", "Sample", "Value")[1:length(colnames(tmp))]
           head(tmp) 
         }
         else
@@ -992,10 +999,16 @@ server <- function(input, output, session) {
       
       if(length(selectPCRcolumns)==3 ){
         tmp = PCR[,selectPCRcolumns]
-        colnames(tmp) = c("Gene", "Sample", "Value")[1:length(colnames(tmp))]
+        colnames(tmp) = c("Gene", "Sample", "Value")
+        tmp$Time = ""
         pcrResult$data = tmp
         pcrResult$selectPCRcolumns = selectPCRcolumns
-      }else{
+      }else if(length(selectPCRcolumns)==4 ){
+        tmp = PCR[,selectPCRcolumns]
+        colnames(tmp) = c("Gene", "Sample", "Value","Time")
+        pcrResult$data = tmp
+        pcrResult$selectPCRcolumns = selectPCRcolumns
+      }{
         pcrResult$data = NULL
       }
     }
@@ -2654,10 +2667,10 @@ server <- function(input, output, session) {
   ### DATAVERSE ####
   
   observeEvent(input$APIkey,{
-    pathOCA <- system.file("Data", package = "OCA")
+    pathORCA <- system.file("Data", package = "ORCA")
     
     if(input$APIkey != "") # the last key used is saved
-      write(input$APIkey,file = paste0(pathOCA,"/.APIkey"))
+      write(input$APIkey,file = paste0(pathORCA,"/.APIkey"))
 
   })
   
@@ -2697,14 +2710,14 @@ server <- function(input, output, session) {
           output$LoadingError_DATAVERSE = renderText("Error: missing information")
       else{
         # creation of a temporary folder
-        tempfolder = paste0(tempdir(check = T),"/OCA")
+        tempfolder = paste0(tempdir(check = T),"/ORCA")
         system(paste0("mkdir ",tempfolder))
   
         # create the metadata
-        result <- fromJSON(file = system.file("docker","metadata.json", package = "OCA") )
+        result <- fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
         result$dataset_title = input$Title_DV
         result$dataset_description = paste0(input$Description_DV,"\n This dataset has
-                                            been obtained using the OCA application,
+                                            been obtained using the ORCA application,
                                             specifically the module: ", input$selectAnalysis_DV)
         result$author_name = input$Author_DV
         result$author_affiliation= input$AuthorAff_DV
@@ -2722,13 +2735,13 @@ server <- function(input, output, session) {
                   ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
                   analysis = input$selectAnalysis_DV )
         
-        saveRDS(file = paste0(tempfolder,"/dataset/OCA_",
+        saveRDS(file = paste0(tempfolder,"/dataset/ORCA_",
                                          gsub(pattern = " ", 
                                               x = input$selectAnalysis_DV,
                                               replacement = ""),".RDs"))
         # docker run
         docker.run(params = paste0("--volume ", tempfolder,
-                   ":/Results/ -d qbioturin/OCA-uploaddataverse python3 main.py /Results/metadata.json /Results/dataset") 
+                   ":/Results/ -d qbioturin/ORCA-uploaddataverse python3 main.py /Results/metadata.json /Results/dataset") 
         )
   
       }
