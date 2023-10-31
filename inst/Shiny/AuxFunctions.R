@@ -593,15 +593,21 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
                   backgroundColor = styleEqual(names(EXPcol), EXPcol) )
     
     cell_SN <- ExpDataTable.colors
-    cell_EXP <- cell_REP <- matrix(
+    cell_TIME <- cell_EXP <- cell_REP <- matrix(
       "",
       nrow = length(ExpDataTable$x$data[,1]),
       ncol = length(ExpDataTable$x$data[1,])
     )
     
-    Result[[grep(x=names(Result),pattern = "cell_SN", value = T)]] <- cell_SN
-    Result[[grep(x=names(Result),pattern = "cell_EXP", value = T)]]<- cell_EXP
-    Result[[grep(x=names(Result),pattern = "cell_REP", value = T)]]<- cell_REP
+    if(length(grep(x=names(Result),pattern = "cell_SN", value = T))>0)
+      Result[[grep(x=names(Result),pattern = "cell_SN", value = T)]] <- cell_SN
+    if(length(grep(x=names(Result),pattern = "cell_EXP", value = T))>0)
+      Result[[grep(x=names(Result),pattern = "cell_EXP", value = T)]]<- cell_EXP
+    if(length(grep(x=names(Result),pattern = "cell_REP", value = T))>0)
+      Result[[grep(x=names(Result),pattern = "cell_REP", value = T)]]<- cell_REP
+    if(length(grep(x=names(Result),pattern = "cell_TIME", value = T))>0)
+      Result[[grep(x=names(Result),pattern = "cell_TIME", value = T)]]<- cell_TIME
+    
     Result$TablePlot = ExpDataTable
   }
   else if(type == "Update"){
@@ -624,7 +630,7 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
       }
     }
     ExpDataTable = Result$TablePlot$x$data
-    completeExpDataTable = cbind(Result$Initdata,Result$CYTOTOXcell_SN)
+    completeExpDataTable = cbind(Result$Initdata,Result[[grep(x=names(Result),pattern = "cell_SN", value = T)]])
     colnames(completeExpDataTable) = colnames(ExpDataTable)
     cols.color = grep(x = colnames(ExpDataTable),pattern = "Col",value = T)
     cols.keep = grep(x = colnames(ExpDataTable),pattern = "V",value = T)

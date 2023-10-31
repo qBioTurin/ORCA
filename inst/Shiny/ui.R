@@ -593,8 +593,8 @@ ui <- dashboardPage(
                                                  "Select control:")
                        ),
                        column(4,
-                              checkboxGroupInput(inputId = "ELISA_blanches",
-                                                 "Select blanches:")
+                              checkboxGroupInput(inputId = "ELISA_blanks",
+                                                 "Select blank:")
                        )
                      )
               ),
@@ -633,12 +633,12 @@ ui <- dashboardPage(
                     )
                 ),
                 box(width= 12,
-                    title = "Select a blanche for the following experimental conditions",
+                    title = "Select a blank for the following experimental conditions",
                     collapsible = TRUE,
                     collapsed = T,
                     h4("If time information is associated with the experimental conditions
-                       defined as blanche, then it will be lost during the averaging of its values."),
-                    uiOutput("ElisaBlancheSelection")
+                       defined as blank, then it will be lost during the averaging of its values."),
+                    uiOutput("ElisaBlankSelection")
                 ),
                 box(width= 12,
                     title = "Select a baseline for the following experimental conditions",
@@ -711,10 +711,10 @@ ui <- dashboardPage(
           box(width = 12,
               title = "Assign experimental information to values:",
               column(width = 6,
-                     DTOutput("ENDOCmatrix")
+                     dataTableOutput("ENDOCmatrix")
               ),
               column(width = 6,
-                     selectizeInput("ENDOCcell_EXP",
+                     selectizeInput("ENDOCcell_SN",
                                     label = "Experimental condition:",
                                     choices = "",
                                     options = list(create = TRUE)),
@@ -727,8 +727,8 @@ ui <- dashboardPage(
                                                  "Select baselines:")
                        ),
                        column(6,
-                              checkboxGroupInput(inputId = "ENDOC_blanches",
-                                                 "Select blanches:")
+                              checkboxGroupInput(inputId = "ENDOC_blanks",
+                                                 "Select blank:")
                        )
                      )
               ),
@@ -750,12 +750,12 @@ ui <- dashboardPage(
               fluidRow(
                 tags$head(tags$script(src = "message-handler.js")),
                 box(width= 12,
-                    title = "Select a blanche for the following experimental conditions",
+                    title = "Select a blank for the following experimental conditions",
                     collapsible = TRUE,
                     collapsed = FALSE,
                     h4("If time information is associated with the experimental conditions
-                       defined as blanche, then it will be lost during the averaging of its values."),
-                    uiOutput("EndocBlancheSelection")
+                       defined as blank, then it will be lost during the averaging of its values."),
+                    uiOutput("EndocBlankSelection")
                 ),
                 box(width= 12,
                     title = "Select a baseline for the following experimental conditions",

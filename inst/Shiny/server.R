@@ -4,7 +4,7 @@
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "ORCA")
 
-source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
+# source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
 # source("./inst/Shiny/AuxFunctions.R")
 
 # Define server logic required to draw a histogram
@@ -1189,9 +1189,9 @@ server <- function(input, output, session) {
                                TablePlot = NULL,
                                dataFinal = NULL,
                                ENDOCcell_TIME = NULL,
-                               ENDOCcell_EXP = NULL,
+                               ENDOCcell_SN = NULL,
                                MapBaseline = NULL,
-                               MapBlanche = NULL)
+                               MapBlank = NULL)
   
   endocResult0 = list(
                       Initdata= NULL,
@@ -1199,9 +1199,9 @@ server <- function(input, output, session) {
                       TablePlot = NULL,
                       dataFinal = NULL,
                       ENDOCcell_TIME = NULL,
-                      ENDOCcell_EXP = NULL,
+                      ENDOCcell_SN = NULL,
                       MapBaseline = NULL,
-                      MapBlanche = NULL)
+                      MapBlank = NULL)
   
   # save everytime there is a change in the results
   ENDOCresultListen <- reactive({
@@ -1230,7 +1230,7 @@ server <- function(input, output, session) {
         filename = input$ENDOCImport$datapath,
         type = "Excel",
         allDouble = T,
-        colname = F
+        colname = F,colors = T
       )
       
       validate(
@@ -1238,7 +1238,9 @@ server <- function(input, output, session) {
              mess[["message"]] )
       )
       
-      endocResult$Initdata = mess
+      endocResult$Initdata = mess$x
+      FlagsENDOC$EXPcol = mess$fill
+      endocResult$ENDOCcell_SN = mess$SNtable
       
       "The ENDOC excel has been uploaded  with success"
     })
@@ -1269,15 +1271,18 @@ server <- function(input, output, session) {
       
       mess = readfile(
         filename = input$ENDOCImport$datapath,
-        type = "Excel"
+        type = "Excel",
+        colors = T
       )
       
       validate(
         need(!setequal(names(mess),c("message","call")) ,
              mess[["message"]])
       )
-      
-      endocResult$Initdata = mess
+
+      endocResult$Initdata = mess$x
+      FlagsENDOC$EXPcol = mess$fill
+      endocResult$ENDOCcell_SN = mess$SNtable
       
       removeModal()
       
@@ -1286,53 +1291,14 @@ server <- function(input, output, session) {
   })
   observe({
     if( !is.null(endocResult$Initdata) && is.null(endocResult$TablePlot) ){
-      ENDOCtb = endocResult$Initdata
+     
+      tableExcelColored(session = session,
+                        Result = endocResult, 
+                        FlagsExp = FlagsENDOC,
+                        type = "Initialize")
       
-      ENDOCtb.colors = ENDOCtb
-      ENDOCtb.colors[,] = ""
-      mENDOC  =cbind(ENDOCtb,ENDOCtb.colors)
+      output$ENDOCmatrix <-renderDataTable({endocResult$TablePlot})
       
-      cols.keep <- paste0('V',1:length(ENDOCtb[1,])) 
-      cols.color <- paste0('Col',1:length(ENDOCtb[1,]))
-      
-      colnames(mENDOC) = c(cols.keep,cols.color)
-      
-      ENDOCtb = datatable(mENDOC,
-                          filter = 'none',
-                          #server = FALSE,
-                          selection = list(mode = 'single', target = 'cell'),
-                          rownames= FALSE,
-                          options = list(
-                            lengthChange = FALSE,
-                            columnDefs = list(list(targets = cols.color, visible = FALSE))
-                          )) %>%
-        formatStyle(cols.keep,
-                    cols.color,
-                    backgroundColor = styleEqual("", 'white'))
-      
-      ENDOC = ENDOCtb$x$data
-      
-      output$ENDOCmatrix <- renderDT(
-        ENDOCtb,
-        #filter = 'none',
-        server = FALSE,
-        #selection = list(mode = 'single', target = 'cell'),
-        #options = list(lengthChange = FALSE ),
-        #rownames= FALSE
-      )
-      
-      # ind = expand.grid(0:(length(ENDOC[1,])-1),0:(length(ENDOC[,1])-1))
-      # ind$Var3 = paste0(ind$Var1,"_",ind$Var2)
-      # NumCells = length(ind$Var3)
-      
-      ENDOCcell_EXP <- ENDOCcell_TIME <- matrix(
-        "",
-        nrow = length(ENDOC[,1]),
-        ncol = length(ENDOC[1,])
-      )
-      endocResult$ENDOCcell_EXP <- ENDOCcell_EXP
-      endocResult$ENDOCcell_TIME<- ENDOCcell_TIME
-      endocResult$TablePlot = ENDOCtb
     }
   })
   observeEvent(input$ENDOCmatrix_cell_clicked,{
@@ -1341,12 +1307,16 @@ server <- function(input, output, session) {
       FlagsENDOC$cellCoo = cellCoo = c(cellSelected[1],cellSelected[2]+1)
       print(cellCoo)
       print(endocResult$ENDOCcell_TIME[ cellCoo[1],cellCoo[2] ])
-      print(endocResult$ENDOCcell_EXP[ cellCoo[1], cellCoo[2] ])
+      print(endocResult$ENDOCcell_SN[ cellCoo[1], cellCoo[2] ])
+      
       updateSelectizeInput(inputId = "ENDOCcell_TIME",
                            selected = ifelse(is.null(endocResult$ENDOCcell_TIME[cellCoo[1],cellCoo[2]]),"",endocResult$ENDOCcell_TIME[cellCoo[1],cellCoo[2]])
       )
-      updateSelectizeInput(inputId = "ENDOCcell_EXP",
-                           selected = ifelse(is.null(endocResult$ENDOCcell_EXP[cellCoo[1],cellCoo[2]]),"",endocResult$ENDOCcell_EXP[cellCoo[1],cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "ENDOCcell_SN",
+                           selected = ifelse(is.null(endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]]),
+                                             "",
+                                             endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]])
       )
     }
   })
@@ -1357,39 +1327,34 @@ server <- function(input, output, session) {
       endocResult$ENDOCcell_TIME[cellCoo[1],cellCoo[2]] = input$ENDOCcell_TIME
     }
   })
-  observeEvent(input$ENDOCcell_EXP,{
-    if(!is.null(endocResult$ENDOCcell_EXP)){
+  
+  observeEvent(input$ENDOCcell_SN,{
+    if(!is.null(endocResult$ENDOCcell_SN)){
       ENDOCtb = endocResult$TablePlot
       cellCoo = FlagsENDOC$cellCoo
       if(!is.null(cellCoo)){
-        endocResult$ENDOCcell_EXP[cellCoo[1],cellCoo[2]] = input$ENDOCcell_EXP
-        ENDOCtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = input$ENDOCcell_EXP
+        value.bef = endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]] 
+        value.now = input$ENDOCcell_SN
         
-        if(! input$ENDOCcell_EXP %in% FlagsENDOC$AllExp){
-          FlagsENDOC$AllExp = unique(c(FlagsENDOC$AllExp,input$ENDOCcell_EXP))
+        # if the value does not change or it is still "Color " then the matrix is not update
+        if( value.now != "" && value.now!=value.bef){
+         
+          endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]] = value.now
+          ENDOCtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = value.now
+          
+        if(! input$ENDOCcell_SN %in% FlagsENDOC$AllExp){
+          FlagsENDOC$AllExp = unique(c(FlagsENDOC$AllExp,input$ENDOCcell_SN))
           print(FlagsENDOC$AllExp)
         }
         
-        EXPcol = rainbow(n = length(FlagsENDOC$AllExp),alpha = 0.4)
-        names(EXPcol) = FlagsENDOC$AllExp
-        EXPcol[names(EXPcol) == ""] = "white"
-          FlagsENDOC$EXPcol = EXPcol
-          print(FlagsENDOC$EXPcol)
-          cols.color = grep(x = colnames(ENDOCtb$x$data),pattern = "Col",value = T)
-          cols.keep = grep(x = colnames(ENDOCtb$x$data),pattern = "V",value = T)
-          endocResult$TablePlot = datatable(ENDOCtb$x$data,
-                                            filter = 'none',
-                                            #server = FALSE,
-                                            selection = list(mode = 'single', target = 'cell'),
-                                            rownames= FALSE,
-                                            options = list(
-                                              lengthChange = FALSE,
-                                              columnDefs = list(list(targets = cols.color, visible = FALSE))
-                                            )) %>%
-            formatStyle(cols.keep,
-                        cols.color,
-                        backgroundColor = styleEqual(names(EXPcol), EXPcol))
-          
+        ## updating table and colors definition depending on the cell fill 
+        tableExcelColored(session = session,
+                          Result = endocResult, 
+                          FlagsExp = FlagsENDOC,
+                          type = "Update")
+        #####
+        output$ENDOCmatrix <-renderDataTable({endocResult$TablePlot})
+        }
       }
     }
   })
@@ -1422,9 +1387,9 @@ server <- function(input, output, session) {
       if(! (length(FlagsENDOC$BASEselected) == 1 && FlagsENDOC$BASEselected == "") )
         exp = exp[!exp %in% FlagsENDOC$BASEselected]
       
-      exp_selec = input$ENDOC_blanches
+      exp_selec = input$ENDOC_blanks
       
-      updateCheckboxGroupInput(session,"ENDOC_blanches",
+      updateCheckboxGroupInput(session,"ENDOC_blanks",
                                choices = exp,
                                selected = exp_selec )
       
@@ -1432,13 +1397,13 @@ server <- function(input, output, session) {
     }
   })
   
-  ## select the baselines and blanche
+  ## select the baselines and blank
   observeEvent(input$ENDOC_baselines,{
     FlagsENDOC$BASEselected = input$ENDOC_baselines
     FlagsENDOC$EXPselected = FlagsENDOC$AllExp[! FlagsENDOC$AllExp %in% c(FlagsENDOC$BASEselected,FlagsENDOC$BLANCHEselected)]
   },ignoreNULL = F)
-  observeEvent(input$ENDOC_blanches,{
-    FlagsENDOC$BLANCHEselected = input$ENDOC_blanches
+  observeEvent(input$ENDOC_blanks,{
+    FlagsENDOC$BLANCHEselected = input$ENDOC_blanks
     FlagsENDOC$EXPselected = FlagsENDOC$AllExp[! FlagsENDOC$AllExp %in% c(FlagsENDOC$BASEselected,FlagsENDOC$BLANCHEselected)]
   },ignoreNULL = F)
   
@@ -1463,9 +1428,9 @@ server <- function(input, output, session) {
     }
     
     if(length(listReturn) == 0){
-      return(list("Nothing",endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_EXP))
+      return(list("Nothing",endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_SN))
     }else{
-      return(c(listReturn,list(endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_EXP)) )
+      return(c(listReturn,list(endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_SN)) )
     }
   })
   
@@ -1476,7 +1441,7 @@ server <- function(input, output, session) {
     if(toListen_endoc()[[1]] != "Nothing"){
       exp = FlagsENDOC$EXPselected
       exp = exp[exp != ""]
-      expNotBlanche = unique(c(exp,baselines))
+      expNotBlank = unique(c(exp,baselines))
       
       MapBaseline = do.call(rbind,
                             lapply(exp,function(i){
@@ -1488,19 +1453,21 @@ server <- function(input, output, session) {
                             })
       ) %>% na.omit()
       
-      MapBlanche = do.call(rbind,
-                           lapply(expNotBlanche,
+      MapBlank = do.call(rbind,
+                           lapply(expNotBlank,
                                   function(i){
                                     if( length(input[[paste0("blExp",i)]]) > 0 && input[[paste0("blExp",i)]] != ""){
-                                      data.frame(Exp = i, Blanche = input[[paste0("blExp",i)]])
+                                      data.frame(Exp = i, Blank = input[[paste0("blExp",i)]])
                                     }else{
-                                      data.frame(Exp = i, Blanche = NA)
+                                      data.frame(Exp = i, Blank = NA)
                                     }
                                   })
       ) %>% na.omit()
       
+      if(!is.null(MapBaseline) && !is.null(MapBlank) ){
+
       endocResult$MapBaseline = MapBaseline
-      endocResult$MapBlanche = MapBlanche
+      endocResult$MapBlank = MapBlank
       
       mat = as.matrix(endocResult$Initdata)
       endocV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
@@ -1510,7 +1477,7 @@ server <- function(input, output, session) {
       endocT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
         rowwise() %>%
         mutate(time = matTime[Var1, Var2])
-      matExp =  as.matrix(endocResult$ENDOCcell_EXP)
+      matExp =  as.matrix(endocResult$ENDOCcell_SN)
       endocE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
         rowwise() %>%
         mutate(exp = matExp[Var1, Var2])
@@ -1518,24 +1485,24 @@ server <- function(input, output, session) {
         filter(exp != "")
       
       endocTotAverage = endocTot %>%
-        mutate(time = ifelse(exp %in% MapBlanche$Blanche, 0, time)) %>%
+        mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
         group_by(time, exp) %>%
         summarize(meanValues = mean(values))
       
-      # merging exp with blanche for the substraction
+      # merging exp with blank for the substraction
       
-      endocTot_bl = right_join( endocTotAverage,MapBlanche, 
-                                by= c("exp"= "Blanche") )%>%
-        rename(BlancheValues = meanValues, Blanche =  exp, exp = Exp )
+      endocTot_bl = right_join( endocTotAverage,MapBlank, 
+                                by= c("exp"= "Blank") )%>%
+        rename(BlankValues = meanValues, Blank =  exp, exp = Exp )
       
-      endocTotAverage = merge( endocTotAverage %>% filter(! exp %in%endocTot_bl$Blanche ),
+      endocTotAverage = merge( endocTotAverage %>% filter(! exp %in%endocTot_bl$Blank ),
                                endocTot_bl %>% ungroup() %>% dplyr::select(-time), all.x = T, by = "exp") 
-      endocTotAverage = endocTotAverage %>% mutate(meanValues = meanValues - BlancheValues )
+      endocTotAverage = endocTotAverage %>% mutate(meanValues = meanValues - BlankValues )
       
       # merging exp with baseline
       endocTot_base = merge(MapBaseline, endocTotAverage,
                             by.y = "exp", by.x = "Baseline") %>%
-        rename(BaseValues = meanValues) %>% select(-Blanche,-BlancheValues)
+        rename(BaseValues = meanValues) %>% select(-Blank,-BlankValues)
       
       endocTot_base = merge(endocTotAverage, endocTot_base, 
                             by.x = c("exp","time"), by.y = c("Exp","time") )
@@ -1579,6 +1546,7 @@ server <- function(input, output, session) {
         )
       }else{
         output$ENDOCtables = renderDT(data.frame(Error = "No baseline is associated with the experiment replicants!"))
+      }        
       }
     }
   })
@@ -1587,7 +1555,7 @@ server <- function(input, output, session) {
   observeEvent(FlagsENDOC$EXPselected,{
     expToselect = FlagsENDOC$EXPselected
     baselines =  FlagsENDOC$BASEselected
-    blanches = FlagsENDOC$BLANCHEselected
+    blanks = FlagsENDOC$BLANCHEselected
     
     expToselect = expToselect[expToselect != ""]
     
@@ -1607,8 +1575,8 @@ server <- function(input, output, session) {
                                    })
       do.call(tagList, select_output_list)
     })
-    # blanches updating
-    output$EndocBlancheSelection <- renderUI({
+    # blanks updating
+    output$EndocBlankSelection <- renderUI({
       select_output_list <- lapply(unique(c(expToselect,baselines)), function(i) {
         
         if(length(input[[paste0("blExp",i)]])>0)
@@ -1618,7 +1586,7 @@ server <- function(input, output, session) {
         
         selectInput(inputId = paste0("blExp",i),
                     label = i,
-                    choices = c("",blanches),
+                    choices = c("",blanks),
                     selected = expsel)
       })
       do.call(tagList, select_output_list)
@@ -1634,7 +1602,7 @@ server <- function(input, output, session) {
     
     ##### Plot the values selected!
     matTime =  as.matrix(endocResult$ENDOCcell_TIME)
-    matExp =  as.matrix(endocResult$ENDOCcell_EXP)
+    matExp =  as.matrix(endocResult$ENDOCcell_SN)
     
     if( !( all(matTime == "")  || all(matExp == "") ) ){
       mat = as.matrix(endocResult$Initdata)
@@ -1690,7 +1658,7 @@ server <- function(input, output, session) {
                                ELISAcell_EXP = NULL,
                                ELISAcell_SN = NULL,
                                MapBaseline = NULL,
-                               MapBlanche = NULL,
+                               MapBlank = NULL,
                                Tablestandcurve = NULL,
                                Regression = NULL)
   
@@ -1702,7 +1670,7 @@ server <- function(input, output, session) {
                       ELISAcell_EXP = NULL,
                       ELISAcell_SN = NULL,
                       MapBaseline = NULL,
-                      MapBlanche = NULL,
+                      MapBlank = NULL,
                       Tablestandcurve = NULL,
                       Regression = NULL)
   
@@ -1928,7 +1896,7 @@ server <- function(input, output, session) {
       if( length(bool.tmp) > 0  )
         exp = exp[!bool.tmp]
       
-      updateCheckboxGroupInput(session,"ELISA_blanches",
+      updateCheckboxGroupInput(session,"ELISA_blanks",
                                choices = exp,
                                selected = FlagsELISA$BLANCHEselected )
     }
@@ -1950,7 +1918,7 @@ server <- function(input, output, session) {
     }
   })
   
-  ## select the baselines, std curves, and blanche
+  ## select the baselines, std curves, and blank
   observeEvent(input$ELISA_baselines,{
     FlagsELISA$BASEselected = input$ELISA_baselines
     FlagsELISA$EXPselected = FlagsELISA$AllExp[! FlagsELISA$AllExp %in% c(FlagsELISA$STDCselected,FlagsELISA$BASEselected,FlagsELISA$BLANCHEselected)]
@@ -1959,8 +1927,8 @@ server <- function(input, output, session) {
     FlagsELISA$STDCselected = input$ELISA_standcurve
     FlagsELISA$EXPselected = FlagsELISA$AllExp[! FlagsELISA$AllExp %in% c(FlagsELISA$STDCselected,FlagsELISA$BASEselected,FlagsELISA$BLANCHEselected)]
   },ignoreNULL = F)
-  observeEvent(input$ELISA_blanches,{
-    FlagsELISA$BLANCHEselected = input$ELISA_blanches
+  observeEvent(input$ELISA_blanks,{
+    FlagsELISA$BLANCHEselected = input$ELISA_blanks
     FlagsELISA$EXPselected = FlagsELISA$AllExp[! FlagsELISA$AllExp %in% c(FlagsELISA$STDCselected,FlagsELISA$BASEselected,FlagsELISA$BLANCHEselected)]
   },ignoreNULL = F)
   
@@ -1999,7 +1967,7 @@ server <- function(input, output, session) {
     if(toListen_elisa()[[1]] != "Nothing" ){
       exp = FlagsELISA$EXPselected
       exp = exp[exp != ""]
-      expNotBlanche = unique(c(exp,baselines))
+      expNotBlank = unique(c(exp,baselines))
       
       MapBaseline = do.call(rbind,
                             lapply(exp,function(i){
@@ -2011,19 +1979,19 @@ server <- function(input, output, session) {
                             })
       ) %>% na.omit()
       
-      MapBlanche = do.call(rbind,
-                           lapply(expNotBlanche,
+      MapBlank = do.call(rbind,
+                           lapply(expNotBlank,
                                   function(i){
                                     if( length(input[[paste0("elisa_blExp",i)]]) > 0 && input[[paste0("elisa_blExp",i)]] != ""){
-                                      data.frame(Exp = i, Blanche = input[[paste0("elisa_blExp",i)]])
+                                      data.frame(Exp = i, Blank = input[[paste0("elisa_blExp",i)]])
                                     }else{
-                                      data.frame(Exp = i, Blanche = NA)
+                                      data.frame(Exp = i, Blank = NA)
                                     }
                                   })
       ) %>% na.omit()
       
       elisaResult$MapBaseline = MapBaseline
-      elisaResult$MapBlanche = MapBlanche
+      elisaResult$MapBlank = MapBlank
       
       mat = as.matrix(elisaResult$Initdata)
       elisaV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
@@ -2041,25 +2009,25 @@ server <- function(input, output, session) {
         filter(exp != "")
       
       elisaTotAverage = elisaTot %>%
-        #mutate(time = ifelse(exp %in% MapBlanche$Blanche, 0, time)) %>%
+        #mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
         group_by(time, exp) %>%
         summarize(meanValues = mean(values))
       
-      # merging exp with blanche for the substraction
+      # merging exp with blank for the substraction
       
-      elisaTot_bl = right_join( elisaTotAverage,MapBlanche, 
-                                by= c("exp"= "Blanche") )%>%
-        rename(BlancheValues = meanValues, Blanche =  exp, exp = Exp )
+      elisaTot_bl = right_join( elisaTotAverage,MapBlank, 
+                                by= c("exp"= "Blank") )%>%
+        rename(BlankValues = meanValues, Blank =  exp, exp = Exp )
       
       elisaTotAverage = merge( elisaTotAverage %>% filter( exp %in%elisaTot_bl$exp ),
                                elisaTot_bl %>% ungroup(),all.x = T, by = c("exp","time") ) 
       elisaTotAverage[is.na(elisaTotAverage[,])] = 0
-      elisaTotAverage = elisaTotAverage %>% mutate(meanValues = meanValues - BlancheValues )
+      elisaTotAverage = elisaTotAverage %>% mutate(meanValues = meanValues - BlankValues )
       
       # merging exp with baseline
       elisaTot_base = merge(MapBaseline, elisaTotAverage,
                             by.y = "exp", by.x = "Baseline",all = T) %>%
-        rename(BaseValues = meanValues) %>% select(-Blanche,-BlancheValues)
+        rename(BaseValues = meanValues) %>% select(-Blank,-BlankValues)
       
       elisaTot_base = merge(elisaTotAverage, elisaTot_base, 
                             by.x = c("exp","time"), by.y = c("Exp","time"),
@@ -2106,7 +2074,7 @@ server <- function(input, output, session) {
   observeEvent(FlagsELISA$EXPselected,{
     expToselect = FlagsELISA$EXPselected
     baselines =  FlagsELISA$BASEselected
-    blanches = FlagsELISA$BLANCHEselected
+    blanks = FlagsELISA$BLANCHEselected
     
     expToselect = expToselect[expToselect != ""]
     
@@ -2126,8 +2094,8 @@ server <- function(input, output, session) {
                                    })
       do.call(tagList, select_output_list)
     })
-    # blanches updating
-    output$ElisaBlancheSelection <- renderUI({
+    # blanks updating
+    output$ElisaBlankSelection <- renderUI({
       select_output_list <- lapply(unique(c(expToselect,baselines)), function(i) {
         
         if(length(input[[paste0("elisa_blExp",i)]])>0)
@@ -2137,7 +2105,7 @@ server <- function(input, output, session) {
         
         selectInput(inputId = paste0("elisa_blExp",i),
                     label = i,
-                    choices = c("",blanches),
+                    choices = c("",blanks),
                     selected = expsel)
       })
       do.call(tagList, select_output_list)
@@ -2422,7 +2390,10 @@ server <- function(input, output, session) {
              mess[["message"]])
       )
       
-      cytotoxResult$Initdata = mess
+      cytotoxResult$Initdata = mess$x
+      FlagsCYTOTOX$EXPcol = mess$fill
+      cytotoxResult$CYTOTOXcell_SN = mess$SNtable
+      
       "The RDs has been uploaded  with success"
     })
   })
@@ -2484,7 +2455,7 @@ server <- function(input, output, session) {
         value.now = input$CYTOTOXcell_SN
         
         # if the value does not change or it is still "Color " then the matrix is not update
-        if( !grep(x = value.bef,pattern = "Color ",value = F) && value.now!=value.bef){
+        if( value.now != ""  && value.now!=value.bef){
           cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]] = value.now
           CYTOTOXtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = value.now
           
