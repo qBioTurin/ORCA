@@ -114,7 +114,7 @@ ui <- dashboardPage(
       ## HOME ####
       tabItem(
         tabName = "Home",
-        h1("OCA"),
+        h1("OCA: OmniCellAnalysis"),
         h2(em("A cellular biologist’s toolbox for data analysis.")),
         h4("OCA  provides an exhaustive platform where scientists can analyze raw:"),
         tags$ol(

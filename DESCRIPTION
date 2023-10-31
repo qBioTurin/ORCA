@@ -1,5 +1,5 @@
-Package: InteGreat
-Title: InteGreat: a framework for cellular biology data analysis and integration for computational modelling
+Package: OCA
+Title: OCA: OmniCellAnalysis.
 Version: 1.0
 Authors@R: 
     c(person("Simone", "Pernice", , "simone.pernice@unito.it", role = c("cre"),
@@ -7,9 +7,10 @@ Authors@R:
     person("Dora", "Tortarolo", , "dora.tortarolo@unito.it", role = c("aut"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
            )
-Description: The InteGreat workflow provides an exhaustive platform where scientists can experience the discovery process from the analysis of a single datum to the creation of a complex computational model.
+Description: A cellular biologist’s toolbox for data analysis. OCA  provides an exhaustive platform where scientists can analyze raw Western Blot (WB), Reverse Transcription-quantitative PCR (RT-qPCR), Enzyme-Linked ImmunoSorbent Assay (ELISA), Endocytosis and, Cytotoxicity experiments.
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
     license
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
+Imports: DT, OpenImageR, dashboardthemes, dplyr, ggplot2, knitr, openxlsx, patchwork, readxl, rjson, shiny, shinyWidgets, shinydashboard, shinyjs, shinythemes, zoo
