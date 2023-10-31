@@ -2,9 +2,9 @@
 #shiny.launch.browser = .rs.invokeShinyWindowExternal
 
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
-APIkey_path = system.file("Data",".APIkey", package = "InteGreat")
+APIkey_path = system.file("Data",".APIkey", package = "OCA")
 
-#source(system.file("Shiny","AuxFunctions.R", package = "InteGreat"))
+#source(system.file("Shiny","AuxFunctions.R", package = "OCA"))
 # source("./inst/Shiny/AuxFunctions.R")
 
 # Define server logic required to draw a histogram
@@ -2654,10 +2654,10 @@ server <- function(input, output, session) {
   ### DATAVERSE ####
   
   observeEvent(input$APIkey,{
-    pathInteGreat <- system.file("Data", package = "InteGreat")
+    pathOCA <- system.file("Data", package = "OCA")
     
     if(input$APIkey != "") # the last key used is saved
-      write(input$APIkey,file = paste0(pathInteGreat,"/.APIkey"))
+      write(input$APIkey,file = paste0(pathOCA,"/.APIkey"))
 
   })
   
@@ -2672,12 +2672,12 @@ server <- function(input, output, session) {
     listDataAnalysisModule = reactiveValuesToList(DataAnalysisModule)
     namesAnalysis = sapply(names(listDataAnalysisModule), function(x){
       if(x == "wbquantResult"){
-        if(! all.equal(DataAnalysisModule[[x]]$NormWBanalysis,DataAnalysisModule0[[x]]$NormWBanalysis) )
+        if(! identical(DataAnalysisModule[[x]]$NormWBanalysis,DataAnalysisModule0[[x]]$NormWBanalysis) )
            return(x)
         else
           return("")
       }
-      else if(!is.null(DataAnalysisModule[[x]]$Initdata) || !all.equal(DataAnalysisModule[[x]]$Initdata,DataAnalysisModule0[[x]]$Initdata) )
+      else if(!is.null(DataAnalysisModule[[x]]$Initdata) || !identical(DataAnalysisModule[[x]]$Initdata,DataAnalysisModule0[[x]]$Initdata) )
         return(x)
       else
         return("")
@@ -2697,14 +2697,14 @@ server <- function(input, output, session) {
           output$LoadingError_DATAVERSE = renderText("Error: missing information")
       else{
         # creation of a temporary folder
-        tempfolder = paste0(tempdir(check = T),"/InteGreat")
+        tempfolder = paste0(tempdir(check = T),"/OCA")
         system(paste0("mkdir ",tempfolder))
   
         # create the metadata
-        result <- fromJSON(file = system.file("docker","metadata.json", package = "InteGreat") )
+        result <- fromJSON(file = system.file("docker","metadata.json", package = "OCA") )
         result$dataset_title = input$Title_DV
         result$dataset_description = paste0(input$Description_DV,"\n This dataset has
-                                            been obtained using the InteGreat application,
+                                            been obtained using the OCA application,
                                             specifically the module: ", input$selectAnalysis_DV)
         result$author_name = input$Author_DV
         result$author_affiliation= input$AuthorAff_DV
@@ -2722,13 +2722,13 @@ server <- function(input, output, session) {
                   ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
                   analysis = input$selectAnalysis_DV )
         
-        saveRDS(file = paste0(tempfolder,"/dataset/InteGreat_",
+        saveRDS(file = paste0(tempfolder,"/dataset/OCA_",
                                          gsub(pattern = " ", 
                                               x = input$selectAnalysis_DV,
                                               replacement = ""),".RDs"))
         # docker run
         docker.run(params = paste0("--volume ", tempfolder,
-                   ":/Results/ -d qbioturin/integreat-uploaddataverse python3 main.py /Results/metadata.json /Results/dataset") 
+                   ":/Results/ -d qbioturin/OCA-uploaddataverse python3 main.py /Results/metadata.json /Results/dataset") 
         )
   
       }

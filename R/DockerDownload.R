@@ -2,7 +2,7 @@
 #' @description This is a function that prepares the docker environment to be used for the first time the application is installed.
 #' @param containers.file, a character string with the name of the file which indicate which are
 #'  the initial set of containers to be downloaded. If NULL then the set is given by a
-#'   file called "containersNames.txt" located in the folder inst/Containers of InteGreat package.
+#'   file called "containersNames.txt" located in the folder inst/Containers of OCA package.
 #' @author Pernice Simone
 #'
 #' @examples
@@ -16,7 +16,7 @@
 downloadContainers <- function(containers.file=NULL, tag = "latest"){
   if (is.null(containers.file))
   {
-    containers.file = paste(path.package(package="InteGreat"),"Containers/containersNames.txt",sep="/")
+    containers.file = paste(path.package(package="OCA"),"Containers/containersNames.txt",sep="/")
     containers <- read.table(containers.file,
                              header = TRUE,
                              row.names = 1)
@@ -27,7 +27,7 @@ downloadContainers <- function(containers.file=NULL, tag = "latest"){
   }
   
 
-    curr.tag <- gsub(pattern = "([[:alpha:]]+){1}(/epimod){1}(-[[:alpha:]]+:){1}",
+    curr.tag <- gsub(pattern = "([[:alpha:]]+){1}(/OCA){1}(-[[:alpha:]]+:){1}",
                      replacement = "",
                      x = containers$names)
     curr.tag <- unique(curr.tag)
@@ -53,7 +53,7 @@ downloadContainers <- function(containers.file=NULL, tag = "latest"){
   }
   
   write.table(containers,
-              paste(path.package(package = "InteGreat"),"Containers/containersNames.txt",
+              paste(path.package(package = "OCA"),"Containers/containersNames.txt",
                     sep = "/"))
 
   }

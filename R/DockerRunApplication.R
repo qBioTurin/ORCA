@@ -22,8 +22,8 @@ docker.application.run <- function(){
   }
   
   ## to execute docker
-  cat(paste("docker run -it --rm -p 3838:3838 qbioturin/integreat-application"))
-  system(paste("docker run -it --rm -p 3838:3838 qbioturin/integreat-application") )
+  cat(paste("docker run -it --rm -p 3838:3838 qbioturin/OCA-application"))
+  system(paste("docker run -it --rm -p 3838:3838 qbioturin/OCA-application") )
 
   ## Get the Docker ID from file
   dockerid=readLines("dockerID", warn = FALSE)

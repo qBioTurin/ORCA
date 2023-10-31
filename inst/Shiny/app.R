@@ -1,6 +1,6 @@
 # 
-# Appui <- system.file("Shiny","ui.R", package = "InteGreat")
-# Appserver <- system.file("Shiny","server.R", package = "InteGreat")
+# Appui <- system.file("Shiny","ui.R", package = "OCA")
+# Appserver <- system.file("Shiny","server.R", package = "OCA")
 # 
 # source("inst/Shiny/server.R")
 # source("inst/Shiny/ui.R")

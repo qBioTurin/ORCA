@@ -13,8 +13,8 @@ library(openxlsx)
 
 ui <- dashboardPage(
   #theme = shinytheme("paper"),
-  dashboardHeader(title = "InteGREAT",
-                  tags$li(a(onclick = "onclick =window.open('https://github.com/qBioTurin/InteGreat')",
+  dashboardHeader(title = "OCA",
+                  tags$li(a(onclick = "onclick =window.open('https://github.com/qBioTurin/OCA')",
                             href = NULL,
                             icon("github"),
                             title = "GitHub",
@@ -114,9 +114,9 @@ ui <- dashboardPage(
       ## HOME ####
       tabItem(
         tabName = "Home",
-        h1("InteGreat"),
+        h1("OCA"),
         h2(em("A cellular biologist’s toolbox for data analysis.")),
-        h4("InteGreat  provides an exhaustive platform where scientists can analyze raw:"),
+        h4("OCA  provides an exhaustive platform where scientists can analyze raw:"),
         tags$ol(
           tags$li(
             h4(strong("Western Blot")," (WB), ")
@@ -134,8 +134,8 @@ ui <- dashboardPage(
             h4(strong("Cytotoxicity experiments"),".")
           )
         ),
-        
-        # h4("InteGreat consists of two modules:"),
+        p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
+        # h4("OCA consists of two modules:"),
         # tags$ol(
         #   tags$li(
         #     h4("The ", strong("Data Analysis module"), "includes tools specifically developed or adapted for the elaboration
@@ -145,9 +145,8 @@ ui <- dashboardPage(
         #     h4("The ",strong("Model Integration module"),"supports scientists in the process of integration of lab data resulting from any type of experiment into a computational model.")
         #   )
         # ),
-        # h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the InteGreat framework, or ",
+        # h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the OCA framework, or ",
         #       a("here", href="https://www.google.com/"),"to download the user guide.")),
-        p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
       ),
       
       ###### BEGIN LOAD ANALYSIS ####
@@ -161,7 +160,7 @@ ui <- dashboardPage(
                     fileInput(
                       inputId = "loadAnalysis_file",
                       label = "",
-                      placeholder = "Select the RDs files storing InteGreat analyses",
+                      placeholder = "Select the RDs files storing OCA analyses",
                       width = "80%", 
                       multiple = TRUE)
                   ),
@@ -273,7 +272,7 @@ ui <- dashboardPage(
                 fileInput(
                   inputId = "IntGImport",
                   label = "",
-                  placeholder = "Select the RDs files storing InteGreat analyses",
+                  placeholder = "Select the RDs files storing OCA analyses",
                   width = "80%", 
                   multiple = TRUE)
               ),
@@ -491,6 +490,13 @@ ui <- dashboardPage(
                 column(width = 1,offset = 1,
                        downloadButton( label = "Download the analysis", 
                                        outputId = "downloadButton_PCR",
+                                       #href = "Results.RData",
+                                       #download = "Results.RData",
+                                       icon = icon("download") )
+                ),
+                column(width = 1,offset = 2,
+                       downloadButton( label = "Download xlsx", 
+                                       outputId = "downloadButtonExcel_PCR",
                                        #href = "Results.RData",
                                        #download = "Results.RData",
                                        icon = icon("download") )
@@ -970,17 +976,32 @@ ui <- dashboardPage(
                 ),
                 box(width=6,
                     DTOutput('AUC'),
-                    actionButton( label = "Reset all", 
-                                  inputId = "actionButton_ResetPlanes"),
-                    downloadButton( label = "Download the analysis", 
-                                    outputId = "downloadButton_WB",
-                                    #href = "Results.RData",
-                                    #download = "Results.RData",
-                                    icon = icon("download") ),
-                    actionButton(inputId = "NextWBQuantif",
-                                 label = 'Proceed to Quantification',
-                                 align = "right",
-                                 icon = shiny::icon("forward"))
+                    fluidRow(
+                      column(width = 3,
+                             actionButton( label = "Reset all", 
+                                           inputId = "actionButton_ResetPlanes")
+                             ),
+                      column(width = 3,
+                             downloadButton( label = "Download the analysis", 
+                                             outputId = "downloadButton_WB",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") ) 
+                      ),
+                      column(width = 3,
+                             downloadButton( label = "Download xlsx", 
+                                             outputId = "downloadButtonExcel_WB",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )  
+                      ),
+                      column(width = 3,
+                             actionButton(inputId = "NextWBQuantif",
+                                          label = 'Proceed to Quantification',
+                                          align = "right",
+                                          icon = shiny::icon("forward"))
+                      )
+                    )
                 )
               )
       ),
@@ -1086,13 +1107,20 @@ ui <- dashboardPage(
                    ),
                    plotOutput("plot_AdjRelDens"),
                    fluidRow(
-                     column(width = 1, offset = 9,
+                     column(width = 1, offset = 7,
                             downloadButton( label = "Download the analysis", 
                                             outputId = "downloadButton_WBquant",
                                             #href = "Results.RData",
                                             #download = "Results.RData",
                                             icon = icon("download") 
                             )
+                     ),
+                     column(width = 1,offset = 9,
+                            downloadButton( label = "Download xlsx", 
+                                            outputId = "downloadButtonExcel_WBquant",
+                                            #href = "Results.RData",
+                                            #download = "Results.RData",
+                                            icon = icon("download") )
                      )
                    )
               )
@@ -1111,7 +1139,7 @@ ui <- dashboardPage(
                         fileInput(
                           inputId = "loadStatAnalysis_file",
                           label = "",
-                          placeholder = "Select the RDs files storing InteGreat analyses",
+                          placeholder = "Select the RDs files storing OCA analyses",
                           width = "80%", 
                           multiple = TRUE)
                       ),
@@ -1171,8 +1199,8 @@ ui <- dashboardPage(
                     fluidRow(
                       column(width=6, 
                              textInput("APIkey",
-                                       value = ifelse(system.file("Data",".APIkey", package = "InteGreat") != "",
-                                                      read.table(paste0(system.file("Data", package = "InteGreat"),
+                                       value = ifelse(system.file("Data",".APIkey", package = "OCA") != "",
+                                                      read.table(paste0(system.file("Data", package = "OCA"),
                                                                         "/.APIkey"),
                                                                  quote="\"",
                                                                  comment.char=""),

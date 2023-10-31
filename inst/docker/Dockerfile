@@ -1,24 +1,57 @@
-FROM ubuntu:20.04
+FROM rocker/r-ver:4.2.1
 
-RUN apt-get update
-RUN apt-get install -y gcc make libbz2-dev zlib1g-dev libncurses5-dev libncursesw5-dev liblzma-dev 
-RUN apt-get install -y bzip2
+ENV S6_VERSION=v2.1.0.2
+ENV RSTUDIO_VERSION=daily
+ENV DEFAULT_USER=rstudio
+ENV PANDOC_VERSION=default
+ENV PATH=/usr/lib/rstudio-server/bin:$PATH
 
-#python3 installation
-RUN apt-get install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev -y
-COPY ./Python-3.11.2.tar.xz /tmp/Python-3.11.2.tar.xz
-RUN tar -xf /tmp/Python-3.11.2.tar.xz
+RUN /rocker_scripts/install_rstudio.sh
+RUN /rocker_scripts/install_pandoc.sh
 
-WORKDIR /Python-3.11.2
-RUN ./configure --enable-optimizations
-RUN make install
+# system libraries
+RUN apt-get update && apt-get install -y \
+    libcurl4-gnutls-dev \
+    libssl-dev \
+    libz-dev \
+    libpng-dev\
+    libtiff5-dev
+  
 
-RUN pip3 install pyDataverse
-WORKDIR /
+# install R packages required 
+RUN R -e 'install.packages(c(\
+              "rjson", \ 
+              "openxlsx", \
+              "shiny", \
+              "shinydashboard", \
+              "ggplot2", \
+              "zoo", \
+              "knitr", \
+              "shinythemes", \
+              "OpenImageR", \
+              "dplyr", \
+              "shinyWidgets", \
+              "DT", \
+              "shinyjs",\
+              "readxl" \
+            ), \
+            repos="https://packagemanager.rstudio.com/cran/__linux__/focal/2022-08-01"\
+          )'
 
-COPY dataverse_controller.py /
-COPY main.py /
-COPY json_parser.py /
-COPY constant.py /
-COPY results /results 
-COPY metadata.json / 
+# date > marker
+COPY marker /dev/null
+
+# copy the app directory into the image
+COPY ./Shiny/* ./app/
+
+# Create data directory
+RUN mkdir ./home/data; chmod 777 ./home/data
+COPY ./Data/ ./home/data/Examples/
+
+# expose port
+EXPOSE 3838
+
+# Define default command.
+# CMD ["bash"]
+# run app on container start
+CMD ["R", "-e", "shiny::runApp('/app', host = '0.0.0.0', port = 3838)"]

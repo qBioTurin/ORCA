@@ -1,6 +1,6 @@
 # InitGreat
 
-**InteGreat**: a cellular biologist’s toolbox for data analysis.
+**OCA**: a cellular biologist’s toolbox for data analysis.
 
 It provides an exhaustive platform where scientists can analyze raw:
 Western Blot (WB),
@@ -24,7 +24,7 @@ To install it you can use  **devtools**:
 ```
 install.packages("devtools")
 library(devtools)
-install_github("qBioTurin/InteGreat", ref="main",dependencies=TRUE)
+install_github("qBioTurin/OCA", ref="main",dependencies=TRUE)
 ```
 
 ## How to run 
@@ -32,7 +32,7 @@ install_github("qBioTurin/InteGreat", ref="main",dependencies=TRUE)
 To run the Shiny application:
 
 ```
-InteGreat::InteGreat.run()
+OCA::OCA.run()
 ```
 
 # Docker
@@ -40,10 +40,10 @@ InteGreat::InteGreat.run()
 You need to have docker installed on your machine, for more info see this document:
 https://docs.docker.com/engine/installation/.
 
-To download all the docker images exploited by **InteGreat** you can use:
+To download all the docker images exploited by **OCA** you can use:
 
 ```
-library(InteGreat)
+library(OCA)
 downloadContainers()
 ```
 
@@ -51,10 +51,10 @@ and the docker images are free available at the following [link](https://hub.doc
 
 ## How to run the application with docker
 
-To run the InteGreat application through its docker image, it is possible to use the R function:
+To run the OCA application through its docker image, it is possible to use the R function:
 
 ```
-library(InteGreat)
+library(OCA)
 docker.application.run()
 ```
 

@@ -549,7 +549,7 @@ saveExcel = function(filename,ResultList,analysis){
     addWorksheet(wb,"AdjRelDensitiy")
     writeDataTable(wb, sheet = "WB", ResultList[["AdjRelDensitiy"]])
     
-  }
+  } 
   
   ## Save it
   saveWorkbook(wb, filename)

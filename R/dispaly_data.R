@@ -1,5 +1,5 @@
-#' @title Run InteGreat
-#' @description function to lunch the InteGreat shiny application.
+#' @title Run OCA
+#' @description function to lunch the OCA shiny application.
 #'
 #' @param 
 #'
@@ -8,16 +8,16 @@
 #' 
 #' @examples
 #'\dontrun{
-#' InteGreat.run()
+#' OCA.run()
 #' }
 #' @export
 
-InteGreat.run <-function()
+OCA.run <-function()
 {
   x = T
   
-  Appui <- system.file("Shiny","ui.R", package = "InteGreat")
-  Appserver <- system.file("Shiny","server.R", package = "InteGreat")
+  Appui <- system.file("Shiny","ui.R", package = "OCA")
+  Appserver <- system.file("Shiny","server.R", package = "OCA")
   
   source(Appui)
   source(Appserver)
@@ -28,7 +28,7 @@ InteGreat.run <-function()
   )
   
   # runApp(
-  #   appDir = system.file("Shiny", package = "InteGreat"),
+  #   appDir = system.file("Shiny", package = "OCA"),
   #   launch.browser = T
   # )
 }
