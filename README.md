@@ -1,24 +1,20 @@
 # InitGreat
 
-The **InteGreat** workflow provides an exhaustive platform where scientists
-can experience the discovery process from the analysis of a single datum to
-the creation of a complex computational model.
+**InteGreat**: a cellular biologist’s toolbox for data analysis.
 
-InteGreat consists of two modules: **Data Analysis** and **Model Integration**. 
-
-1. The Data Analysis module includes tools specifically developed or adapted for the elaboration of raw Western Blot (WB), Reverse Transcription-quantitative PCR (RT-qPCR) and Enzyme-Linked ImmunoSorbent Assay (ELISA) experiments.
-
-2. The Model Integration module supports scientists in the process of integration of lab data resulting from any type of experiment into a computational model.
-
-
+It provides an exhaustive platform where scientists can analyze raw:
+Western Blot (WB),
+Reverse Transcription-quantitative PCR (RT-qPCR),
+Enzyme-Linked ImmunoSorbent Assay (ELISA),
+Endocytosis and,
+Cytotoxicity experiments.
 
 ## Required installed packages
+
 The following R packages must be installed:
-....
 
 ```
-install.packages(c( "ggplot2", "shinydashboard", "shinyWidgets", "shiny", "dashboardthemes",
-"dplyr","OpenImageR","knitr","zoo","shinythemes","readxl","DT","shinyjs"))
+install.packages(c( "rjson", "openxlsx", "patchwork", "ggplot2", "shinydashboard", "shinyWidgets", "shiny", "dashboardthemes", "dplyr","OpenImageR","knitr","zoo", "shinythemes","readxl","DT","shinyjs"))
 ```
 
 ## How to install
@@ -38,3 +34,34 @@ To run the Shiny application:
 ```
 InteGreat::InteGreat.run()
 ```
+
+# Docker
+
+You need to have docker installed on your machine, for more info see this document:
+https://docs.docker.com/engine/installation/.
+
+To download all the docker images exploited by **InteGreat** you can use:
+
+```
+library(InteGreat)
+downloadContainers()
+```
+
+and the docker images are free available at the following [link](https://hub.docker.com/r/qbioturin/).
+
+## How to run the application with docker
+
+To run the InteGreat application through its docker image, it is possible to use the R function:
+
+```
+library(InteGreat)
+docker.application.run()
+```
+
+
+## Dataverse communication
+
+The uploading of the analysis can be done by exploiting the panel in the application called *Dataverse*. In this context, an image docker c
+
+
+
