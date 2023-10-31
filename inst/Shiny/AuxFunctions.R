@@ -477,7 +477,7 @@ saveExcel = function(filename,ResultList,analysis){
     
     ## initial data
     addWorksheet(wb,"Table")
-    writeDataTable(wb, sheet = "Data", ResultList[["Initdata"]])
+    writeDataTable(wb, sheet = "Table", ResultList[["Initdata"]])
 
     ## Norm Analysis
     addWorksheet(wb,"Norm PRC")
@@ -520,7 +520,7 @@ saveExcel = function(filename,ResultList,analysis){
     
     addWorksheet(wb,"Truncated Plot")
     print(ResultList[["TruncatedPlots"]])
-    insertPlot(wb = wb,  sheet="Plot")
+    insertPlot(wb = wb,  sheet="Truncated Plot")
     
     addWorksheet(wb,"AUC")
     finaldata = ResultList[["AUCdf"]]
@@ -530,14 +530,7 @@ saveExcel = function(filename,ResultList,analysis){
   else if(analysis =="WB comparison"){
     ## Create a new workbook
     wb <- createWorkbook("WB comparison")
-    
-    wbquantResult = reactiveValues(NormWBanalysis = NULL,
-                                   NormWBanalysis_filtered = NULL,
-                                   WBanalysis = NULL,
-                                   WBanalysis_filtered = NULL,
-                                   RelDensitiy = NULL,
-                                   AdjRelDensitiy = NULL
-    )
+
     ## initial data
     addWorksheet(wb,"Normalizer WB")
     writeDataTable(wb, sheet = "Normalizer WB", ResultList[["NormWBanalysis_filtered"]])
@@ -548,10 +541,10 @@ saveExcel = function(filename,ResultList,analysis){
     ### Analysis
     
     addWorksheet(wb,"RelDensitiy")
-    writeDataTable(wb, sheet = "WB", ResultList[["RelDensitiy"]])
+    writeDataTable(wb, sheet = "RelDensitiy", ResultList[["RelDensitiy"]])
     
     addWorksheet(wb,"AdjRelDensitiy")
-    writeDataTable(wb, sheet = "WB", ResultList[["AdjRelDensitiy"]])
+    writeDataTable(wb, sheet = "AdjRelDensitiy", ResultList[["AdjRelDensitiy"]])
     
   } 
   
