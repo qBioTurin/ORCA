@@ -1124,24 +1124,33 @@ server <- function(input, output, session) {
       #   })
       #   do.call(tagList, plot_output_list)
       # })
-      
-      pcrResult$plotPRC = ggplot(data = PCRstep5,
-                                 aes(x= as.factor(Time), y = Q, col = Sample)) + 
+        
+      plot1 = ggplot(data = PCRstep5,
+                     aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
         facet_wrap(~Gene, ncol = 1) +
         geom_jitter(width = 0.1, height = 0,size = 2)+
         theme_bw()+
-        labs(x = "Time")
+        labs(x = "Time", y = "DDCT")
+      
+      plot2 = ggplot(data = PCRstep5,
+                     aes(x= as.factor(Time), y = Q, col = Sample)) + 
+          facet_wrap(~Gene, ncol = 1) +
+          geom_jitter(width = 0.1, height = 0,size = 2)+
+          theme_bw()+
+          labs(x = "Time", y = "2^(-DDCT)")
+
+      pcrResult$plotPRC =  plot1/plot2
       
       output$PCRplot <- renderPlot({
         pcrResult$plotPRC
       })
       
-      for (i in AllGenes){
+      for (i in AllGenes[!AllGenes %in% PCRnorm]){
         local({
           my_i <- i
           tablename <- paste("tablename", my_i, sep="")
           output[[tablename]] <- renderTable({
-            PCRstep5 %>% filter(Gene == my_i)
+            PCRstep5 %>% filter(Gene == my_i) %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q)
           })
           
           # ComparisonPCR = list()

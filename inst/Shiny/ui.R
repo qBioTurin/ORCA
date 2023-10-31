@@ -9,6 +9,7 @@ library(dplyr)
 library("shinyWidgets")
 library(DT)
 library(openxlsx)
+library(patchwork)
 
 
 ui <- dashboardPage(
@@ -115,24 +116,32 @@ ui <- dashboardPage(
       tabItem(
         tabName = "Home",
         h1("ORCA: Omni Reproducible Cell Analysis"),
-        h2(em("A cellular biologist’s toolbox for data analysis.")),
-        h4("ORCA  provides an exhaustive platform where scientists can analyze raw:"),
-        tags$ol(
-          tags$li(
-            h4(strong("Western Blot")," (WB), ")
+        h1("  "),
+        fluidRow(
+          column(width = 6,
+                 p(img(src = "images/ORCAlogo.png", height="30%", width="30%"), align = "center"),
           ),
-          tags$li(
-            h4(strong("Reverse Transcription-quantitative PCR ")," (RT-qPCR),")
-          ),
-          tags$li(
-            h4(strong("Enzyme-Linked ImmunoSorbent Assay ")," (ELISA),")
-          ),
-          tags$li(
-            h4(strong("Endocytosis")," and,")
-          ),
-          tags$li(
-            h4(strong("Cytotoxicity experiments"),".")
-          )
+        column(width = 6,
+               h2(em("A cellular biologist’s toolbox for data analysis.")),
+               h4("ORCA  provides an exhaustive platform where scientists can analyze raw:"),
+               tags$ol(
+                 tags$li(
+                   h4(strong("Western Blot")," (WB), ")
+                 ),
+                 tags$li(
+                   h4(strong("Reverse Transcription-quantitative PCR ")," (RT-qPCR),")
+                 ),
+                 tags$li(
+                   h4(strong("Enzyme-Linked ImmunoSorbent Assay ")," (ELISA),")
+                 ),
+                 tags$li(
+                   h4(strong("Endocytosis")," and,")
+                 ),
+                 tags$li(
+                   h4(strong("Cytotoxicity experiments"),".")
+                 )
+               )
+               )
         ),
         p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
         # h4("ORCA consists of two modules:"),
