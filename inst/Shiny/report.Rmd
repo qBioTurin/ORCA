@@ -91,26 +91,27 @@ ResultList$endocResult[["dataFinal"]]
  ResultList$pcrResult[["Initdata"]]
 ```
 
-## Norm Analysis
+## Normalization on Housekeeping Genes
 
 ```{r, echo=FALSE}
 
 ResultList$pcrResult[["NewPCR"]]
+ResultList$pcrResult[["plotPRC"]]
 ```
 
-### Comp Analysis
+<!-- ### Comp Analysis -->
 
-```{r, echo=FALSE}
+<!-- ```{r, echo=FALSE} -->
 
-ResultList$pcrResult[["CompPRC"]]
+<!-- ResultList$pcrResult[["CompPRC"]] -->
 
-ggplot(data =  ResultList$pcrResult[["CompPRC"]],
-                  aes(x= Gene, y = Qnorm, fill = Sample)) + 
-             facet_wrap(~Norm, ncol = 1) +
-             geom_bar(stat = "identity",position = "dodge")
+<!-- ggplot(data =  ResultList$pcrResult[["CompPRC"]], -->
+<!--                   aes(x= Gene, y = Qnorm, fill = Sample)) +  -->
+<!--              facet_wrap(~Norm, ncol = 1) + -->
+<!--              geom_bar(stat = "identity",position = "dodge") -->
 
-  
-```
+
+<!-- ``` -->
 
 ### WB
 

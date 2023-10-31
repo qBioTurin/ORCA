@@ -69,8 +69,8 @@ ui <- dashboardPage(
                          menuItem('RT-qPCR analysis',
                                   tabName = 'pcr',
                                   menuSubItem("Upload data", tabName = "uploadPCR"),
-                                  menuSubItem("Quantification", tabName = "tablesPCR"),
-                                  menuSubItem("Plot", tabName = "plotsPCR")
+                                  menuSubItem("Quantification", tabName = "tablesPCR")
+                                 # menuSubItem("Plot", tabName = "plotsPCR")
                          ),
                          menuItem('ELISA analysis',
                                   tabName = 'elisa',
@@ -472,51 +472,58 @@ ui <- dashboardPage(
       tabItem(tabName = "tablesPCR",
               h2("Quantification"),
               fluidRow(
-                box(width= 12,title = "Single Gene Quantification",
+                box(width= 12,
+                    #title = "Single Gene Quantification",
+                    title = "Normalization on Housekeeping Genes",
                     collapsible = TRUE,
                     collapsed = TRUE,
                     uiOutput("PCRtables")
                 )
               ),
+              # fluidRow(
+              #   box(width= 12,title = "Normalization on Housekeeping Genes",
+              #       collapsible = TRUE,
+              #       collapsed = TRUE,
+              #       uiOutput("PCRtablesComp")
+              #   )
+              # ),
               fluidRow(
-                box(width= 12,title = "Normalization on Housekeeping Genes",
-                    collapsible = TRUE,
-                    collapsed = TRUE,
-                    uiOutput("PCRtablesComp")
-                )
-              ),
-              fluidRow(
-                column(width = 1,offset = 7,
-                       actionButton(inputId = "NextpcrPlots",
-                                    label = 'Proceed to Plots',
-                                    align = "right",
-                                    icon = shiny::icon("forward"))
-                ),
-                column(width = 1,offset = 1,
-                       downloadButton( label = "Download the analysis", 
-                                       outputId = "downloadButton_PCR",
-                                       #href = "Results.RData",
-                                       #download = "Results.RData",
-                                       icon = icon("download") )
-                ),
-                column(width = 1,offset = 2,
-                       downloadButton( label = "Download xlsx", 
-                                       outputId = "downloadButtonExcel_PCR",
-                                       #href = "Results.RData",
-                                       #download = "Results.RData",
-                                       icon = icon("download") )
+                box(width= 12,title = "Plot",
+                    plotOutput("PCRplot",width = "100%"),
+                    fluidRow(
+                      # column(width = 1,offset = 7,
+                      #        actionButton(inputId = "NextpcrPlots",
+                      #                     label = 'Proceed to Plots',
+                      #                     align = "right",
+                      #                     icon = shiny::icon("forward"))
+                      # ),
+                      column(width = 1,offset = 1,
+                             downloadButton( label = "Download the analysis", 
+                                             outputId = "downloadButton_PCR",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      ),
+                      column(width = 1,offset = 2,
+                             downloadButton( label = "Download xlsx", 
+                                             outputId = "downloadButtonExcel_PCR",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      )
+                    )
                 )
               )
       ),
       # Second tab content
-      tabItem(tabName = "plotsPCR",
-              h2("Plots"),
-              fluidRow(
-                box(width= 12,title = "",
-                    plotOutput("PCRplot",width = "100%")
-                )
-              )
-      ),
+      # tabItem(tabName = "plotsPCR",
+      #         h2("Plots"),
+      #         fluidRow(
+      #           box(width= 12,title = "",
+      #               plotOutput("PCRplot",width = "100%")
+      #           )
+      #         )
+      # ),
       ## END data analysis:  RT-PCR 
       ## BEGIN data analysis: ELISA  #######
       tabItem(

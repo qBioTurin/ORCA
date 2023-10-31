@@ -843,7 +843,7 @@ server <- function(input, output, session) {
                              data = NULL,
                              PCRnorm = NULL,
                              BaselineExp = NULL,
-                             CompPRC = NULL,
+                             plotPRC = NULL,
                              NewPCR = NULL)
   pcrResult0 = list(
                     Initdata = NULL,
@@ -851,7 +851,7 @@ server <- function(input, output, session) {
                     data = NULL,
                     PCRnorm = NULL,
                     BaselineExp = NULL,
-                    CompPRC = NULL,
+                    plotPRC = NULL,
                     NewPCR = NULL)
   
   # save everytime there is a change in the results
@@ -1008,7 +1008,7 @@ server <- function(input, output, session) {
         colnames(tmp) = c("Gene", "Sample", "Value","Time")
         pcrResult$data = tmp
         pcrResult$selectPCRcolumns = selectPCRcolumns
-      }{
+      }else{
         pcrResult$data = NULL
       }
     }
@@ -1053,49 +1053,61 @@ server <- function(input, output, session) {
       pcrResult$data -> PCR
       
       NewPCR = PCR %>%
-        group_by(Sample,Gene) %>%
+        group_by(Sample,Gene,Time) %>%
         dplyr::summarise(Mean = mean(Value),
                          Sd = sd(Value)) %>%
         ungroup()
+
+      HousekGenePCR = NewPCR %>%
+        filter(Gene %in% PCRnorm)%>%
+        rename(HousekGene = Gene,HousekGeneMean=Mean, HousekGeneSd=Sd) 
       
-      BaselinePCR = NewPCR %>% 
+      PCRstep2 = merge(HousekGenePCR,NewPCR %>% filter(!Gene %in% PCRnorm),all.y = T,by=c("Sample","Time") )
+      
+      #PCRstep3 = merge(BaselinePCR,PCRstep2,all.y = T,by=c("Gene","Time") )
+
+      
+      PCRstep3 = PCRstep2 %>%
+        group_by(Sample,Gene,Time) %>%
+        dplyr::mutate(dCt = Mean - HousekGeneMean)%>%
+        ungroup()
+      
+      BaselinePCR = PCRstep3 %>% 
         filter(Sample == BaselineExp) %>%
-        rename(BaselineMean=Mean, BaselineSd=Sd) %>%
-        dplyr::select(-Sample)
+        rename(BaselineMean=Mean, BaselineSd=Sd,BaselinedCt = dCt) %>%
+        dplyr::select(-Sample, -HousekGene, -HousekGeneMean, -HousekGeneSd)
       
-      NewPCR = merge(BaselinePCR,NewPCR,all.y = T,by="Gene")
+      PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time") )
       
-      NewPCR = NewPCR %>%
-        group_by(Sample,Gene) %>%
-        dplyr::summarise(dCt = Mean - BaselineMean,
-                         Q = 2^{-dCt},
+      PCRstep5 = PCRstep4 %>%
+        group_by(Sample,Gene,Time) %>%
+        dplyr::summarize(
+          ddCt = dCt - BaselinedCt,
+                         Q = 2^{-ddCt},
                          Sd = Sd,
                          Mean = Mean)%>%
         ungroup()
+
       
-      OnePCR = NewPCR %>%
-        filter(!Gene %in% PCRnorm)
-      
-      NormPCR = NewPCR %>%
+      NormPCR = PCRstep5 %>%
         filter(Gene %in% PCRnorm ) %>%
         rename(Norm = Gene,
-               Norm_dCt = dCt,
                NormQ = Q,
                NormSd = Sd,
                NormMean = Mean)
       
-      CompPRC = merge(OnePCR,NormPCR)
-      
-      CompPRC = CompPRC %>% group_by(Sample,Gene,Norm) %>%
-        dplyr::summarise(Qnorm = Q/NormQ,
-                         SDddct = sqrt(Sd^2+NormSd^2),
-                         SDrq = log(2)*Qnorm*SDddct) %>%
-        ungroup()
+      # CompPRC = merge(OnePCR,NormPCR)
+      # 
+      # CompPRC = CompPRC %>% group_by(Sample,Gene,Norm) %>%
+      #   dplyr::summarise(Qnorm = Q/NormQ,
+      #                    SDddct = sqrt(Sd^2+NormSd^2),
+      #                    SDrq = log(2)*Qnorm*SDddct) %>%
+      #   ungroup()
       
       AllGenes = unique(PCR$Gene)
       
-      pcrResult$CompPRC = CompPRC
-      pcrResult$NewPCR = NewPCR
+      #pcrResult$CompPRC = CompPRC
+      pcrResult$NewPCR = PCRstep5
       
       output$PCRtables <- renderUI({
         plot_output_list <- lapply(AllGenes, function(i) {
@@ -1104,18 +1116,24 @@ server <- function(input, output, session) {
         })
         do.call(tagList, plot_output_list)
       })
-      output$PCRtablesComp <- renderUI({
-        plot_output_list <- lapply(AllGenes[-which(AllGenes %in% PCRnorm)], function(i) {
-          tablename <- paste("CompTablename", i, sep="")
-          tableOutput(tablename)
-        })
-        do.call(tagList, plot_output_list)
-      })
+      
+      # output$PCRtablesComp <- renderUI({
+      #   plot_output_list <- lapply(AllGenes[-which(AllGenes %in% PCRnorm)], function(i) {
+      #     tablename <- paste("CompTablename", i, sep="")
+      #     tableOutput(tablename)
+      #   })
+      #   do.call(tagList, plot_output_list)
+      # })
+      
+      pcrResult$plotPRC = ggplot(data = PCRstep5,
+                                 aes(x= as.factor(Time), y = Q, col = Sample)) + 
+        facet_wrap(~Gene, ncol = 1) +
+        geom_jitter(width = 0.1, height = 0,size = 2)+
+        theme_bw()+
+        labs(x = "Time")
+      
       output$PCRplot <- renderPlot({
-        ggplot(data = CompPRC, aes(x= Gene, y = Qnorm, fill = Sample)) + 
-          facet_wrap(~Norm, ncol = 1) +
-          geom_bar(stat = "identity",position = "dodge")
-        
+        pcrResult$plotPRC
       })
       
       for (i in AllGenes){
@@ -1123,18 +1141,18 @@ server <- function(input, output, session) {
           my_i <- i
           tablename <- paste("tablename", my_i, sep="")
           output[[tablename]] <- renderTable({
-            NewPCR %>% filter(Gene == my_i)
+            PCRstep5 %>% filter(Gene == my_i)
           })
           
-          ComparisonPCR = list()
-          if(my_i %in% AllGenes[-which(AllGenes %in% PCRnorm)]){
-            tablename <- paste("CompTablename", my_i, sep="")
-            output[[tablename]] <- renderTable({
-              CompPRC %>% 
-                filter(Gene == my_i) %>%
-                arrange(Norm,Sample)
-            })
-          }
+          # ComparisonPCR = list()
+          # if(my_i %in% AllGenes[-which(AllGenes %in% PCRnorm)]){
+          #   tablename <- paste("CompTablename", my_i, sep="")
+          #   output[[tablename]] <- renderTable({
+          #     CompPRC %>% 
+          #       filter(Gene == my_i) %>%
+          #       arrange(Norm,Sample)
+          #   })
+          # }
         })    
       }
       
@@ -2926,6 +2944,32 @@ server <- function(input, output, session) {
     }
   )
   
+  output$downloadButtonExcel_PCR <- downloadHandler(
+    filename = function() {
+      paste('RTqPCRanalysis-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      saveExcel(filename = file, ResultList=DataAnalysisModule$pcrResult , analysis = "RT-qPCR")
+    }
+  )
+  
+  output$downloadButtonExcel_WB <- downloadHandler(
+    filename = function() {
+      paste('WBanalysis-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      saveExcel(filename = file, ResultList=DataAnalysisModule$wbResult , analysis = "WB")
+    }
+  )
+  
+  output$downloadButtonExcel_WBquant <- downloadHandler(
+    filename = function() {
+      paste('WBquant_analysis-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      saveExcel(filename = file, ResultList=DataAnalysisModule$wbquantResult , analysis = "WB comparison")
+    }
+  )
   output$downloadButtonExcel_CYTOTOX <- downloadHandler(
     filename = function() {
       paste('CYTOTOXanalysis-', Sys.Date(), '.xlsx', sep='')

@@ -483,17 +483,21 @@ saveExcel = function(filename,ResultList,analysis){
     addWorksheet(wb,"Norm PRC")
     writeDataTable(wb,ResultList[["NewPCR"]], sheet="Norm PRC")
     
-    ## Comp Analysis
-    addWorksheet(wb,"Comparison PRC")
-    writeDataTable(wb,ResultList[["CompPRC"]], sheet="Comparison PRC")
-    print( ggplot(data =  ResultList[["CompPRC"]],
-                  aes(x= Gene, y = Qnorm, fill = Sample)) + 
-             facet_wrap(~Norm, ncol = 1) +
-             geom_bar(stat = "identity",position = "dodge")
-           )
+    print(ResultList[["plotPRC"]])
+    insertPlot(wb = wb,  sheet="Norm PRC",
+               startCol=dim(ResultList[["NewPCR"]])[2]+ 2)
     
-    insertPlot(wb = wb,  sheet="Comparison PRC",
-               startCol=dim(ResultList[["CompPRC"]] )[2]+ 2)
+    ## Comp Analysis
+    # addWorksheet(wb,"Comparison PRC")
+    # writeDataTable(wb,ResultList[["CompPRC"]], sheet="Comparison PRC")
+    # print( ggplot(data =  ResultList[["CompPRC"]],
+    #               aes(x= Gene, y = Qnorm, fill = Sample)) + 
+    #          facet_wrap(~Norm, ncol = 1) +
+    #          geom_bar(stat = "identity",position = "dodge")
+    #        )
+    # 
+    # insertPlot(wb = wb,  sheet="Comparison PRC",
+    #            startCol=dim(ResultList[["CompPRC"]] )[2]+ 2)
   
   }
   else if(analysis =="WB"){
