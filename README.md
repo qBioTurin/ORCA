@@ -1,4 +1,4 @@
-# InitGreat
+# OCA: OmniCellAnalysis
 
 **OCA**: a cellular biologist’s toolbox for data analysis.
 
