@@ -117,33 +117,38 @@ ggplot(data =  ResultList$pcrResult[["CompPRC"]],
 ### Initial data
 
 ```{r, echo=FALSE}
-  ### initial data
-    addWorksheet(wb,"WBimage")
-    ResultList[["Im"]] -> ListIm 
+    ResultList$wbResult[["Im"]] -> ListIm 
     im = ListIm$RGB
     
     plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
     rasterImage(im,1,1,dim(im)[2],dim(im)[1])
-    insertPlot(wb = wb,  sheet="WBimage")
+```
+
+### Analysis
+```{r, echo=FALSE}   
     
-    ### Analysis
-    addWorksheet(wb,"Plot")
-    print(ResultList[["Plots"]])
-    insertPlot(wb = wb,  sheet="Plot")
+ResultList$wbResult[["Plots"]]+ labs(title="Initial curve")
+ResultList$wbResult[["TruncatedPlots"]] + labs(title="Truncated curve")
     
-    addWorksheet(wb,"Truncated Plot")
-    print(ResultList[["TruncatedPlots"]])
-    insertPlot(wb = wb,  sheet="Plot")
-    
-    addWorksheet(wb,"AUC")
-    finaldata = ResultList[["AUCdf"]]
-    writeDataTable(wb,finaldata, sheet="AUC")
+ResultList$wbResult[["AUCdf"]]
 ```
 
 ### WB comparison
 
-### initial data
+### Normalizer WB 
 
 ```{r, echo=FALSE}
+ResultList$wbquantResult[["NormWBanalysis_filtered"]]
+```
+### Normalizer WB 
 
+```{r, echo=FALSE}
+ResultList$wbquantResult[["WBanalysis_filtered"]]
+``` 
+
+### Densities
+```{r, echo=FALSE}
+ResultList$wbquantResult[["RelDensitiy"]]
+    
+ResultList$wbquantResult[["AdjRelDensitiy"]]
 ```

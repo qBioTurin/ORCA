@@ -4,7 +4,7 @@
 #' @param 
 #'
 #' @author Pernice Simone, Tortarolo Dora
-#' @import dataverse ggplot2 patchwork shinydashboard shinyWidgets shiny dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl DT shinyjs
+#' @import rjson openxlsx ggplot2 patchwork shinydashboard shinyWidgets shiny dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl DT shinyjs
 #' 
 #' @examples
 #'\dontrun{

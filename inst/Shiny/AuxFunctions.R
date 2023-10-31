@@ -527,14 +527,28 @@ saveExcel = function(filename,ResultList,analysis){
     ## Create a new workbook
     wb <- createWorkbook("WB comparison")
     
+    wbquantResult = reactiveValues(NormWBanalysis = NULL,
+                                   NormWBanalysis_filtered = NULL,
+                                   WBanalysis = NULL,
+                                   WBanalysis_filtered = NULL,
+                                   RelDensitiy = NULL,
+                                   AdjRelDensitiy = NULL
+    )
     ## initial data
-    # addWorksheet(wb,"Table")
-    # writeDataTable(wb, sheet = "Data", ResultList[["Initdata"]])
-    # 
-    # ## Analysis
-    # addWorksheet(wb,"Results Analysis")
-    # finaldata = ResultList[["dataFinal"]]
-    # writeDataTable(wb,finaldata, sheet="Results Analysis")
+    addWorksheet(wb,"Normalizer WB")
+    writeDataTable(wb, sheet = "Normalizer WB", ResultList[["NormWBanalysis_filtered"]])
+    
+    addWorksheet(wb,"WB")
+    writeDataTable(wb, sheet = "WB", ResultList[["WBanalysis_filtered"]])
+    
+    ### Analysis
+    
+    addWorksheet(wb,"RelDensitiy")
+    writeDataTable(wb, sheet = "WB", ResultList[["RelDensitiy"]])
+    
+    addWorksheet(wb,"AdjRelDensitiy")
+    writeDataTable(wb, sheet = "WB", ResultList[["AdjRelDensitiy"]])
+    
   }
   
   ## Save it
