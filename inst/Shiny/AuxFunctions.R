@@ -161,10 +161,14 @@ LoadImage = function(pathImage){
 UploadRDs = function(Flag, session, output,
                      DataAnalysisModule,
                      Result, FlagsExp,PanelStructures=NULL){
+  
   if(Flag == "WB"){
-    
-    for(nameList in names(DataAnalysisModule$wbResult)) 
+     
+    for(nameList in names(Result)) 
       Result[[nameList]] <- DataAnalysisModule$wbResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$wbResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$wbResult$Flags[[nameList]]
     
     # update image WB
     if(!is.null(Result$Im)){
@@ -231,6 +235,9 @@ UploadRDs = function(Flag, session, output,
     for(nameList in names(DataAnalysisModule$pcrResult)) 
       Result[[nameList]] <- DataAnalysisModule$pcrResult[[nameList]]
     
+    for(nameList in names(DataAnalysisModule$pcrResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$pcrResult$Flags[[nameList]]
+    
     choices = ""
     selected = rep("",3)
     
@@ -273,6 +280,9 @@ UploadRDs = function(Flag, session, output,
     for(nameList in names(DataAnalysisModule$endocResult)) 
       Result[[nameList]] <- DataAnalysisModule$endocResult[[nameList]]
     
+    for(nameList in names(DataAnalysisModule$endocResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$endocResult$Flags[[nameList]]
+    
     if(!is.null(Result$TablePlot)){
       output$ENDOCmatrix <- renderDT(
         Result$TablePlot,
@@ -286,11 +296,11 @@ UploadRDs = function(Flag, session, output,
                            choices = unique(c(Result$ENDOCcell_TIME))
       )
       
-      updateSelectizeInput(inputId = "ENDOCcell_EXP",session = session,
-                           choices = unique(c(Result$ENDOCcell_EXP))
+      updateSelectizeInput(inputId = "ENDOCcell_SN",session = session,
+                           choices = unique(c(Result$ENDOCcell_SN))
       )
       
-      FlagsExp$AllExp = unique(c(Result$ENDOCcell_EXP))
+      FlagsExp$AllExp = unique(c(Result$ENDOCcell_SN))
     }
     
     # change pannel
@@ -302,6 +312,9 @@ UploadRDs = function(Flag, session, output,
     
     for(nameList in names(DataAnalysisModule$elisaResult)) 
       Result[[nameList]] <- DataAnalysisModule$elisaResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$elisaResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$elisaResult$Flags[[nameList]]
     
     if(!is.null(Result$TablePlot)){
       output$ELISAmatrix <- renderDT(

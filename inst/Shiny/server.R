@@ -45,8 +45,7 @@ server <- function(input, output, session) {
                              pl = NULL,
                              AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-"  ))
   
-  wbResult0 <- list(
-                         Normalizer = NULL,
+  wbResult0 <- list(   Normalizer = NULL,
                          Im = NULL,
                          Planes = NULL,
                          TruncatedPanelsValue = NULL,
@@ -64,6 +63,7 @@ server <- function(input, output, session) {
   })
   observeEvent(WBresultList(), {
     DataAnalysisModule$wbResult = reactiveValuesToList(wbResult)
+    DataAnalysisModule$wbResult$Flags = reactiveValuesToList(Flags)
   })
   
   Flags <- reactiveValues( ShowTif = F, 
@@ -860,6 +860,7 @@ server <- function(input, output, session) {
   })
   observeEvent(PCRresultListen(), {
     DataAnalysisModule$pcrResult = reactiveValuesToList(pcrResult)
+    DataAnalysisModule$pcrResult$Flags = reactiveValuesToList(FlagsPCR)
   })
   
   ## next buttons
@@ -1209,6 +1210,7 @@ server <- function(input, output, session) {
   })
   observeEvent(ENDOCresultListen(), {
     DataAnalysisModule$endocResult = reactiveValuesToList(endocResult)
+    DataAnalysisModule$endocResult$Flags = reactiveValuesToList(FlagsENDOC)
   })
   
   ##
@@ -1343,7 +1345,9 @@ server <- function(input, output, session) {
           ENDOCtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = value.now
           
         if(! input$ENDOCcell_SN %in% FlagsENDOC$AllExp){
-          FlagsENDOC$AllExp = unique(c(FlagsENDOC$AllExp,input$ENDOCcell_SN))
+          exp = unique(c(FlagsENDOC$AllExp,input$ENDOCcell_SN))
+          exp = exp[-grep(pattern = "^Color [1-9]",x = exp)]
+          FlagsENDOC$AllExp  = exp
           print(FlagsENDOC$AllExp)
         }
         
@@ -1464,7 +1468,7 @@ server <- function(input, output, session) {
                                   })
       ) %>% na.omit()
       
-      if(!is.null(MapBaseline) && !is.null(MapBlank) ){
+      if(dim(MapBaseline)[1]!=0 && dim(MapBlank)[1]!=0 ){
 
       endocResult$MapBaseline = MapBaseline
       endocResult$MapBlank = MapBlank
@@ -1496,17 +1500,26 @@ server <- function(input, output, session) {
         rename(BlankValues = meanValues, Blank =  exp, exp = Exp )
       
       endocTotAverage = merge( endocTotAverage %>% filter(! exp %in%endocTot_bl$Blank ),
-                               endocTot_bl %>% ungroup() %>% dplyr::select(-time), all.x = T, by = "exp") 
+                               endocTot_bl %>% ungroup() %>%
+                                 dplyr::select(-time), all.x = T, by = "exp") %>%
+        rename(Exp = exp) 
       endocTotAverage = endocTotAverage %>% mutate(meanValues = meanValues - BlankValues )
       
       # merging exp with baseline
       endocTot_base = merge(MapBaseline, endocTotAverage,
-                            by.y = "exp", by.x = "Baseline") %>%
-        rename(BaseValues = meanValues) %>% select(-Blank,-BlankValues)
+                            by.y = "Exp", by.x = "Baseline") %>%
+        rename(BaseValues = meanValues) %>% 
+        select(-Blank,-BlankValues)
       
-      endocTot_base = merge(endocTotAverage, endocTot_base, 
-                            by.x = c("exp","time"), by.y = c("Exp","time") )
-      
+      if(length(unique(endocTot_base$time)) == 1){ 
+        # if there is only one point then the baseline is used to normalize every times
+        endocTot_base = endocTot_base %>% select(-time)
+      }
+      endocTot_base = merge(endocTotAverage,
+                            endocTot_base )
+                            # by.x = c("exp","time"),
+                            # by.y = c("Exp","time")
+                            #)
       endocResult$data = endocTot
       
       if(length(endocTotAverage[,1]) != 0 ){
@@ -1514,7 +1527,7 @@ server <- function(input, output, session) {
           rename( MeanExperiment = meanValues,
                   MeanBaseline = BaseValues ) %>%
           dplyr::mutate(Quantification = MeanExperiment/MeanBaseline * 100) %>%
-          rename(Experiment = exp,Time = time) 
+          rename(Experiment = Exp,Time = time) 
         
         output$ENDOCtables = renderDT(endocmean)
         
@@ -1680,6 +1693,7 @@ server <- function(input, output, session) {
   })
   observeEvent(ELISAresultListen(), {
     DataAnalysisModule$elisaResult = reactiveValuesToList(elisaResult)
+    DataAnalysisModule$elisaResult$Flags = reactiveValuesToList(FlagsELISA)
   })
   
   ##
@@ -2274,12 +2288,12 @@ server <- function(input, output, session) {
   })
   
   # save everytime there is a change in the results
-  ELISAresultListen <- reactive({
-    reactiveValuesToList(elisaResult)
-  })
-  observeEvent(ELISAresultListen(), {
-    DataAnalysisModule$elisaResult = reactiveValuesToList(elisaResult)
-  })
+  # ELISAresultListen <- reactive({
+  #   reactiveValuesToList(elisaResult)
+  # })
+  # observeEvent(ELISAresultListen(), {
+  #   DataAnalysisModule$elisaResult = reactiveValuesToList(elisaResult)
+  # })
   
   ### End ELISA analysis ####
   
@@ -2319,6 +2333,7 @@ server <- function(input, output, session) {
   })
   observeEvent(CYTOTOXresultListen(), {
     DataAnalysisModule$cytotoxResult = reactiveValuesToList(cytotoxResult)
+    DataAnalysisModule$cytotoxResult$Flags = reactiveValuesToList(FlagsCYTOTOX)
   })
   
   ##
@@ -2571,13 +2586,6 @@ server <- function(input, output, session) {
       
       }
   })
-  # save everytime there is a change in the results
-  CYTOTOXresultListen <- reactive({
-    reactiveValuesToList(cytotoxResult)
-  })
-  observeEvent(CYTOTOXresultListen(), {
-    DataAnalysisModule$cytotoxResult = reactiveValuesToList(cytotoxResult)
-  })
   
   ### End CYTOTOX analysis ####
   
@@ -2823,33 +2831,35 @@ server <- function(input, output, session) {
       
       mess = readRDS(input$loadAnalysis_file$datapath)
       
+      messNames = names(mess)
+      if("Flags"%in% messNames) messNames = messNames[ messNames != "Flags"]
+      
       validate(
-        need(all(names(mess) %in% names(DataAnalysisModule)) ||
-               all(names(mess) %in% names(elisaResult)) ||
-               all(names(mess) %in% names(wbResult)) || 
-               all(names(mess) %in% names(pcrResult)) ||
-               all(names(mess) %in% names(cytotoxResult)) ||
-               all(names(mess) %in% names(endocResult)) ,
+        need(all(messNames %in% names(DataAnalysisModule)) ||
+               all(messNames %in% names(elisaResult)) ||
+               all(messNames %in% names(wbResult)) || 
+               all(messNames %in% names(pcrResult)) ||
+               all(messNames %in% names(cytotoxResult)) ||
+               all(messNames %in% names(endocResult)) ,
              paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
       )
       
-      if(all(names(mess) %in% names(DataAnalysisModule)) ){
+      if(all(messNames %in% names(DataAnalysisModule)) ){
         DataAnalysisModule <- mess
         UploadDataAnalysisModule$FlagALL = T
-      }
-      else if( all(names(mess) %in% names(wbResult)) ){
+      }else if( all(messNames %in% names(wbResult)) ){
         DataAnalysisModule$wbResult <- mess
         UploadDataAnalysisModule$FlagWB = T
-      }else if( all(names(mess) %in% names(pcrResult)) ){
+      }else if( all(messNames %in% names(pcrResult)) ){
         DataAnalysisModule$pcrResult <- mess
         UploadDataAnalysisModule$FlagPRCC = T
-      }else if(all(names(mess) %in% names(endocResult)) ){
+      }else if(all(messNames %in% names(endocResult)) ){
         DataAnalysisModule$endocResult <- mess
         UploadDataAnalysisModule$FlagENDOC = T
-      }else if(all(names(mess) %in% names(elisaResult)) ){
+      }else if(all(messNames %in% names(elisaResult)) ){
         DataAnalysisModule$elisaResult <- mess
         UploadDataAnalysisModule$FlagELISA = T
-      }else if(all(names(mess) %in% names(citotoxResult)) ){
+      }else if(all(messNames %in% names(citotoxResult)) ){
         DataAnalysisModule$citotoxResult <- mess
         UploadDataAnalysisModule$FlagCYTOTOX = T
       }
@@ -2860,6 +2870,7 @@ server <- function(input, output, session) {
       
     })
   })
+  
   observeEvent(UploadDataAnalysisModule$FlagUpdate,{
     if(UploadDataAnalysisModule$FlagUpdate){
       
@@ -2889,7 +2900,6 @@ server <- function(input, output, session) {
                   FlagsExp = FlagsENDOC)
       }
       else if(UploadDataAnalysisModule$FlagELISA || UploadDataAnalysisModule$FlagALL){
-        
         UploadRDs(Flag = "ELISA",
                   session = session,
                   output = output,
@@ -2908,8 +2918,8 @@ server <- function(input, output, session) {
                   FlagsExp = FlagsCYTOTOX)
         
       }
-      
-      UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
+
+            UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
     }
     
   })
@@ -2964,7 +2974,7 @@ server <- function(input, output, session) {
       paste('ENDOCanalysis-', Sys.Date(), '.xlsx', sep='')
     },
     content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "Endocytosis")
+      saveExcel(filename = file, ResultList=DataAnalysisModule$endocResult , analysis = "Endocytosis")
     }
   )
   
