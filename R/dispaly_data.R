@@ -4,7 +4,7 @@
 #' @param 
 #'
 #' @author Beccuti Marco, Pernice Simone, Tortarolo Dora
-#' @import rjson openxlsx ggplot2 patchwork shinydashboard dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl shinyjs
+#' @import randomcoloR rjson openxlsx ggplot2 patchwork shinydashboard dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl shinyjs
 #' @rawNamespace import(DT, except=c(dataTableOutput,renderDataTable))
 #' @rawNamespace import(shiny,except=runExample)
 #' @rawNamespace import(shinyWidgets,except=alert)

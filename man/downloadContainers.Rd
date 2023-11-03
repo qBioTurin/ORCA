@@ -9,7 +9,7 @@ downloadContainers(containers.file = NULL, tag = "latest")
 \arguments{
 \item{containers.file, }{a character string with the name of the file which indicate which are
 the initial set of containers to be downloaded. If NULL then the set is given by a
-file called "containersNames.txt" located in the folder inst/Containers of OCA package.}
+file called "containersNames.txt" located in the folder inst/Containers of ORCA package.}
 }
 \description{
 This is a function that prepares the docker environment to be used for the first time the application is installed.

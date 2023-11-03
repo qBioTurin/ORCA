@@ -2399,7 +2399,10 @@ server <- function(input, output, session) {
       
       mess = readfile(
         filename = input$CYTOTOXImport$datapath,
-        type = "Excel"
+        type = "Excel",
+        allDouble = T,
+        colname = F,
+        colors = T
       )
       
       validate(
