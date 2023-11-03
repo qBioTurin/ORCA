@@ -1274,6 +1274,8 @@ server <- function(input, output, session) {
       mess = readfile(
         filename = input$ENDOCImport$datapath,
         type = "Excel",
+        allDouble = T,
+        colname = F,
         colors = T
       )
       

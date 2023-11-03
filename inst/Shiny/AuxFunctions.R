@@ -49,6 +49,8 @@ readfile <- function(filename,type,colname = T, namesAll = namesAll, allDouble =
             if(x$sheet == sheetName){
               if( all(areColors( paste0("#",unname(x$style$fill$fillFg)))) ){
                 color = paste0("#",unname(x$style$fill$fillFg))
+                if(grep(color,pattern="^#FF") && all(areColors(gsub(replacement = "#",x = color,pattern="^#FF"))) )
+                  color = gsub(replacement = "#",x = color,pattern="^#FF")
               }else{
                 color = randomcoloR::randomColor(1)
               }
