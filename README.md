@@ -1,6 +1,8 @@
 # ORCA: Omni Reproducible Cell Analysis
 
-**ORCA**: a cellular biologist’s toolbox for data analysis.
+![](./inst/Shiny/www/images/ORCAlogo.png)
+
+**A cellular biologist’s toolbox for data analysis.**
 
 It provides an exhaustive platform where scientists can analyze raw:
 Western Blot (WB),
@@ -64,4 +66,4 @@ docker.application.run()
 The uploading of the analysis can be done by exploiting the panel in the application called *Dataverse*. In this context, an image docker c
 
 
-
+![](./inst/Shiny/www/images/Logo_QBio.png)
