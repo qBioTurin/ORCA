@@ -1232,7 +1232,8 @@ server <- function(input, output, session) {
         filename = input$ENDOCImport$datapath,
         type = "Excel",
         allDouble = T,
-        colname = F,colors = T
+        colname = F,
+        colors = T
       )
       
       validate(
@@ -1339,7 +1340,7 @@ server <- function(input, output, session) {
       if(!is.null(cellCoo)){
         value.bef = endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]] 
         value.now = input$ENDOCcell_SN
-        
+
         # if the value does not change or it is still "Color " then the matrix is not update
         if( value.now != "" && value.now!=value.bef){
          
@@ -1348,7 +1349,7 @@ server <- function(input, output, session) {
           
         if(! input$ENDOCcell_SN %in% FlagsENDOC$AllExp){
           exp = unique(c(FlagsENDOC$AllExp,input$ENDOCcell_SN))
-          exp = exp[-grep(pattern = "^Color [1-9]",x = exp)]
+          #exp = exp[-grep(pattern = "^Color [1-9]",x = exp)]
           FlagsENDOC$AllExp  = exp
           print(FlagsENDOC$AllExp)
         }
@@ -1789,8 +1790,8 @@ server <- function(input, output, session) {
                           selection = list(mode = 'single', target = 'cell'),
                           rownames= FALSE,
                           options = list(
-                            lengthChange = FALSE,
-                            scrollX = TRUE,
+                            #lengthChange = FALSE,
+                            #scrollX = TRUE,
                             columnDefs = list(list(targets = cols.color, 
                                                    visible = FALSE))
                           )) %>%
@@ -1875,8 +1876,8 @@ server <- function(input, output, session) {
                                             selection = list(mode = 'single', target = 'cell'),
                                             rownames= FALSE,
                                             options = list(
-                                              scrollX = TRUE,
-                                              lengthChange = FALSE,
+                                              #scrollX = TRUE,
+                                              #lengthChange = FALSE,
                                               columnDefs = list(list(targets = cols.color, visible = FALSE))
                                             )) %>%
             formatStyle(cols.keep,
@@ -2053,15 +2054,10 @@ server <- function(input, output, session) {
       
       if(length(elisaTot_base[,1]) != 0 && !is.null(elisaResult$Regression) ){
         
-        # y = m*x + q
-        
-        q = elisaResult$Regression$data$coefficients[1]
-        m = elisaResult$Regression$data$coefficients[2]
-        
         elisamean = elisaTot_base %>%
           rename( MeanExperiment = meanValues,
                   MeanBaseline = BaseValues ) %>%
-          dplyr::mutate(Quantification = (MeanExperiment -q)/m ) %>%
+          dplyr::mutate(Quantification =  elisaResult$Regression$fun(MeanExperiment) ) %>%
           #MeanExperiment/MeanBaseline * 100) %>%
           rename(Experiment = exp,Time = time) 
         
@@ -2155,7 +2151,7 @@ server <- function(input, output, session) {
                  }
                })
   
-  ## linear regression standard curve
+  ##  regression standard curve
   observeEvent(input$ELISA_standcurve,{
     elisaResult$data -> data
     
@@ -2168,7 +2164,7 @@ server <- function(input, output, session) {
         # ungroup() %>%
         select(exp,time,values) %>%
         rename(Measures = values) %>%
-        mutate(Concentrations = NaN )
+        mutate(Concentrations = NA )
       
       # If nothing changes w..r.t. the already saved table then I keep the old one!
       if(!is.null(elisaResult$Tablestandcurve) && 
@@ -2186,7 +2182,21 @@ server <- function(input, output, session) {
                        selection = 'none',
                        editable = list(target = "cell",
                                        disable = list(columns = 0:2) ),
-                       options = list(lengthChange = FALSE, autoWidth = TRUE),
+                       #options = list(lengthChange = FALSE, autoWidth = TRUE),
+                       rownames= FALSE
+        )
+      })
+    } 
+  })
+  observeEvent(elisaResult$Tablestandcurve,{
+    if(!is.null(elisaResult$Tablestandcurve) && dim(elisaResult$Tablestandcurve)[1]!=0){
+      
+      output$ELISA_Table_stdcurve <- DT::renderDataTable({
+        DT::datatable( elisaResult$Tablestandcurve,
+                       selection = 'none',
+                       editable = list(target = "cell",
+                                       disable = list(columns = 0:2) ),
+                       #options = list(lengthChange = FALSE, autoWidth = TRUE),
                        rownames= FALSE
         )
       })
@@ -2201,6 +2211,7 @@ server <- function(input, output, session) {
   })
   observeEvent(input$ELISA_buttonRegression,{
     standcurve = elisaResult$Tablestandcurve
+    standcurve$Concentrations = as.numeric(standcurve$Concentrations)
     if(!is.null(standcurve)){
       standcurve = standcurve %>% na.omit()
       
@@ -2210,12 +2221,14 @@ server <- function(input, output, session) {
         theme_bw()
       
       if(input$regressionType == "Linear"){
-        lmStancurve = lm(Measures~Concentrations, data = standcurve)
+        modelStancurve = lm(Measures~Concentrations, data = standcurve)
         
         infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
                             y = max(standcurve$Measures) + c(2,1.75),
-                            text = c( paste0("y = ", signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
-                                      paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
+                            text = c( paste0("y = ", signif(modelStancurve$coef[[2]], 5), "x + ",signif(modelStancurve$coef[[1]],5 )),
+                                      paste0("Adj R2 = ",signif(summary(modelStancurve)$adj.r.squared, 5))) )
+        
+        fun = paste0("(x - ",modelStancurve$coef[[1]],")/", modelStancurve$coef[[2]])
         
         regressionPlot =  regressionPlot +
           geom_smooth(method='lm', col = "red") +
@@ -2223,16 +2236,21 @@ server <- function(input, output, session) {
                     aes(x = x, y = y, label =text ),
                     vjust = "inward", hjust = "inward" )
         
-      }else if(input$regressionType == "Quadratic"){
+      }
+      else if(input$regressionType == "Quadratic")
+        {
         #this is not implemented
         standcurve$Concentrations2 = standcurve$Concentrations^2
-        lmStancurve = lm(Measures~Concentrations+Concentrations2, data = standcurve)
+        modelStancurve = lm(Measures~Concentrations+Concentrations2, data = standcurve)
         
         infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
                             y = max(standcurve$Measures) + c(2,1.75),
-                            text = c( paste0("y = ", signif(lmStancurve$coef[[3]], 5), "x^2 + ",
-                                             signif(lmStancurve$coef[[2]], 5), "x + ",signif(lmStancurve$coef[[1]],5 )),
-                                      paste0("Adj R2 = ",signif(summary(lmStancurve)$adj.r.squared, 5))) )
+                            text = c( paste0("y = ", signif(modelStancurve$coef[[3]], 5), "x^2 + ",
+                                             signif(modelStancurve$coef[[2]], 5), "x + ",signif(modelStancurve$coef[[1]],5 )),
+                                      paste0("Adj R2 = ",signif(summary(modelStancurve)$adj.r.squared, 5))) )
+        
+        fun = paste0(modelStancurve$coef[[3]],"*x^2 + ",modelStancurve$coef[[2]],"*x + ",modelStancurve$coef[[1]] )
+        
         regressionPlot =  regressionPlot  +
           geom_point() +
           stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1,col="red")+
@@ -2244,7 +2262,7 @@ server <- function(input, output, session) {
         
         outNLreg = tryCatch(
           {
-            nlmStancurve<-nls(
+            modelStancurve<-nls(
               Measures ~ a*Concentrations/(b+Concentrations), 
               data = standcurve, #%>% group_by(Concentrations) %>% summarise(Measures = mean(Measures)),
               start = list(a = 1,b = 1)
@@ -2255,13 +2273,13 @@ server <- function(input, output, session) {
           })
         
         if(!is.null(outNLreg$mess)){
-          nlmStancurve = NULL
+          modelStancurve = NULL
           regressionPlot = ggplot()+ geom_text(data = data.frame(x = 1,y =1,text = paste0("Error: ",outNLreg$mess)),
                                                aes(x,y,label = text),color = "red")
         }else{
-          nlmStancurve = outNLreg
-          coef = nlmStancurve$m$getPars()
-          r2 = 1- sum(nlmStancurve$m$resid()^2)/(sum(( mean(standcurve$Measures) - nlmStancurve$m$predict() )^2))
+          modelStancurve = outNLreg
+          coef = modelStancurve$m$getPars()
+          r2 = 1- sum(modelStancurve$m$resid()^2)/(sum(( mean(standcurve$Measures) - modelStancurve$m$predict() )^2))
           
           infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
                               y = max(standcurve$Measures) + c(2,1.75),
@@ -2272,6 +2290,8 @@ server <- function(input, output, session) {
           dfHyperbola = data.frame(x = seq(min(standcurve$Concentrations),max(standcurve$Concentrations),length.out = 20)) %>%
             mutate(y = (coef["a"]*x/((coef["b"]+x)) ) )
           
+          fun = paste0(coef["b"],"*x/(",coef["a"],"-x)")
+          
           regressionPlot =  regressionPlot  +
             geom_point() +
             geom_line(data = dfHyperbola,aes(x = x,y = y),size = 1,col="red" )+
@@ -2281,7 +2301,7 @@ server <- function(input, output, session) {
         }
       }
       
-      elisaResult$Regression = list(data = lmStancurve, plot = regressionPlot)
+      elisaResult$Regression = list(data = modelStancurve, plot = regressionPlot, fun = function(x){ eval( parse(text = fun ) ) } )
       
     }else{
       regressionPlot = ggplot()

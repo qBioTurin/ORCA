@@ -617,15 +617,20 @@ ui <- dashboardPage(
                 box(width = 12,
                     title = "Regression of the standard curve:",
                     collapsible = TRUE,
+                    fluidRow(column(4,
+                                    selectizeInput("regressionType",
+                                            label="Select the regression model:",
+                                            choices = c("Linear","Hyperbola"))
+                                    ),
+                             column(3,
+                                    actionButton(inputId = "ELISA_buttonRegression",
+                                          label = 'Calculate the regression',
+                                          align = "right")
+                             )
+                             ),
                     fluidRow(
                       column(6,
-                             selectizeInput("regressionType",
-                                            label="Select the regression:",
-                                            choices = c("Linear","Quadratic","Cubic")),
-                             DTOutput("ELISA_Table_stdcurve"),
-                             actionButton(inputId = "ELISA_buttonRegression",
-                                          label = 'Linear Regression',
-                                          align = "right")
+                             DTOutput("ELISA_Table_stdcurve")
                       ),
                       column(6,
                              plotOutput("ELISAregression")

@@ -67,3 +67,4 @@ The uploading of the analysis can be done by exploiting the panel in the applica
 
 
 ![](./inst/Shiny/www/images/Logo_QBio.png)
+
