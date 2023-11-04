@@ -21,6 +21,7 @@ This is an internal function executing a docker container. Not to be used by use
      docker.run(params=NULL, changeUID=TRUE, debug=FALSE)
 
 }
+
 }
 \author{
 Pernice Simone

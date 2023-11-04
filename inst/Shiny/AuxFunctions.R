@@ -566,6 +566,7 @@ saveExcel = function(filename,ResultList,analysis){
   ## Save it
   saveWorkbook(wb, filename)
   
+  return(1)
 }
 
 tableExcelColored = function(session, output,Result, FlagsExp, type){

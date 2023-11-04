@@ -513,22 +513,7 @@ server <- function(input, output, session) {
       wbResult$AUCdf <- AUCdf
     }
   })
-  
-  # # edit AUC sample name
-  # observeEvent(input$AUC_cell_edit, {
-  #   cells = input$AUC_cell_edit
-  #   wbResult$AUCdf -> AUCdf
-  #   AUCdf = AUCdf %>% filter(SampleName == AUCdf[cells$row,"SampleName"])
-  #   
-  #   # we check that the same LANE should not have same names.
-  #   if(cells$value %in% AUCdf$ExpName){
-  #     k = table(AUCdf$ExpName )[cells$value]
-  #     cells$value = paste0(cells$value, " (",k,")")
-  #   }
-  #   cells$col = 1
-  #   wbResult$AUCdf <- editData( wbResult$AUCdf , cells, 'AUC')
-  # })
-  # 
+
   ## next buttons
   observeEvent(input$NextWBQuantif,{
     if(!is.null(wbResult$AUCdf))
@@ -2688,7 +2673,7 @@ server <- function(input, output, session) {
         }
       
       output$TabStat = renderDT({res})
-      output$PlotStat = renderDT({resplot})
+      output$PlotStat = renderPlot({resplot})
       output$TabTTest = renderDT({resTTest})
     }
   })
@@ -2743,19 +2728,17 @@ server <- function(input, output, session) {
         # creation of a temporary folder
         tempfolder = paste0(tempdir(check = T),"/ORCA")
         system(paste0("mkdir ",tempfolder))
-  
+        system(paste0("mkdir ",tempfolder,"/dataset"))
         # create the metadata
-        result <- fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
+        result <- rjson::fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
         result$dataset_title = input$Title_DV
-        result$dataset_description = paste0(input$Description_DV,"\n This dataset has
-                                            been obtained using the ORCA application,
-                                            specifically the module: ", input$selectAnalysis_DV)
+        result$dataset_description = paste0(input$Description_DV,"\n This dataset has been obtained using the ORCA application, specifically the module: ", input$selectAnalysis_DV)
         result$author_name = input$Author_DV
         result$author_affiliation= input$AuthorAff_DV
         result$dataset_contact_name = input$ContactN_DV
         result$dataset_contact_email = input$ContactEmail_DV
         # result$subject = as.vector(result$subject)
-        write(toJSON(result), file=paste0(tempfolder,"/metadata.json") )
+        write(rjson::toJSON(result), file=paste0(tempfolder,"/metadata.json") )
   
         # move the file in the temporary folder
   
@@ -2766,13 +2749,14 @@ server <- function(input, output, session) {
                   ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
                   analysis = input$selectAnalysis_DV )
         
-        saveRDS(file = paste0(tempfolder,"/dataset/ORCA_",
+        saveRDS(DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
+                file = paste0(tempfolder,"/dataset/ORCA_",
                                          gsub(pattern = " ", 
                                               x = input$selectAnalysis_DV,
                                               replacement = ""),".RDs"))
         # docker run
-        docker.run(params = paste0("--volume ", tempfolder,
-                   ":/Results/ -d qbioturin/ORCA-uploaddataverse python3 main.py /Results/metadata.json /Results/dataset") 
+        ORCA::docker.run(params = paste0("--volume ", tempfolder,
+                   ":/Results/ -d qbioturin/orca-upload-dataverse python3 main.py /Results/metadata.json /Results/dataset") 
         )
   
       }
@@ -3085,7 +3069,7 @@ server <- function(input, output, session) {
   )
   #### end save files ###
   
-  observe({namesAll <<- unique( c(names(wbResult), names(wbquantResult), names(pcrResult), names(endocResult)) )})
+  observe({namesAll <<- unique( c("Flags",names(wbResult), names(wbquantResult), names(pcrResult), names(endocResult)) )})
   
   return()
   

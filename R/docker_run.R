@@ -12,6 +12,8 @@
 #'      docker.run(params=NULL, changeUID=TRUE, debug=FALSE)
 #'
 #' }
+#'
+#' @export
 
 docker.run <- function( params=NULL, debug=FALSE){
   
@@ -30,9 +32,8 @@ docker.run <- function( params=NULL, debug=FALSE){
   
   ## to execute docker
   cat(paste("docker run  ",params,"\n\n", sep=""))
-  system(paste("docker run  ",params, sep=""))
+  system(paste("docker run --cidfile	dockerID ",params , sep=""))
 
-  
   ## Get the Docker ID from file
   dockerid=readLines("dockerID", warn = FALSE)
   cat("\nDocker ID is:\n",substr(dockerid,1, 12),"\n")
