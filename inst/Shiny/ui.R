@@ -119,7 +119,8 @@ ui <- dashboardPage(
         h1("  "),
         fluidRow(
           column(width = 6,
-                 p(img(src = "images/ORCAlogo.png", height="30%", width="30%"), align = "center"),
+                 p(img(src = system.file("Shiny/www/images","ORCAlogo.png", package = "ORCA"),
+                       height="30%", width="30%"), align = "center"),
           ),
         column(width = 6,
                h2(em("A cellular biologist’s toolbox for data analysis.")),
@@ -143,7 +144,8 @@ ui <- dashboardPage(
                )
                )
         ),
-        p(img(src = "images/Logo_QBio.png", height="15%", width="15%",style = "margin:100px 0px"), align = "center")
+        p(img(src = system.file("Shiny/www/images","Logo_QBio.png", package = "ORCA"),
+              height="15%", width="15%",style = "margin:100px 0px"), align = "center")
         # h4("ORCA consists of two modules:"),
         # tags$ol(
         #   tags$li(

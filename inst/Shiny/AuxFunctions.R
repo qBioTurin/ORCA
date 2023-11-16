@@ -415,6 +415,44 @@ UploadRDs = function(Flag, session, output,
                       selected = "uploadELISA")
     
   }
+  else if(Flag == "CYTOTX"){
+    
+    for(nameList in names(DataAnalysisModule$cytotoxResult)) 
+      Result[[nameList]] <- DataAnalysisModule$cytotoxResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$cytotoxResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$cytotoxResult$Flags[[nameList]]
+    
+    if(!is.null(Result$TablePlot)){
+      output$CYTOTOXmatrix <- renderDT(
+        Result$TablePlot,
+        server = FALSE
+      )
+    }
+    
+    if(!is.null(Result$CYTOTOXcell_EXP)){
+      
+      updateSelectizeInput(inputId = "CYTOTOXcell_EXP",
+                           session = session,
+                           choices = unique(c(Result$CYTOTOXcell_EXP))
+      )
+      
+      updateSelectizeInput(inputId = "CYTOTOXcell_SN",
+                           session =session,
+                           choices = unique(c(Result$CYTOTOXcell_SN))
+      )
+      updateSelectizeInput(inputId = "CYTOTOXcell_REP",
+                           session =session,
+                           choices = unique(c(Result$CYTOTOXcell_REP))
+      )
+      # FlagsExp$AllExp = unique(c(Result$CYTOTOXcell_SN))
+    }
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "uploadCYTOTOX")
+    
+  }
 }
 
 saveExcel = function(filename,ResultList,analysis){
@@ -598,11 +636,12 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
                           selection = list(mode = 'single', target = 'cell'),
                           rownames= FALSE,
                           options = list(
-                            lengthChange = FALSE,
-                            scrollX = TRUE,
-                            scrollY = TRUE,
-                            columnDefs = list(list(targets = cols.color, 
-                                                   visible = FALSE))
+                            dom = 't',
+                            pageLength = -1,
+                            info = FALSE,
+                            #scrollX = TRUE,
+                            #lengthChange = FALSE,
+                            columnDefs = list(list(targets = cols.color, visible = FALSE))
                           )) %>%
       formatStyle(cols.keep,
                   cols.color,
@@ -656,8 +695,11 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
                                         selection = list(mode = 'single', target = 'cell'),
                                         rownames= FALSE,
                                         options = list(
-                                          scrollX = TRUE,
-                                          lengthChange = FALSE,
+                                          dom = 't',
+                                          pageLength = -1,
+                                          info = FALSE,
+                                          #scrollX = TRUE,
+                                          #lengthChange = FALSE,
                                           columnDefs = list(list(targets = cols.color, visible = FALSE))
                                         )) %>%
       formatStyle(cols.keep,
