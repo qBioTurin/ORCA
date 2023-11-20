@@ -2593,8 +2593,12 @@ server <- function(input, output, session) {
           ggplot(aes(x = as.factor(EXP),y = Mean ,fill = SN, col = SN)) + 
           geom_bar(stat="identity", color="black", position=position_dodge()) +
           geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.2,
-                        position=position_dodge(.9)) +theme_bw()+ theme(legend.position = "bottom")+
-          labs(title = "Sample Name mean values with standard deviation bars",fill="Sample Name",x = "Experimental condition", y= "Mean Values",)
+                        position=position_dodge(.9)) +
+          theme_bw()+ 
+          theme(legend.position = "bottom")+
+          labs(title = "Sample Name mean values with standard deviation bars",
+               col="Sample Name",fill="Sample Name",
+               x = "Experimental condition", y= "Mean Values")
         
         pl2 = CYTOTOXcell %>% ggplot() +
           geom_boxplot(aes(x = as.factor(EXP),y = Res,fill = SN, col = SN),alpha = 0.4) +
