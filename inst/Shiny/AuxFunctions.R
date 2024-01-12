@@ -143,7 +143,9 @@ AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,SName="1",AUCdf
 }
 LoadImage = function(pathImage){
   im <- OpenImageR::readImage(pathImage,as.is = T)
-  im = rgb_2gray(im)
+  
+  if( length(dim(im)) != 2  ) # if the tiff image is already gray
+    im = rgb_2gray(im)
   
   JpegImage = tempfile(fileext = "jpeg")
   
