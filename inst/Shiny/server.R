@@ -166,6 +166,16 @@ server <- function(input, output, session) {
       im = ListIm$RGB
       
       #output$TifPlot  <- renderPlot({ imageShow(im) })
+      output$TiffBox <- renderUI({
+        column(12,align="center",
+        box(plotOutput("TifPlot2",
+                       hover = "plot_hover",
+                       brush = "plot_brush"),
+            width = 12,
+            height = dim(im)[1]+0.1*dim(im)[1])
+        )
+      })
+      
       output$TifPlot2 <- renderPlot({ 
         plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
         rasterImage(im,1,1,dim(im)[2],dim(im)[1])
@@ -173,7 +183,8 @@ server <- function(input, output, session) {
           r <- PanelStructures$data
           rect(r$xmin, r$ymin, r$xmax, r$ymax, border = "red")
         }
-      })
+      }, width  = dim(im)[2],height = dim(im)[1] )
+      
       Flags$ShowTif = FALSE
     }
   })

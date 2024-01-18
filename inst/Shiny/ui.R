@@ -940,11 +940,14 @@ ui <- dashboardPage(
       tabItem(tabName = "plane",
               h2("Select Protein Bands"),
               fluidRow(
-                box( width = 12,
-                     plotOutput("TifPlot2",width="100%",
-                                hover = "plot_hover",
-                                brush = "plot_brush")
-                )
+                #shinydashboard::box( width = 12,
+                     #column(12,align="center",
+                            uiOutput("TiffBox")
+                     # plotOutput("TifPlot2",
+                     #            hover = "plot_hover",
+                     #            brush = "plot_brush")
+                     #)
+                #)
               ),
               fluidRow(
                 box( width = 6,
