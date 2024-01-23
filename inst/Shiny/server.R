@@ -520,7 +520,7 @@ server <- function(input, output, session) {
         geom_line() + 
         theme_bw() +
         facet_wrap(~ID)+ 
-        lims(y=c(minPanelsValue,maxPanelsValue))
+        lims(y=c(0,maxPanelsValue))
       
       wbResult$TruncatedPanelsValue <- PanelsValue
       wbResult$TruncatedPlots <- pl
