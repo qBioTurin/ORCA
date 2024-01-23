@@ -330,12 +330,14 @@ server <- function(input, output, session) {
                                                 Y = 1:length(GreyPlane) )
                                    },
                                    im,PanelData)
-      )
+                            )
       
       
-      pl<-ggplot(PanelsValue, aes(x =Y,y=Values)) +
-        geom_line() + theme_bw() +
-        facet_wrap(~ID)
+      pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
+        geom_line() + 
+        theme_bw() +
+        facet_wrap(~ID) + 
+        lims(y=c(min(PanelsValue$Values),max(PanelsValue$Values)))
       
       wbResult$PanelsValue <- PanelsValue
       wbResult$Plots <- pl
@@ -347,13 +349,16 @@ server <- function(input, output, session) {
       
       output$DataPlot <- renderPlot({pl})
       
+      ### AUC calculation of the whole lane without cuts:
+      aucList = lapply(unique(PanelsValue$ID), function(IDlane) AUCfunction(wbResult$AUCdf,PanelsValue,SName = IDlane) )
+      wbResult$AUCdf <- do.call(rbind,aucList)
     }
   })
   
   # reset all the truncation analysis
   observeEvent(input$actionButton_ResetPlanes,{
     
-    wbResult$AUCdf = wbResult0$AUCdf
+    wbResult$AUCdf =  wbResult$AUCdf %>% filter(Truncation == "-") 
     wbResult$TruncatedPanelsValue = wbResult0$TruncatedPanelsValue
     wbResult$TruncatedPlots = wbResult0$TruncatedPlots 
     
@@ -442,7 +447,7 @@ server <- function(input, output, session) {
       output$DataPlot <- renderPlot({pl})
       
       ### AUC calculation of the whole lane without cuts:
-      wbResult$AUCdf <- AUCfunction(wbResult$AUCdf,PanelsValue,SName = IDlane)
+      # wbResult$AUCdf <- AUCfunction(wbResult$AUCdf,PanelsValue,SName = IDlane)
     }  
   })
   
@@ -461,6 +466,8 @@ server <- function(input, output, session) {
         pl<-wbResult$Plots
       }
       
+      minPanelsValue=min(wbResult$PanelsValue$Values)
+      maxPanelsValue=max(wbResult$PanelsValue$Values)
       wbResult$AUCdf -> AUCdf
       AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
       #AUCdf.new$ExpName = "-"
@@ -482,9 +489,9 @@ server <- function(input, output, session) {
         AUCdf.new$Truncation <- paste(AUCdf.new$Truncation ,";\n X = [", MinTrunc," ; ", MaxTrunc ,"]",collapse = "")
         PanelsValue<- PanelsValue[!((PanelsValue$Y < MinTrunc | PanelsValue$Y > MaxTrunc) & PanelsValue$ID == IDlane),]
         PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] -min(PanelsValue$Values[PanelsValue$ID == IDlane]) 
-        pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-          geom_line() + theme_bw() +
-          facet_wrap(~ID)
+        # pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
+        #   geom_line() + theme_bw() +
+        #   facet_wrap(~ID)
         updateSliderInput(session,"truncV",
                           min = min(PanelsValue$Y[PanelsValue$ID == IDlane]),
                           max = max(PanelsValue$Y[PanelsValue$ID == IDlane]),
@@ -497,15 +504,24 @@ server <- function(input, output, session) {
         PanelsValue <- PanelsValue[!(PanelsValue$Values<TruncY & PanelsValue$ID == IDlane),]
         PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] - TruncY
         AUCdf.new$Truncation <- paste(AUCdf.new$Truncation ,";\n Y = ", TruncY)
-        pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-          geom_line() + theme_bw() +
-          facet_wrap(~ID)
+        # pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
+        #   geom_line() + 
+        #   theme_bw() +
+        #   facet_wrap(~ID)+ 
+        #   lims(y=c(minPanelsValue,maxPanelsValue))
+        
         updateSliderInput(session,"truncH",
                           min = min(PanelsValue$Values[PanelsValue$ID == IDlane]),
                           max = max(PanelsValue$Values[PanelsValue$ID == IDlane]),
                           value = c(min(PanelsValue$Values[PanelsValue$ID == IDlane]),
                                     max(PanelsValue$Values[PanelsValue$ID == IDlane]) ) )
       }
+      
+      pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
+        geom_line() + 
+        theme_bw() +
+        facet_wrap(~ID)+ 
+        lims(y=c(minPanelsValue,maxPanelsValue))
       
       wbResult$TruncatedPanelsValue <- PanelsValue
       wbResult$TruncatedPlots <- pl
@@ -615,42 +631,6 @@ server <- function(input, output, session) {
       FlagsWBquant$BothUploaded = T
   })
   
-  # edit AUC_WB and AUC_WBnorm sample name
-  # observeEvent(input$AUC_WB_cell_edit, {
-  #   cells = input$AUC_WB_cell_edit
-  #   cells$col = cells$col + 1
-  #   wbquantResult$WBanalysis$AUCdf -> AUCdf
-  #   AUCdf = AUCdf %>% filter(SampleName == AUCdf[cells$row,"SampleName"])
-  #   
-  #   # we check that the same LANE should not have same names.
-  #   if(cells$value %in% AUCdf$SampleName){
-  #     k = table(AUCdf$SampleName )[cells$value]
-  #     cells$value = paste0(cells$value, " (",k,")")
-  #   }
-  #   
-  #   wbquantResult$WBanalysis$AUCdf <- editData( wbquantResult$WBanalysis$AUCdf ,
-  #                                               cells, 'AUC_WB')
-  # })
-  # observeEvent(input$AUC_WBnorm_cell_edit, {
-  #   cells = input$AUC_WBnorm_cell_edit
-  #   cells$col = cells$col + 1
-  #   wbquantResult$NormWBanalysis$AUCdf -> AUCdf
-  #   AUCdf = AUCdf %>% filter(Lane == AUCdf[cells$row,"Lane"])
-  #   
-  #   # we check that the same LANE should not have same names.
-  #   if(cells$value %in% AUCdf$ExpName){
-  #     k = table(AUCdf$ExpName )[cells$value]
-  #     cells$value = paste0(cells$value, " (",k,")")
-  #   }
-  #   
-  #   wbquantResult$NormWBanalysis$AUCdf <- editData( wbquantResult$NormWBanalysis$AUCdf ,
-  #                                                   cells, 'AUC_WBnorm')
-  #   updateSelectInput("IdLaneNorm_RelDens",
-  #                     session = session,
-  #                     choices = "Nothing selected",
-  #                     selected = "Nothing selected")
-  # })
-  # 
   # update the wb tables
   observe({
     if(is.null(wbquantResult$NormWBanalysis)){
@@ -2188,7 +2168,8 @@ server <- function(input, output, session) {
     if(!is.null(elisaResult$Tablestandcurve) && dim(elisaResult$Tablestandcurve)[1]!=0){
       
       output$ELISA_Table_stdcurve <- DT::renderDataTable({
-        DT::datatable( elisaResult$Tablestandcurve,
+        DT::datatable( 
+          elisaResult$Tablestandcurve,
                        selection = 'none',
                        editable = list(target = "cell",
                                        disable = list(columns = 0:2) ),
