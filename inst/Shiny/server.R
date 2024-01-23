@@ -3003,12 +3003,13 @@ server <- function(input, output, session) {
   
   output$downloadReport <- downloadHandler(
     filename = function() {
-      "Report.pdf"
+      "Report.html"
     },
     content = function(file) {
+      parmsList = list(ResultList = reactiveValuesToList(DataAnalysisModule))
       rmarkdown::render("report.Rmd",
-                        output_file = file,
-                        params = reactiveValuesToList(DataAnalysisModule) )
+                        output_file = file,output_format = "html_document",
+                        params = parmsList )
     }
   )
   

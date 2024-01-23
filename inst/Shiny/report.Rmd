@@ -10,7 +10,7 @@ params:
 knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(DT)
-
+ResultList = parmsList$ResultList
 ```
 
 ## ELISA
@@ -36,6 +36,8 @@ ResultList$elisaResult[["Regression"]]$plot
 
 ResultList$elisaResult[["dataFinal"]]
 
+if(!is.null(ResultList$elisaResult[["dataFinal"]])){
+
 ResultList$elisaResult[["dataFinal"]] %>%
             ggplot( aes(x = Time, y = Quantification,
                         fill= Experiment, group = Experiment ) )+
@@ -43,7 +45,7 @@ ResultList$elisaResult[["dataFinal"]] %>%
             theme_bw()+
             labs(x = "Time", col = "Experiments",
                  y = "Average quantifications obtained\n from the lm ")
-
+}
 ```
 
 ## Cytotoxicity
@@ -61,11 +63,14 @@ ResultList$cytotoxResult[["TablePlot"]]
 data = ResultList$cytotoxResult[["data"]]
 ResultList$cytotoxResult[["dataFinal"]]
 
-data %>% ggplot() +
+if(!is.null(data)){
+  data %>% ggplot() +
             geom_boxplot(aes(x = as.factor(EXP), y = Res, fill = SN, col = SN),alpha = 0.4) +
             theme_bw() +
             labs(x = "Experimental condition", y= "% Values w.r.t \nthe baseline cell death",
                  col="Sample Name",fill="Sample Name")
+}
+
 
 ```
 
@@ -118,19 +123,26 @@ ResultList$pcrResult[["plotPRC"]]
 ### Initial data
 
 ```{r, echo=FALSE}
-    ResultList$wbResult[["Im"]] -> ListIm 
+    
+if(!is.null(ResultList$wbResult[["Im"]])){
+  ResultList$wbResult[["Im"]] -> ListIm 
     im = ListIm$RGB
     
     plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
     rasterImage(im,1,1,dim(im)[2],dim(im)[1])
+}
 ```
 
 ### Analysis
 ```{r, echo=FALSE}   
-    
-ResultList$wbResult[["Plots"]]+ labs(title="Initial curve")
-ResultList$wbResult[["TruncatedPlots"]] + labs(title="Truncated curve")
-    
+
+if(!is.null(ResultList$wbResult[["Plots"]])){
+  ResultList$wbResult[["Plots"]]+ labs(title="Initial curve")
+}
+if(!is.null(ResultList$wbResult[["TruncatedPlots"]])){
+  ResultList$wbResult[["TruncatedPlots"]]+ labs(title="Truncated curve")
+}
+
 ResultList$wbResult[["AUCdf"]]
 ```
 
