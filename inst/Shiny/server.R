@@ -337,7 +337,7 @@ server <- function(input, output, session) {
         geom_line() + 
         theme_bw() +
         facet_wrap(~ID) + 
-        lims(y=c(min(PanelsValue$Values),max(PanelsValue$Values)))
+        lims(y=c(0,max(PanelsValue$Values)))
       
       wbResult$PanelsValue <- PanelsValue
       wbResult$Plots <- pl
@@ -466,7 +466,6 @@ server <- function(input, output, session) {
         pl<-wbResult$Plots
       }
       
-      minPanelsValue=min(wbResult$PanelsValue$Values)
       maxPanelsValue=max(wbResult$PanelsValue$Values)
       wbResult$AUCdf -> AUCdf
       AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
