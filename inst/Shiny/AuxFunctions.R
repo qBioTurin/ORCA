@@ -601,6 +601,23 @@ saveExcel = function(filename,ResultList,analysis){
     addWorksheet(wb,"AdjRelDensitiy")
     writeDataTable(wb, sheet = "AdjRelDensitiy", ResultList[["AdjRelDensitiy"]])
     
+    addWorksheet(wb,"AdjRelDensitiy")
+    if(!is.null( ResultList[["AdjRelDensitiy"]])){
+      print(
+        ResultList[["AdjRelDensitiy"]] %>% 
+          mutate(Normalizer = paste0("Sample: ",SampleName ),
+                 WB = paste0("Sample: ",SampleName))  %>%
+          ggplot() +
+          geom_bar(aes(x = SampleName,
+                       y = AdjRelDens,
+                       fill = Normalizer ),
+                   stat = "identity" ) +
+          #facet_grid(~WB)+
+          theme_bw()
+      )
+    }
+    insertPlot(wb, sheet = "Barplot AdjRelDensitiy")
+    
   } 
   
   ## Save it

@@ -3007,7 +3007,7 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       parmsList = list(ResultList = reactiveValuesToList(DataAnalysisModule))
-      rmarkdown::render("report.Rmd",
+      rmarkdown::render(system.file("Shiny","report.Rmd", package = "ORCA"),
                         output_file = file,output_format = "html_document",
                         params = parmsList )
     }
