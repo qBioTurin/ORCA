@@ -601,7 +601,7 @@ saveExcel = function(filename,ResultList,analysis){
     addWorksheet(wb,"AdjRelDensitiy")
     writeDataTable(wb, sheet = "AdjRelDensitiy", ResultList[["AdjRelDensitiy"]])
     
-    addWorksheet(wb,"AdjRelDensitiy")
+    addWorksheet(wb,"Barplot AdjRelDensitiy")
     if(!is.null( ResultList[["AdjRelDensitiy"]])){
       print(
         ResultList[["AdjRelDensitiy"]] %>% 
@@ -612,7 +612,6 @@ saveExcel = function(filename,ResultList,analysis){
                        y = AdjRelDens,
                        fill = Normalizer ),
                    stat = "identity" ) +
-          #facet_grid(~WB)+
           theme_bw()
       )
     }
