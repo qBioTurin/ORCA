@@ -350,7 +350,7 @@ server <- function(input, output, session) {
       output$DataPlot <- renderPlot({pl})
       
       ### AUC calculation of the whole lane without cuts:
-      aucList = lapply(unique(PanelsValue$ID), function(IDlane) AUCfunction(wbResult$AUCdf,PanelsValue,SName = IDlane) )
+      aucList = lapply(unique(PanelsValue$ID), function(IDlane) AUCfunction(wbResult0$AUCdf,PanelsValue,SName = IDlane) )
       wbResult$AUCdf <- do.call(rbind,aucList)
     }
   })
