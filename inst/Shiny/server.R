@@ -1028,7 +1028,8 @@ server <- function(input, output, session) {
       pcrResult$PCRnorm -> PCRnorm
       pcrResult$data -> PCR
       
-      NewPCR = PCR %>%
+      NewPCR = PCR %>% 
+        na.omit()%>%
         group_by(Sample,Gene,Time) %>%
         dplyr::summarise(Mean = mean(Value),
                          Sd = sd(Value)) %>%
