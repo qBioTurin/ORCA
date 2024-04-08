@@ -5,7 +5,8 @@
 # source("inst/Shiny/server.R")
 # source("inst/Shiny/ui.R")
 
-shinyApp(ui, server,
+shinyApp(ui,
+         server,
          options =  options(shiny.maxRequestSize=1000*1024^2,
                             shiny.launch.browser = .rs.invokeShinyWindowExternal)
          )
