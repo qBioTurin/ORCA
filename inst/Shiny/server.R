@@ -1,14 +1,16 @@
-#shiny.maxRequestSize=1000*1024^2
-#shiny.launch.browser = .rs.invokeShinyWindowExternal
+# shiny.maxRequestSize=1000*1024^2
+# shiny.launch.browser = .rs.invokeShinyWindowExternal
 
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "ORCA")
 
 source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
-# source("./inst/Shiny/AuxFunctions.R")
+#source("./inst/Shiny/AuxFunctions.R")
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
+  alert <- reactiveValues(alertContext = "")
+  
   DataAnalysisModule <- reactiveValues(wbResult = NULL,
                                        wbquantResult = NULL,
                                        endocResult = NULL,
@@ -28,36 +30,495 @@ server <- function(input, output, session) {
   MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity") 
   names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult") 
   
+  #### DATA INTEGRATION ####
+  ### Omics ####
+  
+  Omics = reactiveValues(Default = NULL, User = NULL, Data = NULL, SelectedRows = list(Default = NULL, User = NULL), FinalSelectedRow = NULL)
+  
+  # default
+  protfile = system.file("Data/Proteomic","pmic13104Simplified.xlsx", package = "ORCA")
+  if(protfile == ""){
+    # In this case it means that we are inside the docker
+    protfile = "~/../home/data/Examples/Proteomic/pmic13104Simplified.xlsx"
+  }
+  Default = readxl::read_excel(protfile)
+  Omics$Default = Default
+  Omics$Data = Default %>%
+    dplyr::select(`Protein name`,iBAQ) %>%
+    rename(Value = iBAQ, Name = `Protein name`)
+  
+  output$OmicsDefault_table <- renderDT(
+    Omics$Default,
+    filter = 'top',
+    server = FALSE,
+    options = list(lengthChange = FALSE,
+                   autoWidth = FALSE,
+                   columnDefs = list(list(
+                     width = "125px",
+                     targets = "_all"
+                   )) ),
+    rownames= FALSE
+  )
+  
+  # user
+  observeEvent(input$LoadOmics_Button,{
+    output$LoadingError_Prot <- renderText({
+      if(!is.null(input$LoadOmics_Button) && file.exists(input$LoadOmics_Button$datapath) )
+      {
+        "Please select an excel files!!"
+      }
+      
+      mess = readfile(
+        filename = input$LoadOmics_Button$datapath,
+        type = "Excel"
+      )
+      
+      validate(
+        need(!setequal(names(mess),c("message","call")) ,
+             paste(mess[["message"]],"\n all the files must be RDs saved from DataIntegrationModule app." ))
+      )
+      
+      
+      colmns = colnames(mess[,sapply(mess, is.numeric)])
+      validate(
+        need(length(colmns) > 0 ,
+             "At least one column should be numeric."
+        )
+      )
+      
+      updateSelectInput(inputId = "RescalingColms_User",
+                        choices = colmns ) 
+      Omics$User = mess
+      "The excel file has been uploaded  with success"
+    })
+  })
+  
+  observeEvent(input$ResetOmics_Button,{
+    Omics$User = NULL
+    Omics$Default -> Default
+    Omics$Data = Default %>%
+      dplyr::select(`Protein name`,iBAQ) %>%
+      rename(Value = iBAQ, Name = `Protein name`)
+    
+  })
+  
+  output$OmicsUser_table <- renderDT(
+    Omics$User,
+    filter = 'top',
+    server = FALSE,
+    selection = list(target = 'column'),
+    options = list(lengthChange = FALSE,
+                   autoWidth = FALSE,
+                   columnDefs = list(list(
+                     width = "125px", targets = "_all"
+                   )) ),
+    rownames= FALSE
+  )
+  
+  observeEvent(input$OmicsUser_table_columns_selected,
+               {
+                 if(!is.null(Omics$User)){
+                   output$LoadingError_Prot <- renderText({
+                     
+                     validate(
+                       need(length(input$OmicsUser_table_columns_selected) == 2 ,
+                            "Please select only two columns (one numeric and one character)." )
+                     )
+                     
+                     prot = Omics$User[,input$OmicsUser_table_columns_selected+1]
+                     validate(
+                       need(all(sapply(prot, class) %in% c("character", "numeric")),
+                            "Please select only two columns (one numeric and one character)." )
+                     )
+                     
+                     protType = sapply(prot, class)
+                     names(prot)[protType == "numeric"] = "Value"
+                     names(prot)[protType == "character"] = "Name"
+                     Omics$Data = prot
+                   })
+                 }
+               })
+  
+  # Observe selected rows in OmicsDefault_table
+  observeEvent(input$OmicsDefault_table_rows_selected, {
+    if (!is.null(input$OmicsDefault_table_rows_selected)) {
+      Omics$SelectedRows$Default <- Omics$Default[input$OmicsDefault_table_rows_selected, ]
+    }
+  })
+  
+  # Observe selected rows in OmicsUser_table
+  observeEvent(input$OmicsUser_table_rows_selected, {
+    if (!is.null(input$OmicsUser_table_rows_selected) && !is.null(Omics$User)) {
+      Omics$SelectedRows$User <- Omics$User[input$OmicsUser_table_rows_selected, ]
+    }
+  })
+  
+  # Render selected rows tables
+  output$SelectedOmicsDefault_table <- renderDT(
+    Omics$SelectedRows$Default,
+    filter = 'top',
+    server = FALSE,
+    options = list(lengthChange = FALSE,
+                   autoWidth = FALSE,
+                   columnDefs = list(list(
+                     width = "125px",
+                     targets = "_all"
+                   ))),
+    rownames = FALSE,
+    selection = 'single'
+  )
+  
+  output$SelectedOmicsUser_table <- renderDT(
+    Omics$SelectedRows$User,
+    filter = 'top',
+    server = FALSE,
+    options = list(lengthChange = FALSE,
+                   autoWidth = FALSE,
+                   columnDefs = list(list(
+                     width = "125px",
+                     targets = "_all"
+                   ))),
+    rownames = FALSE,
+    selection = 'single'
+  )
+  
+  # here, only one row can be selected
+  observeEvent(input$SelectedOmicsUser_table_rows_selected,{
+    proxy <- dataTableProxy('SelectedOmicsDefault_table')
+    selectRows(proxy, NULL)
+    Omics$FinalSelectedRow <-  Omics$SelectedRows$User[input$SelectedOmicsUser_table_rows_selected, , drop = FALSE]
+  })
+  observeEvent(input$SelectedOmicsDefault_table_rows_selected,{
+    proxy <- dataTableProxy('SelectedOmicsUser_table')
+    selectRows(proxy, NULL)
+    Omics$FinalSelectedRow <-  Omics$SelectedRows$Default[input$SelectedOmicsDefault_table_rows_selected, , drop = FALSE]  
+  })
+  
+  observe({
+    print(Omics$FinalSelectedRow)
+  })
+  
+  # rescaling
+  observeEvent(input$InputDefault_rescaling,{
+    
+    if(!( is.numeric(input$InputDefault_rescaling) && input$InputDefault_rescaling > 0)){
+      showAlert("Error", "Please ensure the rescaling factor is a numeric value greater than 0.", "error", 5000)
+      return()
+    }
+    
+    if(!is.null(Omics$Default)){
+      Omics$Default$iBAQ = Omics$Default$iBAQ/input$InputDefault_rescaling
+    }
+  })
+  
+  observeEvent(input$InputUser_rescaling,{
+    if(!( length(input$RescalingColms_User)>0)){
+      #showAlert("Error", "Please select at least one numeric column.", "error", 5000)
+      #return()
+      
+      if(!( is.numeric(input$InputUser_rescaling) && input$InputUser_rescaling > 0)){
+        showAlert("Error", "Please ensure the rescaling factor is a numeric value greater than 0.", "error", 5000)
+        return()
+      }
+      
+      colms = input$RescalingColms_User
+      if(!is.null(Omics$User)){
+        Omics$User[,colms] = Omics$User[,colms]/input$InputUser_rescaling
+      }
+    }
+  })
+  
+  
+  ### end Omics ###
+  
+  ### integration ####
+  
+  observeEvent(input$LoadIntG_Button,{
+    output$LoadingError_IntG <- renderText({
+      validate(
+        need(!is.null(input$IntGImport) && all(file.exists(input$IntGImport$datapath)) ,
+             "Please select one or more RDs files!!" )
+      )
+      
+      mess = readfile(
+        filename = input$IntGImport$datapath,
+        type = "RDsMulti",
+        namesAll = namesAll
+      )
+      
+      validate(
+        need(!setequal(names(mess),c("message","call")) ,
+             mess[["message"]]
+        )
+      )
+      
+      DataIntegrationModule$dataLoaded = mess
+      
+      "The RDs files are uploaded with success"
+    })
+  })
+  
+  observeEvent(DataIntegrationModule$dataLoaded,{
+    
+    data = list(
+      wbResult = NULL,
+      wbquantResult = NULL,
+      endocResult = NULL,
+      pcrResult = NULL
+    )
+    DataIntegrationModule$dataLoaded -> mess
+    
+    if(!is.null(mess)){
+      
+      for( x in 1:length(mess))
+      {
+        if(all(names(mess[[x]]) %in% names(DataAnalysisModule)) )
+          data = mess[[x]]
+        else if( all(names(mess[[x]]) %in% names(wbResult)) )
+          data$wbResult = mess[[x]]
+        else if( all(names(mess[[x]]) %in% names(wbquantResult)) )
+          data$wbquantResult = mess[[x]]
+        else if( all(names(mess[[x]]) %in% names(pcrResult)) )
+          data$pcrResult = mess[[x]]
+        else if( all(names(mess[[x]]) %in% names(endocResult)))
+          data$endocResult = mess[[x]]
+      }
+      
+      DataIntegrationModule$data = data
+      ## starting updating the boxes
+      prot = Omics$Data
+      # removing all the null analysis
+      data = data[!sapply(data, is.null)]
+      
+      namesAnalysis = names(data)
+      
+      for(n in namesAnalysis){
+        subdata = data[[n]]
+        print(n)
+        if(n == "pcrResult"){
+          pcrTabs = subdata$CompPRC 
+          updateSelectizeInput(inputId = "SelectGene",
+                               choices = unique(pcrTabs$Gene),
+                               selected = unique(pcrTabs$Gene)[1])
+          
+          DataIntegrationModule$pcrTabs = pcrTabs
+        }else if(n == "wbquantResult"){
+          wbTabs = subdata$RelDensitiy %>%
+            dplyr::select(ExpName,Lane,RelDens) %>%
+            group_by(ExpName,Lane) %>%
+            
+            ungroup()
+          
+          # wbTabs1 = wbTabs %>% dplyr::select(-Mean) %>%
+          #   tidyr::spread(Dataset, RelDens)
+          # wbTabs2 = wbTabs %>% dplyr::select(-RelDens,-Dataset) %>%
+          #   distinct()
+          
+          DataIntegrationModule$wbTabs = wbTabs #merge(wbTabs1,wbTabs2)
+          updatePickerInput(inputId = "Selectprot_wb",
+                            choices = c("",unique(prot$Name)),
+                            selected = "",session = session)
+          
+        }else if(n == "endocResult"){
+          
+        }
+      }
+      
+    }
+  })
+  
+  observeEvent(input$SelectGene,{
+    if(!is.null(DataIntegrationModule$pcrTabs) && length(input$SelectGene)>0 && input$SelectGene!=""){
+      pcrTabs = DataIntegrationModule$pcrTabs
+      SelectedGene = input$SelectGene
+      output$tables_IntG_pcr <- renderUI({fluidRow(pcrTab.generation(pcrTabs,SelectedGene)) })
+      prot = Omics$Data
+      SelInname = paste0("selinp_",SelectedGene)
+      updateSelectizeInput(inputId = SelInname,
+                           choices = unique(prot$Name),
+                           server =T)
+      
+      local({
+        output[[paste0("tab_",SelectedGene)]] <- renderDT({
+          pcrTabs %>% filter(Gene == SelectedGene) %>%
+            group_by(Sample,Norm) %>%
+            dplyr::summarize(Qnorm=Qnorm,
+                             Mean = mean(Qnorm),
+                             Sd = sd(Qnorm),
+                             Norm.Prot = ifelse(length(input[[SelInname]]) > 0,
+                                                Mean*prot[prot$Name == input[[SelInname]],"Value"],
+                                                Mean)
+            ) %>%
+            ungroup() %>%
+            #tidyr::spread(Dataset,Qnorm) %>%
+            arrange(Norm)
+        })
+      })
+    }
+  })
+  
+  output$Tab_IntG_wb <- renderDT({
+    DataIntegrationModule$wbTabs
+  },
+  filter = 'top',
+  server = FALSE,
+  options = list(lengthChange = FALSE,
+                 autoWidth = TRUE),
+  rownames= FALSE
+  )
+  observeEvent(list(input$Selectprot_wb,Omics$Data),{
+    if(!is.null(DataIntegrationModule$wbTabs)){
+      wbTabs = DataIntegrationModule$wbTabs
+      prot = Omics$Data
+      if(!is.null(input$Selectprot_wb) && length(input$Selectprot_wb)>0 &&input$Selectprot_wb!= "" ){
+        as.numeric(prot[prot$Name == input$Selectprot_wb,"Value"]) -> pr
+        wbTabs = wbTabs %>% dplyr::mutate(`Rel.Prot.` = RelDens * pr )
+        wbTabs[paste(input$Selectprot_wb)] = pr
+      }
+      else
+        wbTabs = wbTabs[,ifelse("Rel.Prot." %in% colnames(wbTabs),
+                                colnames(wbTabs)[!"Rel.Prot." %in% colnames(wbTabs)],
+                                colnames(wbTabs) )]
+    }
+    else{
+      wbTabs = NULL
+    }
+    DataIntegrationModule$wbTabs <- wbTabs 
+  })
+  #### end integration ###
+  
+  ### Other integration ####
+  observeEvent(input$LoadOther_Button,{
+    output$LoadingError_Other <- renderText({
+      validate(
+        need(!is.null(input$OtherImport) && all(file.exists(input$OtherImport$datapath)) ,
+             "Please select one excel files!!" )
+      )
+      
+      mess = readfile(
+        filename = input$OtherImport$datapath,
+        type = "Excel"
+      )
+      
+      validate(
+        need(!setequal(names(mess),c("message","call")) ,
+             mess[["message"]]
+        )
+      )
+      
+      validate(
+        need(all(c("character", "numeric") %in% sapply(mess, class)),
+             "Please, the excel file must have two columns: one numeric and one character." )
+      )
+      
+      DataIntegrationModule$otherTabs = mess
+      "The excel file has been uploaded  with success"
+    })
+  })
+  
+  observe({
+    if(!is.null(DataIntegrationModule$otherTabs)){
+      
+      updateSelectizeInput(inputId = "Selectprot_other",
+                           choices = c("",unique(Omics$Data$Name)),
+                           selected = "",
+                           server = T )
+    }
+  })
+  
+  output$Other_table <- renderDT({
+    DataIntegrationModule$otherTabs
+  },
+  filter = 'top',
+  server = FALSE,
+  selection = list(target = 'column'),
+  options = list(lengthChange = FALSE,
+                 autoWidth = TRUE),
+  rownames= FALSE
+  )
+  
+  output$Other_tableMean <- renderDT({
+    DataIntegrationModule$otherTabsMean
+  },
+  filter = 'top',
+  server = FALSE,
+  options = list(lengthChange = FALSE,
+                 autoWidth = TRUE),
+  rownames= FALSE
+  )
+  
+  observeEvent(input$Other_table_columns_selected,{
+    if(!is.null(DataIntegrationModule$otherTabs) && !is.null(input$Other_table_columns_selected) && length(input$Other_table_columns_selected)>0){
+      
+      prot = Omics$Data
+      data = DataIntegrationModule$otherTabs
+      colmns = colnames(data)[input$Other_table_columns_selected + 1]
+      colmns = names(sapply(data[,colmns], class)[ sapply(data[,colmns], class) == "character"])
+      
+      # check at leat one column selected is character
+      if(length(colmns) > 0){
+        colmnsNumeric = colnames(data)[-which(colnames(data) %in% colmns)]
+        colmnsNumeric = colmnsNumeric[which(sapply(data[,colmnsNumeric], class) %in% "numeric" )]
+        
+        otherTabs = data %>% 
+          tidyr::gather(colmnsNumeric, value = "Value", key= "Numeric Columns") %>%
+          group_by_at(c("Numeric Columns",colmns)) %>%
+          dplyr::summarise(Mean = mean(Value) ) %>%
+          ungroup()
+        
+        DataIntegrationModule$otherTabsMean = otherTabs
+      }
+    }
+  })
+  
+  observeEvent(input$Selectprot_other,{
+    if(!is.null(DataIntegrationModule$otherTabsMean)){
+      if(input$Selectprot_other != ""){
+        prot = Omics$Data
+        as.numeric(prot[prot$Name == input$Selectprot_other,"Value"]) -> pr
+        
+        DataIntegrationModule$otherTabsMean$`Rel.Prot.`  = DataIntegrationModule$otherTabsMean$Mean * pr
+      }else{
+        DataIntegrationModule$otherTabsMean$`Rel.Prot.`  = DataIntegrationModule$otherTabsMean$Mean
+      }
+    }
+  })
+  #### End other integration
+  
+  
+  ### END DATA INTEGRATION ####
+  
+  #### DATA ANALYSIS ####
   ### WB analysis ####
-  # DECLARE REACTIVEVALUES FUNCTION HERE
+  
   PanelData = data.frame(SampleName = character(),
                          xmin = numeric(), ymin = numeric(), 
                          xmax = numeric(), ymax = numeric())
   
+  
   wbResult <- reactiveValues(
-                             Normalizer = NULL,
-                             Im = NULL,
-                             Planes = NULL,
-                             TruncatedPanelsValue = NULL,
-                             PanelsValue = NULL,
-                             Plots = NULL,
-                             TruncatedPlots = NULL,
-                             pl = NULL,
-                             AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-"  ))
+    Normalizer = NULL,
+    Im = NULL,
+    Planes = NULL,
+    TruncatedPanelsValue = NULL,
+    PanelsValue = NULL,
+    Plots = NULL,
+    TruncatedPlots = NULL,
+    pl = NULL,
+    AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-"  ))
   
   wbResult0 <- list(   Normalizer = NULL,
-                         Im = NULL,
-                         Planes = NULL,
-                         TruncatedPanelsValue = NULL,
-                         PanelsValue = NULL,
-                         Plots = NULL,
-                         TruncatedPlots = NULL,
-                         pl = NULL,
-                         AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-" )
+                       Im = NULL,
+                       Planes = NULL,
+                       TruncatedPanelsValue = NULL,
+                       PanelsValue = NULL,
+                       Plots = NULL,
+                       TruncatedPlots = NULL,
+                       pl = NULL,
+                       AUCdf=data.frame(SampleName = "-", Truncation = "-", AUC = "-" )
   )
   
   
-  # save everytime there is a change in the results
   WBresultList <- reactive({
     reactiveValuesToList(wbResult)
   })
@@ -75,104 +536,65 @@ server <- function(input, output, session) {
   NumberOfPlanes <- reactiveValues(N = 0)
   PlaneSelected <- reactiveValues(First = NULL)
   
-  observeEvent(input$LoadingTif,{
-    output$LoadingError <- renderText({
-      validate(
-        need(!is.null(input$imImport) && file.exists(input$imImport$datapath) ,
-             "Please select a tif file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$imImport$datapath,
-        type = "tif"
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]] )
-      )
-      
-      Flags$ShowTif <- TRUE
-      wbResult$Im = mess
-      
-      updateTabsetPanel(session, "SideTabs",
-                        selected = "plane")
-      
-      "The image has been uploaded  with success"
-    })
-    
-    if( !is.null(wbResult$Im) )
-    { ### alert!!! if it is already present! 
-      showModal(modalDialog(
+  
+  observeEvent(input$LoadingTif, {
+    alert$alertContext <- "WB-reset"
+    if(!is.null(wbResult$Im) ) { 
+      shinyalert(
         title = "Important message",
-        "Do you want to update the WB data already present, by resetting the previous analysis?",
-        easyClose = TRUE,
-        footer= tagList(actionButton("confirmUpload", "Update"),
-                        modalButton("Cancel")
-        )
-      ))
+        text = "Do you want to update the WB data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadTifFile()
+  })
+  
+  observeEvent(input$shinyalert, {
+    removeModal()
+    if (input$shinyalert && alert$alertContext == "WB-reset") {  
+      resetPanel("WB", 
+                 Flags, 
+                 PanelStructures, 
+                 NumberOfPlanes, 
+                 PlaneSelected, 
+                 wbResult, 
+                 output, PanelData)
+      updateSelectInput(session, "LaneChoice", choices = "")
+      
+      loadTifFile()
     }
   })
   
-  observeEvent(input$confirmUpload,{
-    DataAnalysisModule$wbResult = wbResult0
-    
-    for(j in names(wbResult))
-      wbResult[[j]] = wbResult0[[j]]
-    
-    output$AUC <- renderDT({
-      wbResult$AUCdf %>% 
-        dplyr::select(SampleName,Truncation, AUC)},
-      selection = 'none',  
-      rownames= FALSE,
-      editable = list(target = "cell", 
-                      disable = list(columns = 1:4)))
+  loadTifFile <- function() {
+    alert$alertContext <- ""
+    file <- !is.null(input$imImport) && file.exists(input$imImport$datapath)
+    mess = readfile(filename = input$imImport$datapath, type = "tif", file)
     
     
-    output$LoadingError <- renderText({
-      validate(
-        need(!is.null(input$imImport) && file.exists(input$imImport$datapath) ,
-             "Please select a tif file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$imImport$datapath,
-        type = "tif"
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]] )
-      )
-      
+    if(setequal(names(mess), c("message", "call"))) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+    } else {
       Flags$ShowTif <- TRUE
       wbResult$Im = mess
-      
-      updateTabsetPanel(session, "SideTabs",
-                        selected = "plane")
-      
-      "The image has been uploaded  with success"
-    })
-    
-    removeModal()
-  })
+      updateTabsetPanel(session, "SideTabs", selected = "plane")
+      showAlert("Success", "The image was uploaded successfully!", "success", 1000)
+    }
+  }
   
   observe({
-    if(Flags$ShowTif)
-    {
-      #output$LoadingError <- renderText({      })
-      #ListIm = LoadImage(input$imImport$datapath)
+    if(Flags$ShowTif) {
       wbResult$Im -> ListIm 
       im = ListIm$RGB
       
-      #output$TifPlot  <- renderPlot({ imageShow(im) })
       output$TiffBox <- renderUI({
         column(12,align="center",
-        box(plotOutput("TifPlot2",
-                       hover = "plot_hover",
-                       brush = "plot_brush"),
-            width = 12,
-            height = dim(im)[1]+0.1*dim(im)[1])
+               box(plotOutput("TifPlot2",
+                              hover = "plot_hover",
+                              brush = "plot_brush"),
+                   width = 12,
+                   height = dim(im)[1]+0.1*dim(im)[1])
         )
       })
       
@@ -197,11 +619,10 @@ server <- function(input, output, session) {
                          xmax = round(e$xmax, 1),
                          ymax = round(e$ymax, 1))
       
-      if (!identical(vals,prev_vals))  #We dont want to change anything if the values havent changed.
+      if (!identical(vals,prev_vals))  
       {
         NumberOfPlanes$N = NumberOfPlanes$N + 1
         if(NumberOfPlanes$N > 1){
-          # we set the same height in the new panel
           vals$ymax = prev_vals$ymax
           vals$ymin = prev_vals$ymin
           
@@ -209,9 +630,7 @@ server <- function(input, output, session) {
           newW = vals$xmax - vals$xmin
           prevH = prev_vals$ymax - prev_vals$ymin
           prevW = prev_vals$xmax - prev_vals$xmin
-          # print(paste0("newH: ",newH,"; prevH: ",prevH,
-          #              "; newW: ",newW,"; prevW: ", prevW))
-          # print(paste0("Res: ", (newH - prevH) + (newW - prevW) ))
+          
           if( abs((newH - prevH) + (newW - prevW)) > 1 )
           {
             NumberOfPlanes$N = 1
@@ -230,7 +649,7 @@ server <- function(input, output, session) {
         }
         prev_vals <<- vals
       }
-    }
+    } else showAlert("Error", "please select before a protein bands", "error", 5000)
   })
   
   observeEvent(input$ResetPan,{
@@ -253,10 +672,7 @@ server <- function(input, output, session) {
       "Mouse hover: ", xy_str(input$plot_hover),
       "New band coordinates: ", xy_range_str(input$plot_brush)
     )
-    
   })
-  
-  ## Profile plots
   
   output$PlanesStructureTable <- renderDT(
     {
@@ -269,13 +685,11 @@ server <- function(input, output, session) {
     }
   )
   
-  # check names Planes
   observeEvent(input$PlanesStructureTable_cell_edit, {
     cells = input$PlanesStructureTable_cell_edit
     
     data = PanelStructures$data %>% filter(SampleName == PanelStructures$data[cells$row,"SampleName"])
     
-    # we check that the same LANE should not have same names.
     if(cells$value %in% data$SampleName){
       k = table(data$SampleName)[cells$value]
       cells$value = paste0(cells$value, " (",k,")")
@@ -295,17 +709,15 @@ server <- function(input, output, session) {
     rownames= FALSE)
   })
   
-  
-  #observeEvent(list(input$GenLanes,wbResult$Planes),{
   observeEvent(input$GenLanes,{
     if(NumberOfPlanes$N >1){
       Planes = PanelStructures$data
       Planes[,-1] = round(Planes[,-1])
       wbResult$Planes = Planes
-      print(Planes)
       Flags$LanesCut= T
     }else{
       Flags$LanesCut= F
+      showAlert("Error", "please select before a protein bands", "error", 5000)
     }
     
     if(Flags$LanesCut)
@@ -323,14 +735,14 @@ server <- function(input, output, session) {
                                      Nrow = dim(im)[1]
                                      Ncol= dim(im)[2]
                                      plane = abs(im[(Nrow-p$ymax):(Nrow-p$ymin),p$xmin:p$xmax]-1)
-                                     #imageShow(plane)
+                                     
                                      GreyPlane = apply(plane,1,"mean")
-                                     data.frame(Values = GreyPlane,# - min(GreyPlane),
+                                     data.frame(Values = GreyPlane,
                                                 ID = paste0(i,". ",p$SampleName),
                                                 Y = 1:length(GreyPlane) )
                                    },
                                    im,PanelData)
-                            )
+      )
       
       
       pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
@@ -342,20 +754,46 @@ server <- function(input, output, session) {
       wbResult$PanelsValue <- PanelsValue
       wbResult$Plots <- pl
       
-      updateSelectInput(session, "LaneChoice",
-                        choices = unique(PanelsValue$ID),
-                        selected = 0
-      )
+      if (!is.null(PanelsValue$ID) && length(PanelsValue$ID) > 0) {
+        updateSelectInput(session, "LaneChoice",
+                          choices = unique(PanelsValue$ID),
+                          selected = unique(PanelsValue$ID)[1])
+      } else {
+        updateSelectInput(session, "LaneChoice",
+                          choices = c("No lanes available"),
+                          selected = "No lanes available")
+      }
       
       output$DataPlot <- renderPlot({pl})
       
-      ### AUC calculation of the whole lane without cuts:
       aucList = lapply(unique(PanelsValue$ID), function(IDlane) AUCfunction(wbResult0$AUCdf,PanelsValue,SName = IDlane) )
       wbResult$AUCdf <- do.call(rbind,aucList)
     }
   })
   
-  # reset all the truncation analysis
+  output$downloadWBAnalysis <- downloadHandler(
+    filename = function() {
+      paste('WBanalysis-', Sys.Date(), '.zip', sep='')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      
+      nomeRDS <- paste0("WBquant_analysis-", Sys.Date(), ".rds")
+      nomeXLSX <- paste0("WBquant_analysis-", Sys.Date(), ".xlsx")
+      
+      tempRdsPath <- file.path(tempDir, nomeRDS)
+      tempXlsxPath <- file.path(tempDir, nomeXLSX)
+      results <- DataAnalysisModule$wbResult
+      saveRDS(results, file = tempRdsPath)
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "WB", PanelStructures)
+      
+      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      manageSpinner(FALSE)
+    },
+  )
+  
   observeEvent(input$actionButton_ResetPlanes,{
     
     wbResult$AUCdf =  wbResult$AUCdf %>% filter(Truncation == "-") 
@@ -366,12 +804,90 @@ server <- function(input, output, session) {
         dplyr::select(SampleName,Truncation, AUC)},
         selection = 'none', 
         rownames= FALSE,
-        # editable = list(target = "cell", 
-        #                 disable = list(columns = 1:4))
     )
     
     output$DataPlot <- renderPlot({wbResult$Plots})
+  })
+  
+  
+  observeEvent(c(input$actionButton_TruncV,input$actionButton_TruncH),{
     
+    if( !is.null(wbResult$PanelsValue))
+    {
+      Flags$IDlane -> IDlane
+      if(!is.null(wbResult$TruncatedPanelsValue ))
+      {
+        pl <- wbResult$TruncatedPlots    
+        wbResult$TruncatedPanelsValue -> PanelsValue
+      }
+      else{
+        wbResult$PanelsValue -> PanelsValue
+        pl<-wbResult$Plots
+      }
+      
+      maxPanelsValue=max(wbResult$PanelsValue$Values)
+      wbResult$AUCdf -> AUCdf
+      AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
+      
+      lastTrunc = AUCdf %>% 
+        group_by(SampleName) %>%
+        filter(SampleName == IDlane, row_number()==n() ) %>%
+        ungroup() %>%
+        dplyr::select(Truncation) 
+      
+      if(length(lastTrunc$Truncation) > 0 & lastTrunc$Truncation != "-")
+        AUCdf.new$Truncation <- lastTrunc$Truncation
+      
+      AUCdf.new$SampleName <- IDlane
+      
+      if(Flags$CutTab=="V")
+      {
+        MinTrunc<-input$truncV[1]
+        MaxTrunc<-input$truncV[2]
+        AUCdf.new$Truncation <- paste(AUCdf.new$Truncation ,";\n X = [", MinTrunc," ; ", MaxTrunc ,"]",collapse = "")
+        PanelsValue<- PanelsValue[!((PanelsValue$Y < MinTrunc | PanelsValue$Y > MaxTrunc) & PanelsValue$ID == IDlane),]
+        PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] -min(PanelsValue$Values[PanelsValue$ID == IDlane]) 
+        
+        updateSliderInput(session,"truncV",
+                          min = min(PanelsValue$Y[PanelsValue$ID == IDlane]),
+                          max = max(PanelsValue$Y[PanelsValue$ID == IDlane]),
+                          value = c(min(PanelsValue$Y[PanelsValue$ID == IDlane]),
+                                    max(PanelsValue$Y[PanelsValue$ID == IDlane]) ) )
+      }
+      else if(Flags$CutTab=="H")
+      {
+        TruncY<-input$truncH[1]
+        PanelsValue <- PanelsValue[!(PanelsValue$Values<TruncY & PanelsValue$ID == IDlane),]
+        PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] - TruncY
+        AUCdf.new$Truncation <- paste(AUCdf.new$Truncation ,";\n Y = ", TruncY)
+        
+        updateSliderInput(session,"truncH",
+                          min = min(PanelsValue$Values[PanelsValue$ID == IDlane]),
+                          max = max(PanelsValue$Values[PanelsValue$ID == IDlane]),
+                          value = c(min(PanelsValue$Values[PanelsValue$ID == IDlane]),
+                                    max(PanelsValue$Values[PanelsValue$ID == IDlane]) ) )
+      }
+      
+      pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
+        geom_line() + 
+        theme_bw() +
+        facet_wrap(~ID)+ 
+        lims(y=c(0,maxPanelsValue))
+      
+      wbResult$TruncatedPanelsValue <- PanelsValue
+      wbResult$TruncatedPlots <- pl
+      output$DataPlot <- renderPlot({pl})
+      AUCdf<-AUCfunction(AUCdf.new=AUCdf.new,wbResult$AUCdf,PanelsValue,SName = IDlane)
+      
+      output$AUC <- renderDT({
+        AUCdf  %>% 
+          dplyr::select(SampleName,Truncation, AUC) 
+      },
+      selection = 'none', 
+      rownames= FALSE
+      )
+      wbResult$AUCdf <- AUCdf
+    }
   })
   
   observeEvent(list(input$LaneChoice),{
@@ -445,9 +961,6 @@ server <- function(input, output, session) {
       }
       
       output$DataPlot <- renderPlot({pl})
-      
-      ### AUC calculation of the whole lane without cuts:
-      # wbResult$AUCdf <- AUCfunction(wbResult$AUCdf,PanelsValue,SName = IDlane)
     }  
   })
   
@@ -539,7 +1052,7 @@ server <- function(input, output, session) {
       wbResult$AUCdf <- AUCdf
     }
   })
-
+  
   ## next buttons
   observeEvent(input$NextWBQuantif,{
     if(!is.null(wbResult$AUCdf))
@@ -558,71 +1071,120 @@ server <- function(input, output, session) {
                                  AdjRelDensitiy = NULL
   )
   wbquantResult0 = list(NormWBanalysis = NULL,
+                        NormWBanalysis_filtered = NULL,
+                        WBanalysis = NULL,
+                        WBanalysis_filtered = NULL,
+                        RelDensitiy = NULL,
+                        AdjRelDensitiy = NULL
+  )
+  FlagsWBquant = reactiveValues(BothUploaded = F)
+  
+  
+  observeEvent(input$DataverseUpload_Button,{
+    
+    if(input$selectAnalysis_DV != ""){
+      
+      if(input$Title_DV == "" && input$Author_DV == "" && input$Description_DV == "" &&
+         input$AuthorAff_DV== "" && input$ContactN_DV == "" && input$ContactEmail_DV == "")
+        output$LoadingError_DATAVERSE = showAlert("Error", "Error: missing information", "error", 5000)
+      else{
+        # creation of a temporary folder
+        tempfolder = paste0(tempdir(check = T),"/ORCA")
+        system(paste0("mkdir ",tempfolder))
+        system(paste0("mkdir ",tempfolder,"/dataset"))
+        # create the metadata
+        result <- rjson::fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
+        result$dataset_title = input$Title_DV
+        result$dataset_description = paste0(input$Description_DV,"\n This dataset has been obtained using the ORCA application, specifically the module: ", input$selectAnalysis_DV)
+        result$author_name = input$Author_DV
+        result$author_affiliation= input$AuthorAff_DV
+        result$dataset_contact_name = input$ContactN_DV
+        result$dataset_contact_email = input$ContactEmail_DV
+        # result$subject = as.vector(result$subject)
+        write(rjson::toJSON(result), file=paste0(tempfolder,"/metadata.json") )
+        
+        # move the file in the temporary folder
+        
+        saveExcel(filename = paste0(tempfolder,"/dataset/",
+                                    gsub(pattern = " ", 
+                                         x = input$selectAnalysis_DV,
+                                         replacement = ""),".xlsx"),
+                  ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
+                  analysis = input$selectAnalysis_DV )
+        
+        saveRDS(DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
+                file = paste0(tempfolder,"/dataset/ORCA_",
+                              gsub(pattern = " ", 
+                                   x = input$selectAnalysis_DV,
+                                   replacement = ""),".RDs"))
+        # docker run
+        ORCA::docker.run(params = paste0("--volume ", tempfolder,
+                                         ":/Results/ -d qbioturin/orca-upload-dataverse python3 main.py /Results/metadata.json /Results/dataset") 
+        )
+        
+      }
+      
+    }
+  })
+  
+  observeEvent(input$NextWBQuantif,{
+    if(!is.null(wbResult$AUCdf))
+      wbquantResult$WBanalysis = reactiveValuesToList(wbResult)
+    
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "quantification")
+  })
+  
+  wbquantResult = reactiveValues(NormWBanalysis = NULL,
                                  NormWBanalysis_filtered = NULL,
                                  WBanalysis = NULL,
                                  WBanalysis_filtered = NULL,
                                  RelDensitiy = NULL,
                                  AdjRelDensitiy = NULL
   )
-  FlagsWBquant = reactiveValues(BothUploaded = F)
   
-  # load the two wb analyses
-  observeEvent(input$actionB_loadingWB,{
+  observeEvent(input$actionB_loadingNormWB, {
+    mess = readfile(
+      filename = input$NormWBImport$datapath,
+      type = "RDs",
+      namesAll = namesAll
+    )
     
-    output$LoadingErrorWB <- renderText({
-      validate(
-        need(!is.null(input$WBImport) && file.exists(input$WBImport$datapath) ,
-             "Please select a RDs file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$WBImport$datapath,
-        type = "RDs",
-        namesAll = namesAll
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]])
-      )
-      
-      wbquantResult$WBanalysis = mess
-      wbquantResult$WBanalysis_filtered = NULL
-      
-      "The RDs has been uploaded  with success"
-    })
+    if(is.list(mess) && !is.null(mess$message)) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+      return() 
+    }
     
+    validate(
+      need(!setequal(names(mess),c("message","call")) ,
+           mess[["message"]])
+    )
+    
+    choices = paste0(mess$AUCdf$SampleName, " with ", mess$AUCdf$Truncation)
+    wbquantResult$NormWBanalysis = mess
+    showAlert("Success", "The RDS has been uploaded with success", "success", 2000)
   })
-  observeEvent(input$actionB_loadingNormWB,{
-    output$LoadingErrorNormWB <- renderText({
-      validate(
-        need(!is.null(input$NormWBImport) && file.exists(input$NormWBImport$datapath) ,
-             "Please select a RDs file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$NormWBImport$datapath,
-        type = "RDs",
-        namesAll = namesAll
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]])
-      )
-      
-      validate(
-        need(!is.null(mess$AUCdf) ,
-             "The WB analysis must contain the AUC table")
-      )
-      
-      choices = paste0(mess$AUCdf$SampleName, " with ", mess$AUCdf$Truncation)
-      
-      wbquantResult$NormWBanalysis  = mess
-      
-      "The RDs has been uploaded  with success"
-    })
+  
+  observeEvent(input$actionB_loadingWB,{
+    mess = readfile(
+      filename = input$WBImport$datapath,
+      type = "RDs",
+      namesAll = namesAll
+    )
     
+    if(is.list(mess) && !is.null(mess$message)) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+      return() 
+    }
+    
+    validate(
+      need(!setequal(names(mess),c("message","call")) ,
+           mess[["message"]])
+    )
+    
+    wbquantResult$WBanalysis = mess
+    wbquantResult$WBanalysis_filtered = NULL
+    showAlert("Success", "The RDS has been uploaded with success", "success", 2000)
   })
   
   observe({
@@ -630,7 +1192,6 @@ server <- function(input, output, session) {
       FlagsWBquant$BothUploaded = T
   })
   
-  # update the wb tables
   observe({
     if(is.null(wbquantResult$NormWBanalysis)){
       table = wbResult0$AUCdf
@@ -647,6 +1208,7 @@ server <- function(input, output, session) {
       rownames= FALSE
     )
   })
+  
   observe({
     if(is.null(wbquantResult$WBanalysis)){
       table = wbResult0$AUCdf
@@ -664,7 +1226,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # selecting rows
   observeEvent(input$AUC_WB_rows_selected,{
     if(!is.null(wbquantResult$WBanalysis) ){
       indexesWB = input$AUC_WB_rows_selected
@@ -677,6 +1238,7 @@ server <- function(input, output, session) {
       }
     }
   })
+  
   observeEvent(input$AUC_WBnorm_rows_selected,{
     if(!is.null(wbquantResult$NormWBanalysis)){
       indexesWB = input$AUC_WBnorm_rows_selected
@@ -697,7 +1259,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # the relative density and adjusted is calculated
   observeEvent(list(FlagsWBquant$BothUploaded, input$IdLaneNorm_RelDens,input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
     table =  wbResult0$AUCdf 
     
@@ -719,7 +1280,7 @@ server <- function(input, output, session) {
         if(!all(table(tbWB$SampleName)==1) ){
           output$LoadingErrorWB <- renderText({"No rows with equal sample name are allowed"})
         }
-        else{ # we admit only one SampleName
+        else{ 
           table = tbWB
           table$AUC_Norm = tbWBnorm$AUC_Norm
           table$RelDens = table$AUC/table$AUC_Norm
@@ -800,7 +1361,28 @@ server <- function(input, output, session) {
     }
   })
   
-  #
+  output$downloadWBquantAnalysis <- downloadHandler(
+    filename = function() {
+      paste0('WBquantanalysis-', Sys.Date(), '.zip')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      tempRDSPath <- file.path(tempDir, paste0("Analysis-", Sys.Date(), ".rds"))
+      tempExcelPath <- file.path(tempDir, paste0("Analysis-", Sys.Date(), ".xlsx"))
+      
+      resultsRDS <- DataAnalysisModule$wbquantResult
+      saveRDS(resultsRDS, tempRDSPath)
+      
+      resultsExcel <- DataAnalysisModule$wbquantResult
+      saveExcel(filename = tempExcelPath, ResultList=resultsExcel, analysis = "WB comparison")
+      
+      zip(file, files = c(tempRDSPath, tempExcelPath), flags = "-j")
+      manageSpinner(FALSE)
+    }
+  )
+  
   toListenWBquant <- reactive({
     reactiveValuesToList(wbquantResult)
   })
@@ -813,21 +1395,21 @@ server <- function(input, output, session) {
   #### PCR analysis ####
   
   pcrResult = reactiveValues(
-                             Initdata = NULL,
-                             selectPCRcolumns = NULL,
-                             data = NULL,
-                             PCRnorm = NULL,
-                             BaselineExp = NULL,
-                             plotPRC = NULL,
-                             NewPCR = NULL)
+    Initdata = NULL,
+    selectPCRcolumns = NULL,
+    data = NULL,
+    PCRnorm = NULL,
+    BaselineExp = NULL,
+    plotPRC = NULL,
+    NewPCR = NULL)
   pcrResult0 = list(
-                    Initdata = NULL,
-                    selectPCRcolumns = NULL,
-                    data = NULL,
-                    PCRnorm = NULL,
-                    BaselineExp = NULL,
-                    plotPRC = NULL,
-                    NewPCR = NULL)
+    Initdata = NULL,
+    selectPCRcolumns = NULL,
+    data = NULL,
+    PCRnorm = NULL,
+    BaselineExp = NULL,
+    plotPRC = NULL,
+    NewPCR = NULL)
   
   # save everytime there is a change in the results
   PCRresultListen <- reactive({
@@ -847,114 +1429,69 @@ server <- function(input, output, session) {
     updateTabsetPanel(session, "SideTabs",
                       selected = "plotsPCR")
   })
-  #
   
   FlagsPCR <- reactiveValues(norm=F, 
                              baseline = F)
   
+  
   observeEvent(input$LoadPCR_Button,{
-    
-    if( !is.null(pcrResult$Initdata) )
-    { ### alert!!! if it is already present! 
-      showModal(modalDialog(
+    alert$alertContext <- "PCR-reset"
+    if( !is.null(pcrResult$Initdata) ) {
+      shinyalert(
         title = "Important message",
-        "Do you want to update the RT-PCR data already present?",
-        easyClose = TRUE,
-        footer= tagList(actionButton("confirmUploadPCR", "Update"),
-                        modalButton("Cancel")
-        )
-      ))
-    }
-    
-    output$LoadingError_PCR <- renderText({
-      validate(
-        need(!is.null(input$PCRImport) && file.exists(input$PCRImport$datapath) ,
-             "Please select an RT-qPCR excel file!!" )
+        text = "Do you want to update the WB data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
       )
-      
-      mess = readfile(
-        filename = input$PCRImport$datapath,
-        type = "Excel"
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]] )
-      )
-      
-      pcrResult$Initdata = mess
-      
-      updateSelectInput(session,"PCR_gene",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      updateSelectInput(session,"PCR_sample",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      updateSelectInput(session,"PCR_value",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      updateSelectInput(session,"PCR_time",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      "The RT-qPCR excel has been uploaded  with success"
-    })
-  })
-  observeEvent(input$confirmUploadPCR,{
-    
-    pcrResult = pcrResult0
-    
-    FlagsPCR$norm=F 
-    FlagsPCR$baseline = F
-    
-    output$PCRtables <- renderUI({ NULL })
-    output$PCRtablesComp <- renderUI({ NULL })
-    output$PCRplot <- renderPlot({ NULL })
-    
-    output$LoadingError_PCR <- renderText({
-      validate(
-        need(!is.null(input$PCRImport) && file.exists(input$PCRImport$datapath) ,
-             "Please select an RT-PCR excel file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$PCRImport$datapath,
-        type = "Excel"
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]])
-      )
-      
-      pcrResult$Initdata = mess
-      
-      updateSelectInput(session,"PCR_gene",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      updateSelectInput(session,"PCR_sample",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      updateSelectInput(session,"PCR_value",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      updateSelectInput(session,"PCR_time",
-                        choices = c("",colnames(pcrResult$Initdata)),
-                        selected = ""
-      )
-      
-      removeModal()
-      
-      "The RDs has been uploaded  with success"
-    })
+    } else loadExcelFilePCR()
   })
   
+  observeEvent(input$shinyalert, {
+    removeModal()
+    if (input$shinyalert && alert$alertContext == "PCR-reset") {  
+      resetPanel("PCR", flags = FlagsPCR, result = pcrResult)
+      loadExcelFilePCR()
+    }
+  })
+  
+  loadExcelFilePCR <- function() {
+    alert$alertContext <- ""
+    
+    mess = readfile(
+      filename = input$PCRImport$datapath,
+      type = "Excel", 
+      isFileUploaded = !is.null(input$PCRImport) && file.exists(input$PCRImport$datapath),
+    )
+    
+    
+    if (!is.null(mess$message) && mess$call == "") {
+      showAlert("Error", mess$message, "error", 5000)
+      return()
+    }
+    
+    pcrResult$Initdata = mess
+    
+    updateSelectInput(session,
+                      "PCR_gene",
+                      choices = c("", colnames(pcrResult$Initdata)),
+                      selected = "")
+    updateSelectInput(session,
+                      "PCR_sample",
+                      choices = c("", colnames(pcrResult$Initdata)),
+                      selected = "")
+    updateSelectInput(session,
+                      "PCR_value",
+                      choices = c("", colnames(pcrResult$Initdata)),
+                      selected = "")
+    updateSelectInput(session,
+                      "PCR_time",
+                      choices = c("", colnames(pcrResult$Initdata)),
+                      selected = "")
+    showAlert("Success", "The RT-qPCR excel has been uploaded with success", "success", 2000)
+    
+  }
   
   observeEvent(list(input$PCR_value,input$PCR_gene,input$PCR_sample,input$PCR_time),{
     if( !is.null(pcrResult$Initdata) ){
@@ -1034,7 +1571,7 @@ server <- function(input, output, session) {
         dplyr::summarise(Mean = mean(Value),
                          Sd = sd(Value)) %>%
         ungroup()
-
+      
       HousekGenePCR = NewPCR %>%
         filter(Gene %in% PCRnorm)%>%
         rename(HousekGene = Gene,HousekGeneMean=Mean, HousekGeneSd=Sd) 
@@ -1042,7 +1579,7 @@ server <- function(input, output, session) {
       PCRstep2 = merge(HousekGenePCR,NewPCR %>% filter(!Gene %in% PCRnorm),all.y = T,by=c("Sample","Time") )
       
       #PCRstep3 = merge(BaselinePCR,PCRstep2,all.y = T,by=c("Gene","Time") )
-
+      
       
       PCRstep3 = PCRstep2 %>%
         group_by(Sample,Gene,Time) %>%
@@ -1060,11 +1597,11 @@ server <- function(input, output, session) {
         group_by(Sample,Gene,Time) %>%
         dplyr::summarize(
           ddCt = dCt - BaselinedCt,
-                         Q = 2^{-ddCt},
-                         Sd = Sd,
-                         Mean = Mean)%>%
+          Q = 2^{-ddCt},
+          Sd = Sd,
+          Mean = Mean)%>%
         ungroup()
-
+      
       
       NormPCR = PCRstep5 %>%
         filter(Gene %in% PCRnorm ) %>%
@@ -1101,7 +1638,7 @@ server <- function(input, output, session) {
       #   })
       #   do.call(tagList, plot_output_list)
       # })
-        
+      
       plot1 = ggplot(data = PCRstep5,
                      aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
         facet_wrap(~Gene, ncol = 1) +
@@ -1111,11 +1648,11 @@ server <- function(input, output, session) {
       
       plot2 = ggplot(data = PCRstep5,
                      aes(x= as.factor(Time), y = Q, col = Sample)) + 
-          facet_wrap(~Gene, ncol = 1) +
-          geom_jitter(width = 0.1, height = 0,size = 2)+
-          theme_bw()+
-          labs(x = "Time", y = "2^(-DDCT)")
-
+        facet_wrap(~Gene, ncol = 1) +
+        geom_jitter(width = 0.1, height = 0,size = 2)+
+        theme_bw()+
+        labs(x = "Time", y = "2^(-DDCT)")
+      
       pcrResult$plotPRC =  plot1/plot2
       
       output$PCRplot <- renderPlot({
@@ -1149,493 +1686,33 @@ server <- function(input, output, session) {
     DataAnalysisModule$pcrResult = reactiveValuesToList(pcrResult)
   })
   
+  output$downloadRTPCRAnalysis <- downloadHandler(
+    filename = function() {
+      paste('RTqPCRanalysis-', Sys.Date(), '.zip', sep='')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      
+      nomeRDS <- paste0("RTqPCRanalysis-", Sys.Date(), ".rds")
+      nomeXLSX <- paste0("RTqPCRanalysis-", Sys.Date(), ".xlsx")
+      
+      tempRdsPath <- file.path(tempDir, nomeRDS)
+      tempXlsxPath <- file.path(tempDir, nomeXLSX)
+      
+      results <- DataAnalysisModule$pcrResult
+      saveRDS(results, file = tempRdsPath)
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "RT-qPCR")
+      
+      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      manageSpinner(FALSE)
+    },
+  )
+  
   #### END PCR analysis ####
   
-  ### ENDOC analysis ####
-  
-  # next buttons
-  observeEvent(input$NextEndocQuantif,{
-    updateTabsetPanel(session, "SideTabs",
-                      selected = "tablesENDOC")
-  })
-  #
-  
-  endocResult = reactiveValues(
-                               Initdata= NULL,
-                               data = NULL,
-                               TablePlot = NULL,
-                               dataFinal = NULL,
-                               ENDOCcell_TIME = NULL,
-                               ENDOCcell_SN = NULL,
-                               MapBaseline = NULL,
-                               MapBlank = NULL)
-  
-  endocResult0 = list(
-                      Initdata= NULL,
-                      data = NULL,
-                      TablePlot = NULL,
-                      dataFinal = NULL,
-                      ENDOCcell_TIME = NULL,
-                      ENDOCcell_SN = NULL,
-                      MapBaseline = NULL,
-                      MapBlank = NULL)
-  
-  # save everytime there is a change in the results
-  ENDOCresultListen <- reactive({
-    reactiveValuesToList(endocResult)
-  })
-  observeEvent(ENDOCresultListen(), {
-    DataAnalysisModule$endocResult = reactiveValuesToList(endocResult)
-    DataAnalysisModule$endocResult$Flags = reactiveValuesToList(FlagsENDOC)
-  })
-  
-  ##
-  FlagsENDOC <- reactiveValues(cellCoo = NULL,
-                               AllExp = "",
-                               BASEselected = "",
-                               BLANCHEselected = "",
-                               EXPselected = "",
-                               EXPcol = NULL)
-  
-  observeEvent(input$LoadENDOC_Button,{
-    output$LoadingError_ENDOC <- renderText({
-      validate(
-        need(!is.null(input$ENDOCImport) && file.exists(input$ENDOCImport$datapath) ,
-             "Please select an ENDOC excel file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$ENDOCImport$datapath,
-        type = "Excel",
-        allDouble = T,
-        colname = F,
-        colors = T
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]] )
-      )
-      
-      endocResult$Initdata = mess$x
-      FlagsENDOC$EXPcol = mess$fill
-      endocResult$ENDOCcell_SN = mess$SNtable
-      
-      "The ENDOC excel has been uploaded  with success"
-    })
-    
-    if( !is.null(endocResult$Initdata) )
-    { ### alert!!! if it is already present! 
-      showModal(modalDialog(
-        title = "Important message",
-        "Do you want to update the ENDOC data already present?",
-        easyClose = TRUE,
-        footer= tagList(actionButton("confirmUploadENDOC", "Update"),
-                        modalButton("Cancel")
-        )
-      ))
-      
-    }
-  })
-  observeEvent(input$confirmUploadENDOC,{
-    
-    for(nameList in names(endocResult0)) 
-      endocResult[[nameList]] <- endocResult0[[nameList]]
-    
-    output$LoadingError_ENDOC <- renderText({
-      validate(
-        need(!is.null(input$ENDOCImport) && file.exists(input$ENDOCImport$datapath) ,
-             "Please select an ENDOC excel file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$ENDOCImport$datapath,
-        type = "Excel",
-        allDouble = T,
-        colname = F,
-        colors = T
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]])
-      )
-
-      endocResult$Initdata = mess$x
-      FlagsENDOC$EXPcol = mess$fill
-      endocResult$ENDOCcell_SN = mess$SNtable
-      
-      removeModal()
-      
-      "The RDs has been uploaded  with success"
-    })
-  })
-  observe({
-    if( !is.null(endocResult$Initdata) && is.null(endocResult$TablePlot) ){
-     
-      tableExcelColored(session = session,
-                        Result = endocResult, 
-                        FlagsExp = FlagsENDOC,
-                        type = "Initialize")
-      
-      output$ENDOCmatrix <-renderDataTable({endocResult$TablePlot})
-      
-    }
-  })
-  observeEvent(input$ENDOCmatrix_cell_clicked,{
-    if(length(input$ENDOCmatrix_cell_clicked)!=0){
-      cellSelected= as.numeric(input$ENDOCmatrix_cell_clicked)
-      FlagsENDOC$cellCoo = cellCoo = c(cellSelected[1],cellSelected[2]+1)
-      print(cellCoo)
-      print(endocResult$ENDOCcell_TIME[ cellCoo[1],cellCoo[2] ])
-      print(endocResult$ENDOCcell_SN[ cellCoo[1], cellCoo[2] ])
-      
-      updateSelectizeInput(inputId = "ENDOCcell_TIME",
-                           selected = ifelse(is.null(endocResult$ENDOCcell_TIME[cellCoo[1],cellCoo[2]]),"",endocResult$ENDOCcell_TIME[cellCoo[1],cellCoo[2]])
-      )
-      
-      updateSelectizeInput(inputId = "ENDOCcell_SN",
-                           selected = ifelse(is.null(endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]]),
-                                             "",
-                                             endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]])
-      )
-    }
-  })
-  
-  observeEvent(input$ENDOCcell_TIME,{
-    if(!is.null(endocResult$ENDOCcell_TIME)){
-      cellCoo = FlagsENDOC$cellCoo
-      endocResult$ENDOCcell_TIME[cellCoo[1],cellCoo[2]] = input$ENDOCcell_TIME
-    }
-  })
-  
-  observeEvent(input$ENDOCcell_SN,{
-    if(!is.null(endocResult$ENDOCcell_SN)){
-      ENDOCtb = endocResult$TablePlot
-      cellCoo = FlagsENDOC$cellCoo
-      if(!is.null(cellCoo)){
-        value.bef = endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]] 
-        value.now = input$ENDOCcell_SN
-
-        # if the value does not change or it is still "Color " then the matrix is not update
-        if( value.now != "" && value.now!=value.bef){
-         
-          endocResult$ENDOCcell_SN[cellCoo[1],cellCoo[2]] = value.now
-          ENDOCtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = value.now
-          
-        if(! input$ENDOCcell_SN %in% FlagsENDOC$AllExp){
-          exp = unique(c(FlagsENDOC$AllExp,input$ENDOCcell_SN))
-          #exp = exp[-grep(pattern = "^Color [1-9]",x = exp)]
-          FlagsENDOC$AllExp  = exp
-          print(FlagsENDOC$AllExp)
-        }
-        
-        ## updating table and colors definition depending on the cell fill 
-        tableExcelColored(session = session,
-                          Result = endocResult, 
-                          FlagsExp = FlagsENDOC,
-                          type = "Update")
-        #####
-        output$ENDOCmatrix <-renderDataTable({endocResult$TablePlot})
-        }
-      }
-    }
-  })
-  
-  ## update Baselines checkBox
-  observeEvent(c(FlagsENDOC$AllExp,FlagsENDOC$BLANCHEselected),{
-    if(length(FlagsENDOC$AllExp) > 1){
-      exp = FlagsENDOC$AllExp
-      exp = exp[exp != ""]
-      
-      if(!( length(FlagsENDOC$BLANCHEselected) == 1 && FlagsENDOC$BLANCHEselected == "") )
-        exp = exp[!exp %in% FlagsENDOC$BLANCHEselected]
-      
-      exp_selec = input$ENDOC_baselines
-      
-      updateCheckboxGroupInput(session,"ENDOC_baselines",
-                               choices = exp,
-                               selected = exp_selec )
-      
-      FlagsENDOC$EXPselected = exp
-      
-    }
-  })
-  
-  observeEvent(c(FlagsENDOC$AllExp,FlagsENDOC$BASEselected),{
-    if(length(FlagsENDOC$AllExp) > 1){
-      exp = FlagsENDOC$AllExp
-      exp = exp[exp != ""]
-      
-      if(! (length(FlagsENDOC$BASEselected) == 1 && FlagsENDOC$BASEselected == "") )
-        exp = exp[!exp %in% FlagsENDOC$BASEselected]
-      
-      exp_selec = input$ENDOC_blanks
-      
-      updateCheckboxGroupInput(session,"ENDOC_blanks",
-                               choices = exp,
-                               selected = exp_selec )
-      
-      FlagsENDOC$EXPselected = exp
-    }
-  })
-  
-  ## select the baselines and blank
-  observeEvent(input$ENDOC_baselines,{
-    FlagsENDOC$BASEselected = input$ENDOC_baselines
-    FlagsENDOC$EXPselected = FlagsENDOC$AllExp[! FlagsENDOC$AllExp %in% c(FlagsENDOC$BASEselected,FlagsENDOC$BLANCHEselected)]
-  },ignoreNULL = F)
-  observeEvent(input$ENDOC_blanks,{
-    FlagsENDOC$BLANCHEselected = input$ENDOC_blanks
-    FlagsENDOC$EXPselected = FlagsENDOC$AllExp[! FlagsENDOC$AllExp %in% c(FlagsENDOC$BASEselected,FlagsENDOC$BLANCHEselected)]
-  },ignoreNULL = F)
-  
-  toListen_endoc <- reactive({
-    exp = FlagsENDOC$EXPselected
-    exp = exp[exp != ""]
-    if(length(exp) > 0 )
-    {
-      Input_baselEXP = lapply(exp,
-                              function(i) input[[paste0("Exp",i)]])
-      Input_blEXP = lapply(unique(exp,FlagsENDOC$BASELINEselected),
-                           function(i) input[[paste0("blExp",i)]] )
-      InputEXP = c(Input_baselEXP,Input_blEXP)
-      
-      which(sapply(InputEXP, is.null)) -> indexesEXPnull
-      if(length(indexesEXPnull) > 0 )
-        listReturn = InputEXP[-indexesEXPnull]
-      else
-        listReturn = InputEXP
-    }else{
-      listReturn = list()
-    }
-    
-    if(length(listReturn) == 0){
-      return(list("Nothing",endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_SN))
-    }else{
-      return(c(listReturn,list(endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_SN)) )
-    }
-  })
-  
-  observeEvent(toListen_endoc(),{
-    baselines = FlagsENDOC$BASEselected
-    baselines = baselines[baselines != ""]
-    
-    if(toListen_endoc()[[1]] != "Nothing"){
-      exp = FlagsENDOC$EXPselected
-      exp = exp[exp != ""]
-      expNotBlank = unique(c(exp,baselines))
-      
-      MapBaseline = do.call(rbind,
-                            lapply(exp,function(i){
-                              if( length(input[[paste0("Exp",i)]]) > 0 && input[[paste0("Exp",i)]] != ""){
-                                data.frame(Exp = i, Baseline = input[[paste0("Exp",i)]])
-                              }else{
-                                data.frame(Exp = i, Baseline = NA)
-                              }
-                            })
-      ) %>% na.omit()
-      
-      MapBlank = do.call(rbind,
-                           lapply(expNotBlank,
-                                  function(i){
-                                    if( length(input[[paste0("blExp",i)]]) > 0 && input[[paste0("blExp",i)]] != ""){
-                                      data.frame(Exp = i, Blank = input[[paste0("blExp",i)]])
-                                    }else{
-                                      data.frame(Exp = i, Blank = NA)
-                                    }
-                                  })
-      ) %>% na.omit()
-      
-      if(dim(MapBaseline)[1]!=0 && dim(MapBlank)[1]!=0 ){
-
-      endocResult$MapBaseline = MapBaseline
-      endocResult$MapBlank = MapBlank
-      
-      mat = as.matrix(endocResult$Initdata)
-      endocV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
-        rowwise() %>%
-        mutate(values = mat[Var1, Var2])
-      matTime =  as.matrix(endocResult$ENDOCcell_TIME)
-      endocT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
-        rowwise() %>%
-        mutate(time = matTime[Var1, Var2])
-      matExp =  as.matrix(endocResult$ENDOCcell_SN)
-      endocE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
-        rowwise() %>%
-        mutate(exp = matExp[Var1, Var2])
-      endocTot = merge(endocV,merge(endocT,endocE)) %>%
-        filter(exp != "")
-      
-      endocTotAverage = endocTot %>%
-        mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
-        group_by(time, exp) %>%
-        summarize(meanValues = mean(values))
-      
-      # merging exp with blank for the substraction
-      
-      endocTot_bl = right_join( endocTotAverage,MapBlank, 
-                                by= c("exp"= "Blank") )%>%
-        rename(BlankValues = meanValues, Blank =  exp, exp = Exp )
-      
-      endocTotAverage = merge( endocTotAverage %>% filter(! exp %in%endocTot_bl$Blank ),
-                               endocTot_bl %>% ungroup() %>%
-                                 dplyr::select(-time), all.x = T, by = "exp") %>%
-        rename(Exp = exp) 
-      endocTotAverage = endocTotAverage %>% mutate(meanValues = meanValues - BlankValues )
-      
-      # merging exp with baseline
-      endocTot_base = merge(MapBaseline, endocTotAverage,
-                            by.y = "Exp", by.x = "Baseline") %>%
-        rename(BaseValues = meanValues) %>% 
-        select(-Blank,-BlankValues)
-      
-      if(length(unique(endocTot_base$time)) == 1){ 
-        # if there is only one point then the baseline is used to normalize every times
-        endocTot_base = endocTot_base %>% select(-time)
-      }
-      endocTot_base = merge(endocTotAverage,
-                            endocTot_base )
-                            # by.x = c("exp","time"),
-                            # by.y = c("Exp","time")
-                            #)
-      endocResult$data = endocTot
-      
-      if(length(endocTotAverage[,1]) != 0 ){
-        endocmean = endocTot_base %>%
-          rename( MeanExperiment = meanValues,
-                  MeanBaseline = BaseValues ) %>%
-          dplyr::mutate(Quantification = MeanExperiment/MeanBaseline * 100) %>%
-          rename(Experiment = Exp,Time = time) 
-        
-        output$ENDOCtables = renderDT(endocmean)
-        
-        endocResult$dataFinal = endocmean
-        
-        output$ENDOCplots = renderPlot(
-          {
-            pl1 = endocmean %>%
-              ggplot( aes(x = Time, y = MeanBaseline,
-                          col= Baseline, group = Experiment ) )+
-              geom_point( )+
-              geom_line()+
-              theme_bw()+
-              labs(x = "Time", col = "Baselines selected",
-                   y = "Average Baseline\n quantifications")
-            
-            pl2 = endocmean %>%
-              mutate(ExperimentBaseline = paste0(Experiment,"/",Baseline)) %>%
-              ggplot( aes(x = Time, y = Quantification,
-                          col= ExperimentBaseline, group = Experiment ) )+
-              geom_point()+
-              geom_line()+
-              theme_bw()+
-              labs(x = "Time", col = "Ratio\n Experiment / Baseline",
-                   y = "Ratio of the average quantifications\n (as %)")
-            
-            pl2/pl1
-          }
-        )
-      }else{
-        output$ENDOCtables = renderDT(data.frame(Error = "No baseline is associated with the experiment replicants!"))
-      }        
-      }
-    }
-  })
-  
-  # here the Exp boxes are updated every time a new experiment is added 
-  observeEvent(FlagsENDOC$EXPselected,{
-    expToselect = FlagsENDOC$EXPselected
-    baselines =  FlagsENDOC$BASEselected
-    blanks = FlagsENDOC$BLANCHEselected
-    
-    expToselect = expToselect[expToselect != ""]
-    
-    # baselines updating
-    output$EndocBaselineSelection <- renderUI({
-      select_output_list <- lapply(expToselect[! expToselect %in% baselines],
-                                   function(i) {
-                                     if(length(input[[paste0("Exp",i)]])>0)
-                                       expsel = input[[paste0("Exp",i)]]
-                                     else 
-                                       expsel = ""
-                                     
-                                     selectInput(inputId = paste0("Exp",i),
-                                                 label = i,
-                                                 choices = c("",baselines),
-                                                 selected = expsel)
-                                   })
-      do.call(tagList, select_output_list)
-    })
-    # blanks updating
-    output$EndocBlankSelection <- renderUI({
-      select_output_list <- lapply(unique(c(expToselect,baselines)), function(i) {
-        
-        if(length(input[[paste0("blExp",i)]])>0)
-          expsel = input[[paste0("blExp",i)]]
-        else 
-          expsel = ""
-        
-        selectInput(inputId = paste0("blExp",i),
-                    label = i,
-                    choices = c("",blanks),
-                    selected = expsel)
-      })
-      do.call(tagList, select_output_list)
-    })
-  })
-  
-  observeEvent(endocResult$TablePlot, {
-    ENDOCtb = endocResult$TablePlot
-    output$ENDOCmatrix <- renderDT(
-      ENDOCtb,
-      server = FALSE
-    )
-    
-    ##### Plot the values selected!
-    matTime =  as.matrix(endocResult$ENDOCcell_TIME)
-    matExp =  as.matrix(endocResult$ENDOCcell_SN)
-    
-    if( !( all(matTime == "")  || all(matExp == "") ) ){
-      mat = as.matrix(endocResult$Initdata)
-      endocV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
-        rowwise() %>%
-        mutate(values = mat[Var1, Var2])
-      endocT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
-        rowwise() %>%
-        mutate(time = matTime[Var1, Var2])
-      endocE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
-        rowwise() %>%
-        mutate(exp = matExp[Var1, Var2])
-      endocTot = merge(endocV,merge(endocT,endocE)) %>%
-        na.omit() %>%
-        filter(time != "",  exp != "") 
-      
-      endocResult$data = endocTot
-      
-      output$ENDOCinitplots <- renderPlot(
-        ggplot(endocTot, aes(x = time, y=values, col = exp),alpha = 1.4) +
-          #geom_boxplot(aes(fill= exp, group = time),alpha = 0.4) +
-          geom_point(aes(group = exp)) +
-          scale_color_manual(values = FlagsENDOC$EXPcol) + 
-          #scale_fill_manual(values = FlagsENDOC$EXPcol) + 
-          theme_bw()+
-          labs(x = "Times", y = "Values", col = "Exp",fill = "Exp")+
-          theme(legend.position = c(0, 1), 
-                legend.justification = c(0, 1),
-                legend.direction = "vertical",
-                legend.background = element_rect(size=0.5,
-                                                 linetype="solid",
-                                                 colour ="black"))
-      )
-    }
-  })
-  
-  ### End ENDOC analysis ####
-  
-  ### ELISA analysis ####
-  
-  # next buttons
+  #### ELISA analysis ####
   observeEvent(input$NextElisaQuantif,{
     updateTabsetPanel(session, "SideTabs",
                       selected = "tablesELISA")
@@ -1643,28 +1720,33 @@ server <- function(input, output, session) {
   #
   
   elisaResult = reactiveValues(
-                               Initdata= NULL,
-                               data = NULL,
-                               TablePlot = NULL,
-                               dataFinal = NULL,
-                               ELISAcell_EXP = NULL,
-                               ELISAcell_SN = NULL,
-                               MapBaseline = NULL,
-                               MapBlank = NULL,
-                               Tablestandcurve = NULL,
-                               Regression = NULL)
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    ELISAcell_EXP = "",
+    ELISAcell_SN = NULL,
+    ELISAcell_COLOR = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL,
+    Tablestandcurve = NULL,
+    Regression = NULL)
   
   elisaResult0 = list(
-                      Initdata= NULL,
-                      data = NULL,
-                      TablePlot = NULL,
-                      dataFinal = NULL,
-                      ELISAcell_EXP = NULL,
-                      ELISAcell_SN = NULL,
-                      MapBaseline = NULL,
-                      MapBlank = NULL,
-                      Tablestandcurve = NULL,
-                      Regression = NULL)
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    ELISAcell_EXP = "",
+    ELISAcell_SN = NULL,
+    ELISAcell_COLOR = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL,
+    Tablestandcurve = NULL,
+    Regression = NULL)
+  
+  left_data_elisa <- reactiveVal()
+  right_data_elisa <- reactiveVal()
   
   # save everytime there is a change in the results
   ELISAresultListen <- reactive({
@@ -1685,184 +1767,258 @@ server <- function(input, output, session) {
                                EXPcol = NULL)
   
   observeEvent(input$LoadELISA_Button,{
-    output$LoadingError_ELISA <- renderText({
-      validate(
-        need(!is.null(input$ELISAImport) && file.exists(input$ELISAImport$datapath) ,
-             "Please select an ELISA excel file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$ELISAImport$datapath,
-        type = "Excel",
-        allDouble = T,
-        colname = F
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]] )
-      )
-      
-      elisaResult$Initdata = mess
-      
-      "The ELISA excel has been uploaded  with success"
-    })
-    
-    if( !is.null(elisaResult$Initdata) )
-    { ### alert!!! if it is already present! 
-      showModal(modalDialog(
+    alert$alertContext <- "ELISA-reset"
+    if( !is.null(elisaResult$Initdata) ) {
+      shinyalert(
         title = "Important message",
-        "Do you want to update the ELISA data already present?",
-        easyClose = TRUE,
-        footer= tagList(actionButton("confirmUploadELISA", "Update"),
-                        modalButton("Cancel")
-        )
-      ))
-      
-    }
+        text = "Do you want to update the ELISA data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadExcelFileELISA()
   })
-  observeEvent(input$confirmUploadELISA,{
+  
+  observeEvent(input$shinyalert, {
     removeModal()
-    
-    for(nameList in names(elisaResult0)) 
-      elisaResult[[nameList]] <- elisaResult0[[nameList]]
-    
-    output$LoadingError_ELISA <- renderText({
-      validate(
-        need(!is.null(input$ELISAImport) && file.exists(input$ELISAImport$datapath) ,
-             "Please select an ELISA excel file!!" )
-      )
+    if (input$shinyalert && alert$alertContext == "ELISA-reset") {  
+      resetPanel("ELISA", flags = FlagsELISA, result = elisaResult)
       
-      mess = readfile(
-        filename = input$ELISAImport$datapath,
-        type = "Excel"
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]])
-      )
-      
-      elisaResult$Initdata = mess
-      "The RDs has been uploaded  with success"
-    })
-  })
-  observe({
-    if( !is.null(elisaResult$Initdata) && is.null(elisaResult$TablePlot) ){
-      ELISAtb = elisaResult$Initdata
-      
-      ELISAtb.colors = ELISAtb
-      ELISAtb.colors[,] = ""
-      mELISA  =cbind(ELISAtb,ELISAtb.colors)
-      
-      cols.keep <- paste0('V',1:length(ELISAtb[1,])) 
-      cols.color <- paste0('Col',1:length(ELISAtb[1,]))
-      
-      colnames(mELISA) = c(cols.keep,cols.color)
-      
-      ELISAtb = datatable(mELISA,
-                          filter = 'none',
-                          #server = FALSE,
-                          selection = list(mode = 'single', target = 'cell'),
-                          rownames= FALSE,
-                          options = list(
-                            #lengthChange = FALSE,
-                            #scrollX = TRUE,
-                            columnDefs = list(list(targets = cols.color, 
-                                                   visible = FALSE))
-                          )) %>%
-        formatStyle(cols.keep,
-                    cols.color,
-                    backgroundColor = styleEqual("", 'white'))
-      
-      ELISA = ELISAtb$x$data
-      
-      output$ELISAmatrix <-renderDataTable({ELISAtb} 
-                                           #options = list(scrollX = TRUE)
-      )
-      # renderDataTable(
-      #   ELISAtb,
-      #   #filter = 'none',
-      #   server = FALSE,
-      #   options=list(scrollX=T)
-      #   #selection = list(mode = 'single', target = 'cell'),
-      #   #options = list(lengthChange = FALSE ),
-      #   #rownames= FALSE
-      # )
-      
-      ELISAcell_SN <- ELISAcell_EXP <- matrix(
-        "",
-        nrow = length(ELISA[,1]),
-        ncol = length(ELISA[1,])
-      )
-      elisaResult$ELISAcell_SN <- ELISAcell_SN
-      elisaResult$ELISAcell_EXP<- ELISAcell_EXP
-      elisaResult$TablePlot = ELISAtb
-    }
-  })
-  observeEvent(input$ELISAmatrix_cell_clicked,{
-    if(length(input$ELISAmatrix_cell_clicked)!=0){
-      cellSelected= as.numeric(input$ELISAmatrix_cell_clicked)
-      FlagsELISA$cellCoo = cellCoo = c(cellSelected[1],cellSelected[2]+1)
-      print(cellCoo)
-      print(elisaResult$ELISAcell_EXP[ cellCoo[1],cellCoo[2] ])
-      print(elisaResult$ELISAcell_SN[ cellCoo[1], cellCoo[2] ])
-      updateSelectizeInput(inputId = "ELISAcell_EXP",
-                           selected = ifelse(is.null(elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]]),
-                                             "",
-                                             elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]])
-      )
-      updateSelectizeInput(inputId = "ELISAcell_SN",
-                           selected = ifelse(is.null(elisaResult$ELISAcell_SN[cellCoo[1],cellCoo[2]]),
-                                             "",
-                                             elisaResult$ELISAcell_SN[cellCoo[1],cellCoo[2]])
-      )
+      loadExcelFileELISA()
     }
   })
   
-  observeEvent(input$ELISAcell_EXP,{
-    if(!is.null(elisaResult$ELISAcell_EXP)){
-      cellCoo = FlagsELISA$cellCoo
-      elisaResult$ELISAcell_EXP[cellCoo[1],cellCoo[2]] = input$ELISAcell_EXP
+  loadExcelFileELISA <- function() {
+    alert$alertContext <- ""
+    mess = readfile(
+      filename = input$ELISAImport$datapath,
+      isFileUploaded = !is.null(input$ELISAImport) && file.exists(input$ELISAImport$datapath),
+      type = "Excel",
+      allDouble = T,
+      colname = F,
+      colors = T
+    )
+    
+    if(setequal(names(mess), c("message", "call"))) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+    } else {
+      elisaResult$Initdata = mess$x
+      FlagsELISA$EXPcol = mess$fill
+      elisaResult$ELISAcell_COLOR = mess$SNtable
+      elisaResult$ELISAcell_SN = matrix("", nrow = nrow(elisaResult$ELISAcell_COLOR), ncol = ncol(elisaResult$ELISAcell_COLOR))
+      
+      removeModal()
+      showAlert("Success", "The Excel has been uploaded  with success", "success", 2000)
+    }
+  }
+  
+  observe({
+    if (!is.null(elisaResult$Initdata) && is.null(elisaResult$TablePlot)) {
+      tableExcelColored(session = session,
+                        Result = elisaResult, 
+                        FlagsExp = FlagsELISA,
+                        type = "Initialize")
     }
   })
-  observeEvent(input$ELISAcell_SN,{
-    if(!is.null(elisaResult$ELISAcell_SN)){
+  
+  observeEvent(c(elisaResult$TablePlot,elisaResult$ELISAcell_EXP), {
+    if (!is.null(elisaResult$TablePlot)) {
+      ELISAtb <- elisaResult$TablePlot
+      output$ELISAmatrix <- renderDT(ELISAtb, server = FALSE)
+      
+      if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(elisaResult$ELISAcell_COLOR)) {
+        matTime <- as.matrix(elisaResult$ELISAcell_EXP)
+        matExp <- as.matrix(elisaResult$ELISAcell_COLOR)
+        
+        #if (!(all(matTime == "") || all(matExp == ""))) {
+        mat <- as.matrix(elisaResult$Initdata)
+        elisaV <- expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
+          rowwise() %>%
+          mutate(values = mat[Var1, Var2])
+        elisaT <- expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
+          rowwise() %>%
+          mutate(time = matTime[Var1, Var2])
+        elisaE <- expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
+          rowwise() %>%
+          mutate(exp = matExp[Var1, Var2])
+        elisaTot <- merge(elisaV, merge(elisaT, elisaE)) %>%
+          na.omit() %>%
+          filter(time != "", exp != "")
+        
+        elisaResult$data <- elisaTot
+        
+        output$ELISAinitplots <- renderPlot({
+          ggplot(elisaTot, aes(x = time, y = values, col = exp), alpha = 1.4) +
+            geom_point(aes(group = exp)) +
+            scale_color_manual(values = FlagsELISA$EXPcol) +
+            theme_bw() +
+            labs(x = "Times", y = "Values", col = "Exp", fill = "Exp") +
+            theme(legend.position = c(0, 1),
+                  legend.justification = c(0, 1),
+                  legend.direction = "vertical",
+                  legend.background = element_rect(linewidth = 0.5,
+                                                   linetype = "solid",
+                                                   colour = "black"))
+        })
+        #}
+      }
+    } 
+  })
+  
+  observe({
+    color_codes <- FlagsELISA$EXPcol
+    color_names <- names(FlagsELISA$EXPcol)
+    
+    valid_colors <- color_codes != "white"
+    color_codes <- color_codes[valid_colors]
+    color_names <- color_names[valid_colors]
+    
+    mid_point <- ceiling(length(color_codes) / 2)
+    left_colors <- color_codes[1:mid_point]
+    right_colors <- color_codes[(mid_point+1):length(color_codes)]
+    
+    left_formatted_data <- get_formatted_data(left_colors, color_names[1:mid_point], elisaResult, elisaResult$ELISAcell_EXP,"ELISA")
+    right_formatted_data <- get_formatted_data(right_colors, color_names[(mid_point+1):length(color_codes)], elisaResult, elisaResult$ELISAcell_EXP, "ELISA")
+    
+    left_data_elisa(left_formatted_data)
+    right_data_elisa(right_formatted_data)
+    
+    output$leftTableElisa <- renderDataTable(
+      left_data_elisa(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE, 
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '200px', targets = 3),
+          list(width = '80px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+    
+    output$rightTableElisa <- renderDataTable(
+      right_data_elisa(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE,
+        editable = TRUE,
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '200px', targets = 3),
+          list(width = '80px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+  })
+  
+  observeEvent(input$leftTableElisa_cell_edit, {
+    info <- input$leftTableElisa_cell_edit
+    data <- left_data_elisa() 
+    updatedText <- updateTable("left", "ELISA", info, data, elisaResult, FlagsELISA)
+    
+    output$ELISASelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$rightTableElisa_cell_edit, {
+    info <- input$rightTableElisa_cell_edit
+    data <- right_data_elisa() 
+    updatedText <- updateTable("right", "ELISA", info, data, elisaResult, FlagsELISA)
+    
+    output$ELISASelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$ELISAmatrix_cell_clicked, {
+    req(input$ELISAmatrix_cell_clicked)  
+    
+    cellSelected = as.numeric(input$ELISAmatrix_cell_clicked)
+    FlagsELISA$cellCoo = cellCoo = c(cellSelected[1], cellSelected[2] + 1)
+    
+    allExp <- unique(na.omit(c(elisaResult$ELISAcell_EXP)))  
+    selectedExp <- ifelse(is.null(elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]]), "", elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "ELISAcell_EXP", 
+                         choices = allExp,
+                         selected = selectedExp)
+    
+    allSN <- unique(na.omit(c(elisaResult$ELISAcell_SN)))  
+    selectedSN <- ifelse(is.null(elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]]), "", elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "ELISAcell_SN",
+                         choices = allSN,
+                         selected = selectedSN)
+  })
+  
+  observeEvent(input$ELISAcell_SN, {
+    if (!is.null(elisaResult$ELISAcell_COLOR) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo)) {
       ELISAtb = elisaResult$TablePlot
       cellCoo = FlagsELISA$cellCoo
-      if(!is.null(cellCoo)){
-        elisaResult$ELISAcell_SN[cellCoo[1],cellCoo[2]] = input$ELISAcell_SN
-        ELISAtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = input$ELISAcell_SN
+      
+      value.bef = elisaResult$ELISAcell_COLOR[cellCoo[1], cellCoo[2]] 
+      value.now = input$ELISAcell_SN
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- elisaResult$Initdata[cellCoo[1], cellCoo[2]]
         
-        if(! input$ELISAcell_SN %in% FlagsELISA$AllExp){
-          FlagsELISA$AllExp = unique(c(FlagsELISA$AllExp,input$ELISAcell_SN))
-          print(FlagsELISA$AllExp)
+        elisaResult$ELISAcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
+        elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]] = value.now
+        ELISAtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] = value.now
+        
+        if (!input$ELISAcell_SN %in% FlagsELISA$AllExp) {
+          exp = unique(c(FlagsELISA$AllExp, input$ELISAcell_SN))
+          FlagsELISA$AllExp = exp
         }
         
-        EXPcol = rainbow(n = length(FlagsELISA$AllExp),alpha = 0.4)
-        names(EXPcol) = FlagsELISA$AllExp
-        EXPcol[names(EXPcol) == ""] = "white"
-          FlagsELISA$EXPcol = EXPcol
-          print(FlagsELISA$EXPcol)
-          cols.color = grep(x = colnames(ELISAtb$x$data),pattern = "Col",value = T)
-          cols.keep = grep(x = colnames(ELISAtb$x$data),pattern = "V",value = T)
-          elisaResult$TablePlot = datatable(ELISAtb$x$data,
-                                            filter = 'none',
-                                            #server = FALSE,
-                                            selection = list(mode = 'single', target = 'cell'),
-                                            rownames= FALSE,
-                                            options = list(
-                                              #scrollX = TRUE,
-                                              #lengthChange = FALSE,
-                                              columnDefs = list(list(targets = cols.color, visible = FALSE))
-                                            )) %>%
-            formatStyle(cols.keep,
-                        cols.color,
-                        backgroundColor = styleEqual(names(EXPcol), EXPcol))
-          
+        tableExcelColored(session = session,
+                          Result = elisaResult, 
+                          FlagsExp = FlagsELISA,
+                          type = "Update")
+        
+        output$ELISASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": sample name ", value.now))
+        output$ELISAmatrix <- renderDataTable({elisaResult$TablePlot})
       }
-    }
-  })
+    } else return()
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$ELISAcell_EXP, {
+    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo)) {
+      ELISAtb = elisaResult$TablePlot
+      cellCoo = FlagsELISA$cellCoo
+      
+      value.bef = elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]] 
+      value.now = input$ELISAcell_EXP
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- elisaResult$Initdata[cellCoo[1], cellCoo[2]]
+        
+        elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]] = value.now
+        tableExcelColored(session = session,
+                          Result = elisaResult, 
+                          FlagsExp = FlagsELISA,
+                          type = "Update",
+        )
+        
+        output$ELISASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": time ", value.now))
+        output$ELISAmatrix <- renderDataTable({elisaResult$TablePlot})
+      }
+    } else return()
+  }, ignoreInit = TRUE)
   
   ## update Baselines checkBox
   observeEvent(c(FlagsELISA$AllExp,FlagsELISA$BASEselected,FlagsELISA$BLANCHEselected),{
@@ -1953,6 +2109,7 @@ server <- function(input, output, session) {
       return(c(listReturn,list(elisaResult$ELISAcell_EXP,elisaResult$ELISAcell_SN)) )
     }
   })
+  
   observeEvent(toListen_elisa(),{
     baselines = FlagsELISA$BASEselected
     baselines = baselines[baselines != ""]
@@ -1973,14 +2130,14 @@ server <- function(input, output, session) {
       ) %>% na.omit()
       
       MapBlank = do.call(rbind,
-                           lapply(expNotBlank,
-                                  function(i){
-                                    if( length(input[[paste0("elisa_blExp",i)]]) > 0 && input[[paste0("elisa_blExp",i)]] != ""){
-                                      data.frame(Exp = i, Blank = input[[paste0("elisa_blExp",i)]])
-                                    }else{
-                                      data.frame(Exp = i, Blank = NA)
-                                    }
-                                  })
+                         lapply(expNotBlank,
+                                function(i){
+                                  if( length(input[[paste0("elisa_blExp",i)]]) > 0 && input[[paste0("elisa_blExp",i)]] != ""){
+                                    data.frame(Exp = i, Blank = input[[paste0("elisa_blExp",i)]])
+                                  }else{
+                                    data.frame(Exp = i, Blank = NA)
+                                  }
+                                })
       ) %>% na.omit()
       
       elisaResult$MapBaseline = MapBaseline
@@ -2099,38 +2256,9 @@ server <- function(input, output, session) {
       do.call(tagList, select_output_list)
     })
   })
-  observeEvent(c(elisaResult$TablePlot,elisaResult$ELISAcell_EXP),
-               {
-                 ELISAtb = elisaResult$TablePlot
-                 output$ELISAmatrix <-renderDataTable({ELISAtb})
-                 
-                 ##### Plot the values selected!
-                 matTime =  as.matrix(elisaResult$ELISAcell_EXP)
-                 matExp =  as.matrix(elisaResult$ELISAcell_SN)
-                 
-                 if( !( all(matTime == "")  || all(matExp == "") ) ){
-                   mat = as.matrix(elisaResult$Initdata)
-                   elisaV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
-                     rowwise() %>%
-                     mutate(values = mat[Var1, Var2])
-                   elisaT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
-                     rowwise() %>%
-                     mutate(time = matTime[Var1, Var2])
-                   elisaE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
-                     rowwise() %>%
-                     mutate(exp = matExp[Var1, Var2])
-                   elisaTot = merge(elisaV,merge(elisaT,elisaE)) %>%
-                     na.omit() %>%
-                     filter(time != "",  exp != "") 
-                   
-                   elisaResult$data = elisaTot
-                 }
-               })
   
-  ##  regression standard curve
   observeEvent(input$ELISA_standcurve,{
     elisaResult$data -> data
-    
     if(input$ELISA_standcurve != ""){
       
       standcurve = data %>%
@@ -2164,17 +2292,18 @@ server <- function(input, output, session) {
       })
     } 
   })
+  
   observeEvent(elisaResult$Tablestandcurve,{
     if(!is.null(elisaResult$Tablestandcurve) && dim(elisaResult$Tablestandcurve)[1]!=0){
       
       output$ELISA_Table_stdcurve <- DT::renderDataTable({
         DT::datatable( 
           elisaResult$Tablestandcurve,
-                       selection = 'none',
-                       editable = list(target = "cell",
-                                       disable = list(columns = 0:2) ),
-                       #options = list(lengthChange = FALSE, autoWidth = TRUE),
-                       rownames= FALSE
+          selection = 'none',
+          editable = list(target = "cell",
+                          disable = list(columns = 0:2) ),
+          #options = list(lengthChange = FALSE, autoWidth = TRUE),
+          rownames= FALSE
         )
       })
     } 
@@ -2215,7 +2344,7 @@ server <- function(input, output, session) {
         
       }
       else if(input$regressionType == "Quadratic")
-        {
+      {
         #this is not implemented
         standcurve$Concentrations2 = standcurve$Concentrations^2
         modelStancurve = lm(Measures~Concentrations+Concentrations2, data = standcurve)
@@ -2243,7 +2372,7 @@ server <- function(input, output, session) {
               Measures ~ a*Concentrations/(b+Concentrations), 
               data = standcurve, #%>% group_by(Concentrations) %>% summarise(Measures = mean(Measures)),
               start = list(a = 1,b = 1)
-             )
+            )
           }, 
           error = function(e){
             return(e)
@@ -2294,318 +2423,936 @@ server <- function(input, output, session) {
   #   DataAnalysisModule$elisaResult = reactiveValuesToList(elisaResult)
   # })
   
-  ### End ELISA analysis ####
-  
-  ### CYTOTOX analysis ####
-  
-  # next buttons
-  observeEvent(input$NextCytotoxQuantif,{
+  ### End ELISA analysis ####  
+  #### ENDOCYTOSIS analysis ####
+  observeEvent(input$NextEndocQuantif,{
     updateTabsetPanel(session, "SideTabs",
-                      selected = "tablesCYTOTOX")
+                      selected = "tablesENDOC")
   })
-  #
   
-  cytotoxResult = reactiveValues(
-                                 Initdata= NULL,
-                                 data = NULL,
-                                 TablePlot = NULL,
-                                 dataFinal = NULL,
-                                 CYTOTOXcell_EXP = NULL,
-                                 CYTOTOXcell_REP = NULL,
-                                 CYTOTOXcell_SN = NULL,
-                                 MapBaseline = NULL)
+  endocResult = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    ENDOCcell_TIME = NULL,
+    ENDOCcell_COLOR = NULL,
+    ENDOCcell_EXP = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL)
   
-  cytotoxResult0 = list(
-                        Initdata= NULL,
-                        data = NULL,
-                        TablePlot = NULL,
-                        dataFinal = NULL,
-                        CYTOTOXcell_EXP = NULL,
-                        CYTOTOXcell_REP = NULL,
-                        CYTOTOXcell_SN = NULL,
-                        MapBaseline = NULL)
+  endocResult0 = list(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    ENDOCcell_TIME = NULL,
+    ENDOCcell_COLOR = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL)
   
-  
-  # save everytime there is a change in the results
-  CYTOTOXresultListen <- reactive({
-    reactiveValuesToList(cytotoxResult)
+  ENDOCresultListen <- reactive({
+    reactiveValuesToList(endocResult)
   })
-  observeEvent(CYTOTOXresultListen(), {
-    DataAnalysisModule$cytotoxResult = reactiveValuesToList(cytotoxResult)
-    DataAnalysisModule$cytotoxResult$Flags = reactiveValuesToList(FlagsCYTOTOX)
+  observeEvent(ENDOCresultListen(), {
+    DataAnalysisModule$endocResult = reactiveValuesToList(endocResult)
+    DataAnalysisModule$endocResult$Flags = reactiveValuesToList(FlagsENDOC)
   })
   
   ##
-  FlagsCYTOTOX <- reactiveValues(cellCoo = NULL,
-                                 AllExp = "",
-                                 BASEselected = "",
-                                 EXPselected = "",
-                                 EXPcol = NULL)
+  FlagsENDOC <- reactiveValues(cellCoo = NULL,
+                               AllExp = "",
+                               BASEselected = "",
+                               BLANCHEselected = "",
+                               EXPselected = "",
+                               EXPcol = NULL)
   
-  observeEvent(input$LoadCYTOTOX_Button,{
-    output$LoadingError_CYTOTOX <- renderText({
-      validate(
-        need(!is.null(input$CYTOTOXImport) && file.exists(input$CYTOTOXImport$datapath) ,
-             "Please select an CYTOTOX excel file!!" )
-      )
-      
-      mess = readfile(
-        filename = input$CYTOTOXImport$datapath,
-        type = "Excel",
-        allDouble = T,
-        colname = F,
-        colors = T
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]] )
-      )
-      
-      cytotoxResult$Initdata = mess$x
-      FlagsCYTOTOX$EXPcol = mess$fill
-      cytotoxResult$CYTOTOXcell_SN = mess$SNtable
-      
-      "The CYTOTOX excel has been uploaded  with success"
-    })
-    
-    if( !is.null(cytotoxResult$Initdata) )
-    { ### alert!!! if it is already present! 
-      showModal(modalDialog(
+  left_data_endoc <- reactiveVal()
+  right_data_endoc <- reactiveVal()
+  
+  observeEvent(input$LoadENDOC_Button,{
+    alert$alertContext <- "ENDOC-reset"
+    if( !is.null(endocResult$Initdata) ) {
+      shinyalert(
         title = "Important message",
-        "Do you want to update the CYTOTOX data already present?",
-        easyClose = TRUE,
-        footer= tagList(actionButton("confirmUploadCYTOTOX", "Update"),
-                        modalButton("Cancel")
-        )
-      ))
-      
-    }
+        text = "Do you want to update the ENDOC data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadExcelFileENDOC()
   })
-  observeEvent(input$confirmUploadCYTOTOX,{
+  
+  observeEvent(input$shinyalert, {
     removeModal()
-    
-    for(nameList in names(cytotoxResult0)) 
-      cytotoxResult[[nameList]] <- cytotoxResult0[[nameList]]
-    
-    output$LoadingError_CYTOTOX <- renderText({
-      validate(
-        need(!is.null(input$CYTOTOXImport) && file.exists(input$CYTOTOXImport$datapath) ,
-             "Please select an CYTOTOX excel file!!" )
-      )
+    if (input$shinyalert && alert$alertContext == "ENDOC-reset") {  
+      resetPanel("ENDOC", flags = FlagsENDOC, result = endocResult)
+      updateCheckboxGroupInput(session, "ENDOC_baselines", choices = list(), selected = character(0))
+      updateCheckboxGroupInput(session, "ENDOC_blanks", choices = list(), selected = character(0))
       
-      mess = readfile(
-        filename = input$CYTOTOXImport$datapath,
-        type = "Excel",
-        allDouble = T,
-        colname = F,
-        colors = T
-      )
+      updateSelectizeInput(session, "ENDOCcell_EXP", choices = character(0), selected = character(0))
+      updateSelectizeInput(session, "ENDOCcell_TIME", choices = character(0), selected = character(0))
       
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]])
-      )
-      
-      cytotoxResult$Initdata = mess$x
-      FlagsCYTOTOX$EXPcol = mess$fill
-      cytotoxResult$CYTOTOXcell_SN = mess$SNtable
-      
-      "The RDs has been uploaded  with success"
-    })
-  })
-  observe({
-    if( !is.null(cytotoxResult$Initdata) && is.null(cytotoxResult$TablePlot) ){
-      
-      tableExcelColored(session = session,
-                        Result = cytotoxResult, 
-                        FlagsExp = FlagsCYTOTOX,
-                        type = "Initialize")
-      
-      output$CYTOTOXmatrix <-renderDataTable({cytotoxResult$TablePlot})
-    }
-  })
-  observeEvent(input$CYTOTOXmatrix_cell_clicked,{
-    if(length(input$CYTOTOXmatrix_cell_clicked)!=0){
-      cellSelected= as.numeric(input$CYTOTOXmatrix_cell_clicked)
-      FlagsCYTOTOX$cellCoo = cellCoo = c(cellSelected[1],cellSelected[2]+1)
-      print(cellCoo)
-      print(cytotoxResult$CYTOTOXcell_EXP[ cellCoo[1],cellCoo[2] ])
-      print(cytotoxResult$CYTOTOXcell_SN[ cellCoo[1], cellCoo[2] ])
-      updateSelectizeInput(inputId = "CYTOTOXcell_EXP",
-                           selected = ifelse(is.null(cytotoxResult$CYTOTOXcell_EXP[cellCoo[1],cellCoo[2]]),
-                                             "",
-                                             cytotoxResult$CYTOTOXcell_EXP[cellCoo[1],cellCoo[2]])
-      )
-      updateSelectizeInput(inputId = "CYTOTOXcell_SN",
-                           selected = ifelse(is.null(cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]]),
-                                             "",
-                                             cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]])
-      )
-      updateSelectizeInput(inputId = "CYTOTOXcell_REP",
-                           selected = ifelse(is.null(cytotoxResult$CYTOTOXcell_REP[cellCoo[1],cellCoo[2]]),
-                                             "",
-                                             cytotoxResult$CYTOTOXcell_REP[cellCoo[1],cellCoo[2]])
-      )
+      left_data_endoc <- NULL
+      right_data_endoc <- NULL
+      loadExcelFileENDOC()
     }
   })
   
-  observeEvent(input$CYTOTOXcell_EXP,{
-    if(!is.null(cytotoxResult$CYTOTOXcell_EXP)){
-      cellCoo = FlagsCYTOTOX$cellCoo
-      cytotoxResult$CYTOTOXcell_EXP[cellCoo[1],cellCoo[2]] = input$CYTOTOXcell_EXP
-    }
-  })
-  observeEvent(input$CYTOTOXcell_REP,{
-    if(!is.null(cytotoxResult$CYTOTOXcell_REP)){
-      cellCoo = FlagsCYTOTOX$cellCoo
-      cytotoxResult$CYTOTOXcell_REP[cellCoo[1],cellCoo[2]] = input$CYTOTOXcell_REP
-    }
-  })
-  observeEvent(input$CYTOTOXcell_SN,{
-    if(!is.null(cytotoxResult$CYTOTOXcell_SN)){
-      CYTOTOXtb = cytotoxResult$TablePlot
-      cellCoo = FlagsCYTOTOX$cellCoo
+  loadExcelFileENDOC <- function() {
+    alert$alertContext <- ""
+    
+    for(nameList in names(endocResult0)) 
+      endocResult[[nameList]] <- endocResult0[[nameList]]
+    
+    mess = readfile(
+      filename = input$ENDOCImport$datapath,
+      isFileUploaded = !is.null(input$ENDOCImport) && file.exists(input$ENDOCImport$datapath),
+      type = "Excel",
+      allDouble = T,
+      colname = F,
+      colors = T,
+    )
+    
+    if(setequal(names(mess), c("message", "call"))) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+    } else {
+      endocResult$Initdata = mess$x
+      FlagsENDOC$EXPcol = mess$fill
+      endocResult$ENDOCcell_COLOR = mess$SNtable
+      endocResult$ENDOCcell_EXP <- matrix("", nrow = nrow(endocResult$ENDOCcell_COLOR), ncol = ncol(endocResult$ENDOCcell_COLOR))
       
-      if(!is.null(cellCoo)){
-        value.bef = cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]] 
-        value.now = input$CYTOTOXcell_SN
-        
-        # if the value does not change or it is still "Color " then the matrix is not update
-        if( value.now != ""  && value.now!=value.bef){
-          cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]] = value.now
-          CYTOTOXtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = value.now
-          
-          if(! input$CYTOTOXcell_SN %in% FlagsCYTOTOX$AllExp){
-            FlagsCYTOTOX$AllExp = unique(c(FlagsCYTOTOX$AllExp,input$CYTOTOXcell_SN))
-            print(FlagsCYTOTOX$AllExp)
-          }
-          
-          ## updating table and colors definition depending on the cell fill 
-          tableExcelColored(session = session,
-                            Result = cytotoxResult, 
-                            FlagsExp = FlagsCYTOTOX,
-                            type = "Update")
-          #####
-          output$CYTOTOXmatrix <-renderDataTable({cytotoxResult$TablePlot})
-        }
-      }
+      removeModal()
+      showAlert("Success", "The Excel has been uploaded  with success", "success", 2000)
+    }
+  }
+  
+  observe({
+    if (!is.null(endocResult$Initdata) && is.null(endocResult$TablePlot)) {
+      tableExcelColored(session = session,
+                        Result = endocResult, 
+                        FlagsExp = FlagsENDOC,
+                        type = "Initialize")
     }
   })
+  
+  observe({
+    color_codes <- FlagsENDOC$EXPcol
+    color_names <- names(FlagsENDOC$EXPcol)
+    
+    valid_colors <- color_codes != "white"
+    color_codes <- color_codes[valid_colors]
+    color_names <- color_names[valid_colors]
+    
+    mid_point <- ceiling(length(color_codes) / 2)
+    left_colors <- color_codes[1:mid_point]
+    right_colors <- color_codes[(mid_point+1):length(color_codes)]
+    
+    left_formatted_data <- get_formatted_data(left_colors, color_names[1:mid_point], endocResult, endocResult$ENDOCcell_TIME,"ENDOC")
+    right_formatted_data <- get_formatted_data(right_colors, color_names[(mid_point+1):length(color_codes)], endocResult, endocResult$ENDOCcell_TIME, "ENDOC")
+    
+    left_data_endoc(left_formatted_data)
+    right_data_endoc(right_formatted_data)
+    
+    output$leftTableEndoc <- renderDataTable(
+      left_data_endoc(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE, 
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '100px', targets = 3),
+          list(width = '100px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+    
+    output$rightTableEndoc <- renderDataTable(
+      right_data_endoc(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE,
+        editable = TRUE,
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '100px', targets = 3),
+          list(width = '100px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+  })
+  
+  observeEvent(input$leftTableEndoc_cell_edit, {
+    info <- input$leftTableEndoc_cell_edit
+    data <- left_data_endoc() 
+    updatedText <- updateTable("left", "ENDOC", info, data, endocResult, FlagsENDOC)
+    
+    output$ENDOCSelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$rightTableEndoc_cell_edit, {
+    info <- input$rightTableEndoc_cell_edit
+    data <- right_data_endoc() 
+    updatedText <- updateTable("right", "ENDOC", info, data, endocResult, FlagsENDOC)
+    
+    output$ENDOCSelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$ENDOCmatrix_cell_clicked, {
+    req(input$ENDOCmatrix_cell_clicked)  
+    
+    cellSelected = as.numeric(input$ENDOCmatrix_cell_clicked)
+    FlagsENDOC$cellCoo = cellCoo = c(cellSelected[1], cellSelected[2] + 1)
+    
+    allTime <- unique(na.omit(c(endocResult$ENDOCcell_TIME)))  
+    selectedTime <- ifelse(is.null(endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "ENDOCcell_TIME", 
+                         choices = allTime,
+                         selected = selectedTime)
+    
+    allConditions <- unique(na.omit(c(endocResult$ENDOCcell_EXP)))  
+    selectedCondition <- ifelse(is.null(endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "ENDOCcell_EXP",
+                         choices = allConditions,
+                         selected = selectedCondition)
+  })
+  
+  observeEvent(input$ENDOCcell_EXP, {
+    if (!is.null(endocResult$ENDOCcell_COLOR) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo)) {
+      ENDOCtb = endocResult$TablePlot
+      cellCoo = FlagsENDOC$cellCoo
+      
+      value.bef = endocResult$ENDOCcell_COLOR[cellCoo[1], cellCoo[2]] 
+      value.now = input$ENDOCcell_EXP
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- endocResult$Initdata[cellCoo[1], cellCoo[2]]
+        
+        endocResult$ENDOCcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
+        endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]] = value.now
+        ENDOCtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] = value.now
+        
+        if (!input$ENDOCcell_EXP %in% FlagsENDOC$AllExp) {
+          exp = unique(c(FlagsENDOC$AllExp, input$ENDOCcell_EXP))
+          FlagsENDOC$AllExp = exp
+        }
+        
+        tableExcelColored(session = session,
+                          Result = endocResult, 
+                          FlagsExp = FlagsENDOC,
+                          type = "Update")
+        
+        output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": experimental condition ", value.now))
+        output$ENDOCmatrix <- renderDataTable({endocResult$TablePlot})
+      }
+    } else return()
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$ENDOCcell_TIME, {
+    if (!is.null(endocResult$ENDOCcell_TIME) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo)) {
+      ENDOCtb = endocResult$TablePlot
+      cellCoo = FlagsENDOC$cellCoo
+      
+      value.bef = endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]] 
+      value.now = input$ENDOCcell_TIME
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- endocResult$Initdata[cellCoo[1], cellCoo[2]]
+        
+        endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]] = value.now
+        tableExcelColored(session = session,
+                          Result = endocResult, 
+                          FlagsExp = FlagsENDOC,
+                          type = "Update",
+        )
+        
+        output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": time ", value.now))
+        output$ENDOCmatrix <- renderDataTable({endocResult$TablePlot})
+      }
+    } else return()
+  }, ignoreInit = TRUE)
   
   ## update Baselines checkBox
-  observeEvent(FlagsCYTOTOX$AllExp,{
-    if(length(FlagsCYTOTOX$AllExp) > 1){
-      exp = FlagsCYTOTOX$AllExp
+  observeEvent(c(FlagsENDOC$AllExp,FlagsENDOC$BLANCHEselected),{
+    if(length(FlagsENDOC$AllExp) > 1){
+      exp = FlagsENDOC$AllExp
       exp = exp[exp != ""]
       
-      exp_selec = input$CYTOTOX_baselines
+      if(!( length(FlagsENDOC$BLANCHEselected) == 1 && FlagsENDOC$BLANCHEselected == "") )
+        exp = exp[!exp %in% FlagsENDOC$BLANCHEselected]
       
-      updateSelectizeInput(session,"CYTOTOX_baselines",
+      exp_selec = input$ENDOC_baselines
+      
+      updateCheckboxGroupInput(session,"ENDOC_baselines",
                                choices = exp,
-                               selected = FlagsCYTOTOX$BASEselected )
+                               selected = exp_selec )
+      
+      FlagsENDOC$EXPselected = exp
     }
   })
   
-  ## select the baselines
-  observeEvent(input$CYTOTOX_baselines,{
-    FlagsCYTOTOX$BASEselected = input$CYTOTOX_baselines
-    FlagsCYTOTOX$EXPselected = FlagsCYTOTOX$AllExp[! FlagsCYTOTOX$AllExp %in% FlagsCYTOTOX$BASEselected]
+  observeEvent(c(FlagsENDOC$AllExp,FlagsENDOC$BASEselected),{
+    if(length(FlagsENDOC$AllExp) > 1){
+      exp = FlagsENDOC$AllExp
+      exp = exp[exp != ""]
+      
+      if(! (length(FlagsENDOC$BASEselected) == 1 && FlagsENDOC$BASEselected == "") )
+        exp = exp[!exp %in% FlagsENDOC$BASEselected]
+      
+      exp_selec = input$ENDOC_blanks
+      
+      updateCheckboxGroupInput(session,"ENDOC_blanks",
+                               choices = exp,
+                               selected = exp_selec )
+      
+      FlagsENDOC$EXPselected = exp
+    }
+  })
+  
+  ## select the baselines and blank
+  observeEvent(input$ENDOC_baselines,{
+    FlagsENDOC$BASEselected = input$ENDOC_baselines
+    FlagsENDOC$EXPselected = FlagsENDOC$AllExp[! FlagsENDOC$AllExp %in% c(FlagsENDOC$BASEselected,FlagsENDOC$BLANCHEselected)]
   },ignoreNULL = F)
-
-  toListen_cytotox <- reactive({
-    return( list(cytotoxResult$CYTOTOXcell_EXP,cytotoxResult$CYTOTOXcell_SN,FlagsCYTOTOX$BASEselected) )
-  })
-  observeEvent(toListen_cytotox(),{
-    baselines = FlagsCYTOTOX$BASEselected
-    baselines = baselines[baselines != ""]
-    if(length(baselines) > 0 )
+  observeEvent(input$ENDOC_blanks,{
+    FlagsENDOC$BLANCHEselected = input$ENDOC_blanks
+    FlagsENDOC$EXPselected = FlagsENDOC$AllExp[! FlagsENDOC$AllExp %in% c(FlagsENDOC$BASEselected,FlagsENDOC$BLANCHEselected)]
+  },ignoreNULL = F)
+  
+  toListen_endoc <- reactive({
+    exp = FlagsENDOC$EXPselected
+    exp = exp[exp != ""]
+    if(length(exp) > 0 )
     {
-      CYTOTOXcell_value = data.frame(
-        row = c(t(row(cytotoxResult$Initdata))),
-        col = c(t(col(cytotoxResult$Initdata))),
-        Val = c(t(cytotoxResult$Initdata))
-      ) 
-      CYTOTOXcell_SN = data.frame(
-        row = c(t(row(cytotoxResult$CYTOTOXcell_SN))),
-        col = c(t(col(cytotoxResult$CYTOTOXcell_SN))),
-        SN = c(t(cytotoxResult$CYTOTOXcell_SN))
-      ) 
-      CYTOTOXcell_EXP = data.frame(
-        row = c(t(row(cytotoxResult$CYTOTOXcell_EXP))),
-        col = c(t(col(cytotoxResult$CYTOTOXcell_EXP))),
-        EXP = c(t(cytotoxResult$CYTOTOXcell_EXP))
-      ) 
-      CYTOTOXcell_REP = data.frame(
-        row = c(t(row(cytotoxResult$CYTOTOXcell_REP))),
-        col = c(t(col(cytotoxResult$CYTOTOXcell_REP))),
-        REP = c(t(cytotoxResult$CYTOTOXcell_REP))
-      ) 
-     
-      CYTOTOXcell = merge(merge(merge(CYTOTOXcell_REP,CYTOTOXcell_EXP) , CYTOTOXcell_SN), CYTOTOXcell_value) %>%
-        group_by(SN,EXP,REP) %>%
-        summarise(MeanV = mean(Val,na.rm = T)) %>%
-        ungroup()
+      Input_baselEXP = lapply(exp,
+                              function(i) input[[paste0("Exp",i)]])
+      Input_blEXP = lapply(unique(exp,FlagsENDOC$BASELINEselected),
+                           function(i) input[[paste0("blExp",i)]] )
+      InputEXP = c(Input_baselEXP,Input_blEXP)
       
-      CYTOTOXcell_base = CYTOTOXcell %>%
-        filter(SN == baselines) %>%
-        rename(MeanBaseV = MeanV, Baseline = SN) 
-      # if no exp conditions is used for the baseline then we repeat  exp given for the other SN
-      # in thius way the same baseline is used for each SN
-      if(all(CYTOTOXcell_base$EXP == "") ) {
-        CYTOTOXcell_base = do.call("rbind", lapply(unique(CYTOTOXcell$EXP), function(x) CYTOTOXcell_base %>% mutate(EXP = x) ) )
-      }
-      
-      CYTOTOXcell = CYTOTOXcell %>%  filter(SN != baselines)
-      CYTOTOXcell = merge(CYTOTOXcell_base,CYTOTOXcell,by= c("REP","EXP"),all.y = T)
-      CYTOTOXcell = CYTOTOXcell %>% mutate(Res = (MeanV-MeanBaseV)/(100-MeanBaseV)*100)
-      
-      cytotoxResult$data =  CYTOTOXcell
-      cytotoxResult$dataFinal =  CYTOTOXcell %>%
-        select(-Baseline, - MeanBaseV, - MeanV ) %>%
-        tidyr::spread(key= "REP", value = "Res") %>%
-        rename(`Sample Name` = SN,
-               `Experimental Condition` = EXP)
-      
-      output$CYTOTOXtables = renderDT({
-        datatable(
-          cytotoxResult$dataFinal,
-        rownames= FALSE,
-        options = list(
-          scrollX = TRUE,
-          lengthChange = FALSE,
-          dom = 't')
-        )
-      })
-      
-      output$CYTOTOXplots = renderPlot({
-        pl1 = CYTOTOXcell %>%
-          group_by(EXP,SN) %>%
-          summarize(Mean = mean(MeanV),SD = sd(MeanV)) %>%
-          ggplot(aes(x = as.factor(EXP),y = Mean ,fill = SN, col = SN)) + 
-          geom_bar(stat="identity", color="black", position=position_dodge()) +
-          geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.2,
-                        position=position_dodge(.9)) +
-          theme_bw()+ 
-          theme(legend.position = "bottom")+
-          labs(title = "Sample Name mean values with standard deviation bars",
-               col="Sample Name",fill="Sample Name",
-               x = "Experimental condition", y= "Mean Values")
-        
-        pl2 = CYTOTOXcell %>% ggplot() +
-          geom_boxplot(aes(x = as.factor(EXP),y = Res,fill = SN, col = SN),alpha = 0.4) +
-          theme_bw() + theme(legend.position = "bottom") +
-          labs(x = "Experimental condition", y= "% Values w.r.t \nthe baseline cell death",
-               col="Sample Name",fill="Sample Name")
-        pl1+pl2
-      })
-      
-      }
+      which(sapply(InputEXP, is.null)) -> indexesEXPnull
+      if(length(indexesEXPnull) > 0 )
+        listReturn = InputEXP[-indexesEXPnull]
+      else
+        listReturn = InputEXP
+    }else{
+      listReturn = list()
+    }
+    
+    if(length(listReturn) == 0){
+      return(list("Nothing",endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_COLOR))
+    }else{
+      return(c(listReturn,list(endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_COLOR)) )
+    }
   })
   
-  ### End CYTOTOX analysis ####
+  observeEvent(toListen_endoc(),{
+    baselines = FlagsENDOC$BASEselected
+    baselines = baselines[baselines != ""]
+    
+    if(toListen_endoc()[[1]] != "Nothing"){
+      exp = FlagsENDOC$EXPselected
+      exp = exp[exp != ""]
+      expNotBlank = unique(c(exp,baselines))
+      
+      MapBaseline = do.call(rbind,
+                            lapply(exp,function(i){
+                              if( length(input[[paste0("Exp",i)]]) > 0 && input[[paste0("Exp",i)]] != ""){
+                                data.frame(Exp = i, Baseline = input[[paste0("Exp",i)]])
+                              }else{
+                                data.frame(Exp = i, Baseline = NA)
+                              }
+                            })
+      ) %>% na.omit()
+      
+      MapBlank = do.call(rbind,
+                         lapply(expNotBlank,
+                                function(i){
+                                  if( length(input[[paste0("blExp",i)]]) > 0 && input[[paste0("blExp",i)]] != ""){
+                                    data.frame(Exp = i, Blank = input[[paste0("blExp",i)]])
+                                  }else{
+                                    data.frame(Exp = i, Blank = NA)
+                                  }
+                                })
+      ) %>% na.omit()
+      
+      if(dim(MapBaseline)[1]!=0 && dim(MapBlank)[1]!=0 ){
+        
+        endocResult$MapBaseline = MapBaseline
+        endocResult$MapBlank = MapBlank
+        
+        mat = as.matrix(endocResult$Initdata)
+        endocV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
+          rowwise() %>%
+          mutate(values = mat[Var1, Var2])
+        matTime =  as.matrix(endocResult$ENDOCcell_TIME)
+        endocT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
+          rowwise() %>%
+          mutate(time = matTime[Var1, Var2])
+        matExp =  as.matrix(endocResult$ENDOCcell_COLOR)
+        endocE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
+          rowwise() %>%
+          mutate(exp = matExp[Var1, Var2])
+        endocTot = merge(endocV,merge(endocT,endocE)) %>%
+          filter(exp != "")
+        
+        endocTotAverage = endocTot %>%
+          mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
+          group_by(time, exp) %>%
+          summarize(meanValues = mean(values))
+        
+        # merging exp with blank for the substraction
+        
+        endocTot_bl = right_join( endocTotAverage,MapBlank, 
+                                  by= c("exp"= "Blank") )%>%
+          rename(BlankValues = meanValues, Blank =  exp, exp = Exp )
+        
+        endocTotAverage = merge( endocTotAverage %>% filter(! exp %in%endocTot_bl$Blank ),
+                                 endocTot_bl %>% ungroup() %>%
+                                   dplyr::select(-time), all.x = T, by = "exp") %>%
+          rename(Exp = exp) 
+        endocTotAverage = endocTotAverage %>% mutate(meanValues = meanValues - BlankValues )
+        
+        # merging exp with baseline
+        endocTot_base = merge(MapBaseline, endocTotAverage,
+                              by.y = "Exp", by.x = "Baseline") %>%
+          rename(BaseValues = meanValues) %>% 
+          select(-Blank,-BlankValues)
+        
+        if(length(unique(endocTot_base$time)) == 1){ 
+          # if there is only one point then the baseline is used to normalize every times
+          endocTot_base = endocTot_base %>% select(-time)
+        }
+        endocTot_base = merge(endocTotAverage,
+                              endocTot_base )
+        # by.x = c("exp","time"),
+        # by.y = c("Exp","time")
+        #)
+        endocResult$data = endocTot
+        
+        if(length(endocTotAverage[,1]) != 0 ){
+          endocmean = endocTot_base %>%
+            rename( MeanExperiment = meanValues,
+                    MeanBaseline = BaseValues ) %>%
+            dplyr::mutate(Quantification = MeanExperiment/MeanBaseline * 100) %>%
+            rename(Experiment = Exp,Time = time) 
+          
+          output$ENDOCtables = renderDT(endocmean)
+          
+          endocResult$dataFinal = endocmean
+          
+          output$ENDOCplots = renderPlot(
+            {
+              pl1 = endocmean %>%
+                ggplot( aes(x = Time, y = MeanBaseline,
+                            col= Baseline, group = Experiment ) )+
+                geom_point( )+
+                geom_line()+
+                theme_bw()+
+                labs(x = "Time", col = "Baselines selected",
+                     y = "Average Baseline\n quantifications")
+              
+              pl2 = endocmean %>%
+                mutate(ExperimentBaseline = paste0(Experiment,"/",Baseline)) %>%
+                ggplot( aes(x = Time, y = Quantification,
+                            col= ExperimentBaseline, group = Experiment ) )+
+                geom_point()+
+                geom_line()+
+                theme_bw()+
+                labs(x = "Time", col = "Ratio\n Experiment / Baseline",
+                     y = "Ratio of the average quantifications\n (as %)")
+              
+              pl2/pl1
+            }
+          )
+        }else{
+          output$ENDOCtables = renderDT(data.frame(Error = "No baseline is associated with the experiment replicants!"))
+        }        
+      }
+    }
+  })
   
-  ### Start Statistic ####
+  # here the Exp boxes are updated every time a new experiment is added 
+  observeEvent(FlagsENDOC$EXPselected,{
+    expToselect = FlagsENDOC$EXPselected
+    baselines =  FlagsENDOC$BASEselected
+    blanks = FlagsENDOC$BLANCHEselected
+    
+    expToselect = expToselect[expToselect != ""]
+    
+    # baselines updating
+    output$EndocBaselineSelection <- renderUI({
+      select_output_list <- lapply(expToselect[! expToselect %in% baselines],
+                                   function(i) {
+                                     if(length(input[[paste0("Exp",i)]])>0)
+                                       expsel = input[[paste0("Exp",i)]]
+                                     else 
+                                       expsel = ""
+                                     
+                                     selectInput(inputId = paste0("Exp",i),
+                                                 label = i,
+                                                 choices = c("",baselines),
+                                                 selected = expsel)
+                                   })
+      do.call(tagList, select_output_list)
+    })
+    
+    # blanks updating
+    output$EndocBlankSelection <- renderUI({
+      select_output_list <- lapply(unique(c(expToselect,baselines)), function(i) {
+        
+        if(length(input[[paste0("blExp",i)]])>0)
+          expsel = input[[paste0("blExp",i)]]
+        else 
+          expsel = ""
+        
+        selectInput(inputId = paste0("blExp",i),
+                    label = i,
+                    choices = c("",blanks),
+                    selected = expsel)
+      })
+      do.call(tagList, select_output_list)
+    })
+  })
+  
+  observeEvent(endocResult$TablePlot, {
+    ENDOCtb = endocResult$TablePlot
+    output$ENDOCmatrix <- renderDT(
+      ENDOCtb,
+      server = FALSE
+    )
+    
+    ##### Plot the values selected!
+    matTime =  as.matrix(endocResult$ENDOCcell_TIME)
+    matExp =  as.matrix(endocResult$ENDOCcell_COLOR)
+    
+    if( !( all(matTime == "")  || all(matExp == "") ) ){
+      mat = as.matrix(endocResult$Initdata)
+      endocV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
+        rowwise() %>%
+        mutate(values = mat[Var1, Var2])
+      endocT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
+        rowwise() %>%
+        mutate(time = matTime[Var1, Var2])
+      endocE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
+        rowwise() %>%
+        mutate(exp = matExp[Var1, Var2])
+      endocTot = merge(endocV,merge(endocT,endocE)) %>%
+        na.omit() %>%
+        filter(time != "",  exp != "") 
+      
+      endocResult$data = endocTot
+      
+      output$ENDOCinitplots <- renderPlot(
+        ggplot(endocTot, aes(x = time, y=values, col = exp),alpha = 1.4) +
+          #geom_boxplot(aes(fill= exp, group = time),alpha = 0.4) +
+          geom_point(aes(group = exp)) +
+          scale_color_manual(values = FlagsENDOC$EXPcol) + 
+          #scale_fill_manual(values = FlagsENDOC$EXPcol) + 
+          theme_bw()+
+          labs(x = "Times", y = "Values", col = "Exp",fill = "Exp")+
+          theme(legend.position = c(0, 1), 
+                legend.justification = c(0, 1),
+                legend.direction = "vertical",
+                legend.background = element_rect(linewidth = 0.5,
+                                                 linetype="solid",
+                                                 colour ="black"))
+      )
+    }
+  })
+  
+  output$downloadENDOCAnalysis <- downloadHandler(
+    filename = function() {
+      paste('ENDOCanalysis-', Sys.Date(), '.zip', sep='')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      nomeRDS <- paste0("ENDOC_analysis-", Sys.Date(), ".rds")
+      nomeXLSX <- paste0("ENDOC_analysis-", Sys.Date(), ".xlsx")
+      
+      tempRdsPath <- file.path(tempDir, nomeRDS)
+      tempXlsxPath <- file.path(tempDir, nomeXLSX)
+      
+      results <- endocResult  # Assicurati di accedere a endocResult in un contesto reattivo, se necessario
+      saveRDS(results, file = tempRdsPath)
+      
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "ENDOC")
+      
+      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      manageSpinner(FALSE)
+      
+    } 
+  )
+  
+  ### End ENDOC analysis ####
+  
+  
+  #### CITOXICITY analysis ####
+  
+  ### End CITOXICITY analysis ####
+  
+  #### FACS analysis ####
+  facsResult = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    dataFinal = NULL,
+    depth = NULL,
+    depthCount = NULL,
+    name = NULL,
+    statistics = NULL,
+    cells = NULL
+  )
+  
+  facsResult0 = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    dataFinal = NULL,
+    depth = NULL,
+    depthCount = NULL,
+    name = NULL,
+    statistics = NULL,
+    cells = NULL
+  )
+  
+  FACSresultListen <- reactive({
+    reactiveValuesToList(facsResult)
+  })
+  observeEvent(FACSresultListen(), {
+    DataAnalysisModule$facsResult = reactiveValuesToList(facsResult)
+    DataAnalysisModule$facsResult$Flags = reactiveValuesToList(FlagsFACS)
+  })
+  
+  FlagsFACS <- reactiveValues(
+    actualLevel = NULL,
+    allLevel = NULL,
+    actualPath = NULL
+  )
+  
+  observeEvent(input$LoadFACS_Button,{
+    alert$alertContext <- "FACS-reset"
+    if(!is.null(facsResult$name) ) {
+      shinyalert(
+        title = "Important message",
+        text = "Do you want to update the FACS data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadExcelFileFACS()
+  })
+  
+  observeEvent(input$shinyalert, {
+    removeModal()
+    if (input$shinyalert && alert$alertContext == "FACS-reset") {  
+      resetPanel("FACS", flags = FlagsFACS, result = facsResult)
+      updateSelectizeInput(session, "FACScell", choices = character(0), selected = character(0))
+      
+      loadExcelFileFACS()
+    }
+  })
+  
+  loadExcelFileFACS <- function() {
+    alert$alertContext <- ""
+    
+    for(nameList in names(facsResult0)) 
+      facsResult[[nameList]] <- facsResult0[[nameList]]
+    
+    mess = readfile(
+      filename = input$FACSImport$datapath,
+      isFileUploaded = !is.null(input$FACSImport) && file.exists(input$FACSImport$datapath),
+      type = "Excel",
+      allDouble = TRUE,
+      colname = FALSE,
+      colors = FALSE,
+    )
+    
+    if (setequal(names(mess), c("message", "call"))) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+    } else {
+      if (nrow(mess) > 1) {
+        data <- mess[-1, , drop = FALSE]  
+        facsResult$depth <- vector("list", nrow(data))
+        facsResult$depthCount <- numeric(nrow(data))
+        facsResult$name <- vector("list", nrow(data))
+        facsResult$statistics <- vector("list", nrow(data))
+        facsResult$cells <- vector("list", nrow(data))
+        
+        for (i in 1:nrow(data)) {
+          x <- data[i, 1]
+          
+          if (is.na(x)) {
+            facsResult$depth[i] <- NA
+            facsResult$depthCount[i] <- 0
+            facsResult$name[i] <- data[i, 2]
+            facsResult$statistics[i] <- data[i, 3]
+            facsResult$cells[i] <- data[i, 4]
+          } else {
+            x_cleaned <- gsub(" ", "", x)  
+            facsResult$depth[i] <- x 
+            facsResult$depthCount[i] <- str_count(x_cleaned, fixed(">"))
+            facsResult$name[i] <- data[i, 2]
+            facsResult$statistics[i] <- data[i, 3]
+            facsResult$cells[i] <- data[i, 4]
+          }
+        }
+        
+        removeModal()
+        
+        maxDepth <- max(facsResult$depthCount, na.rm = TRUE)
+        
+        # Primo: cambia la tab
+        updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
+        
+        # Secondo: Ascolta il cambio della tab e poi esegue le funzioni
+        observeEvent(input$SideTabs, {
+          if (input$SideTabs == "tablesFACS") {
+            updateSelectizeUI(maxDepth)
+            FlagsFACS$actualLevel <- 0
+            showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
+          }
+        }, ignoreInit = TRUE)  # Assicurati di non eseguire al primo caricamento
+      }
+    }
+  }
+  
+  updateSelectizeUI <- function(maxDepth) {
+    output$dynamicSelectize <- renderUI({
+      rowContent <- fluidRow(
+        lapply(1:maxDepth, function(i) {
+          column(
+            2, offset = 1,
+            tags$div(style = "display: none;", id = paste("div_FACScell", i, sep = ""),
+                     selectizeInput(
+                       inputId = paste("FACScell", i, sep = "_"),
+                       label = paste("Gate", i),
+                       choices = c(),
+                       options = list(placeholder = 'Select the next gate', create = TRUE)
+                     )
+            )
+          )
+        })
+      )
+      rowContent
+    })
+  }
+  
+  observeEvent(FlagsFACS$actualLevel, {
+    currentInputId <- paste("FACScell", FlagsFACS$actualLevel, sep = "_")
+    
+    if (FlagsFACS$actualLevel == 0) {
+      valid_indices <- facsResult$depthCount == FlagsFACS$actualLevel
+      filtered_cells <- list()
+      filtered_names <- list()
+      
+      if (any(valid_indices)) {
+        for (i in which(valid_indices)) {
+          filtered_cells <- c(filtered_cells, facsResult$cells[i])
+          filtered_names <- c(filtered_names, facsResult$name[i])
+        }
+      }
+      
+      data_for_table <- data.frame(
+        Name = unlist(filtered_names),
+        Start = unlist(filtered_cells),
+        stringsAsFactors = FALSE
+      )
+      FlagsFACS$data <- data_for_table  
+      
+      FlagsFACS$actualPath <- ""
+      
+      output$FACSmatrix <- renderDT({
+        datatable(data_for_table, options = list(
+          pageLength = 10,
+          autoWidth = TRUE,
+          columnDefs = list(
+            list(title = "", targets = 2)  
+          )
+        ))
+      })
+    } else {
+      selected_item <- input[[currentInputId]]
+      path_components <- strsplit(FlagsFACS$actualPath, "/")[[1]]
+      if (length(path_components) >= FlagsFACS$actualLevel) {
+        path_components <- path_components[1:(FlagsFACS$actualLevel - 1)]
+      }
+      path_components <- c(path_components, selected_item)
+      FlagsFACS$actualPath <- paste(path_components, collapse = "/")
+      
+      if (ncol(FlagsFACS$data) > length(path_components) + 1) {  
+        FlagsFACS$data <- FlagsFACS$data[, c(1, (2:length(path_components) + 1)), drop = FALSE]
+      }
+      
+      new_column_name <- tail(path_components, n = 1)  
+      new_column_data <- vector("numeric", length = nrow(FlagsFACS$data))
+      
+      for (i in seq_len(nrow(FlagsFACS$data))) {
+        new_path <- paste0(FlagsFACS$data$Name[i], "/", FlagsFACS$actualPath)
+        index <- which(facsResult$name == new_path)
+        
+        if (length(index) == 1) {
+          new_column_data[i] <- sprintf("%.2f%%", facsResult$statistics[index])
+        } else {
+          new_column_data[i] <- NA
+        }
+      }
+      
+      maxLevels <- max(facsResult$depthCount, na.rm = TRUE)
+      if (FlagsFACS$actualLevel < maxLevels) {
+        lapply((FlagsFACS$actualLevel + 1):maxLevels, function(level) {
+          updateSelectizeInput(session, paste("FACScell", level, sep = "_"), choices = list())
+        })
+      }
+      
+      FlagsFACS$data[[new_column_name]] <- new_column_data
+      
+      output$FACSmatrix <- renderDT({
+        datatable(FlagsFACS$data, options = list(autoWidth = TRUE))
+      })
+    }
+    loadDrop() 
+  }, ignoreInit = TRUE)
+  
+  observe({FlagsFACS$actualPath
+    updateSelectizeInput(session = session,
+                         inputId = "selectBaseGate",
+                         choices = colnames(FlagsFACS$data)
+    )
+  }
+  )
+  
+  escapeRegex <- function(string) {
+    gsub("([\\\\^$.*+?()[{\\]|-])", "\\\\\\1", string)
+  }
+  
+  loadDrop <- function() {
+    targetLevel <- FlagsFACS$actualLevel + 1
+    currentPath <- FlagsFACS$actualPath
+    
+    escapedPath <- escapeRegex(currentPath)
+    regex_path <- paste0(".*", escapedPath, "/[^/]+$")
+    valid_indices <- facsResult$depthCount == targetLevel & grepl(regex_path, facsResult$name)
+    
+    valid_names <- facsResult$name[valid_indices]
+    valid_names <- as.character(valid_names)
+    
+    if (length(valid_names) > 0) {
+      short_names <- sapply(strsplit(valid_names, "/", fixed = TRUE), function(x) tail(x, 1))
+    } else {
+      short_names <- "no valid names found"
+    }
+    
+    nextInputId <- paste("FACScell", targetLevel, sep = "_")
+    nextDivId <- paste("div_FACScell", targetLevel, sep = "")
+    
+    if (length(short_names) == 0) {
+      updateSelectInput(session, nextInputId, choices = list("No choices available" = ""), selected = "")
+    } else {
+      updateSelectInput(session, nextInputId, choices = setNames(short_names, short_names), selected = character(0))
+    }
+    
+    shinyjs::runjs(paste0('setTimeout(function() { $("#', nextDivId, '").css("display", "block"); }, 200);'))
+  }
+  
+  
+  observe({
+    if (is.null(facsResult$depthCount) || length(facsResult$depthCount) == 0) {
+      numLevels <- 0
+    } else {
+      numLevels <- max(facsResult$depthCount, na.rm = TRUE)
+    }
+    
+    if (numLevels > 0) {
+      if (exists("levelObservers", envir = .GlobalEnv)) {
+        lapply(levelObservers, function(observer) {
+          observer$destroy()
+        })
+      }
+      
+      levelObservers <<- lapply(1:numLevels, function(level) {
+        observeEvent(input[[paste("FACScell", level, sep = "_")]], {
+          selectedValue <- input[[paste("FACScell", level, sep = "_")]]
+          if (!is.null(selectedValue) && nzchar(selectedValue) && selectedValue != "no valid names found") {
+            FlagsFACS$actualLevel <- 0
+            FlagsFACS$actualLevel <- level
+          }
+        }, ignoreInit = TRUE)
+      })
+    } else {
+      if (exists("levelObservers", envir = .GlobalEnv)) {
+        lapply(levelObservers, function(observer) {
+          observer$destroy()
+        })
+      }
+      levelObservers <<- list()  
+    }
+  })
+  
+  convert_percent_to_final <- function(data_row) {
+    last_percentage_name <- names(data_row)[length(data_row)]
+    start_percent_index <- 2  
+    
+    percentages = as.numeric(sub("%", "", data_row[start_percent_index:length(data_row)])) / 100
+    final_percentage = Reduce(`*`, percentages) * 100 
+    
+    data.frame(Name = data_row[1], FinalPercent = sprintf("%.2f%%", final_percentage)) %>%
+      setNames(c("Name", last_percentage_name))
+  }
+  
+  
+  observeEvent(input$SaveFACSanalysis, {
+    start_percent_index <- 3
+    current_data <- FlagsFACS$data[, c(1, start_percent_index:ncol(FlagsFACS$data)), drop = FALSE]
+    
+    processed_data <- lapply(split(current_data, seq(nrow(current_data))), convert_percent_to_final)
+    new_data <- do.call(rbind, processed_data)
+    
+    if (is.null(facsResult$data)) {
+      facsResult$data <- new_data
+    } else {
+      if (names(facsResult$data)[ncol(facsResult$data)] != names(new_data)[2]) {
+        facsResult$data[names(new_data)[2]] <- new_data[, 2]
+      }
+    }
+    
+    output$FACSresult <- renderDT({
+      datatable(facsResult$data, 
+                options = list(
+                  autoWidth = TRUE,
+                  #editable = TRUE,
+                  columnDefs = list(
+                    list(visible = FALSE, targets = 0)  
+                  )
+                ),
+                #editable = list(target = "cell", disable = list(2:ncol(facsResult$data)))
+      )
+    })
+  })
+  
+  ### End FACS analysis ####
+  
+  ### Start Statistic  ####
   DataStatisticModule = reactiveValues(WB = list(),
                                        PRCC = list(),
                                        ELISA = list(),
@@ -2634,362 +3381,160 @@ server <- function(input, output, session) {
       
       DataStatisticModule$Flag = F
     }
-    
   })
   
-  observeEvent(input$StatAnalysis,{
+  observeEvent(input$loadStatAnalysis_file_Button,{
+    manageSpinner(TRUE)
     
-    if(input$StatAnalysis != ""){
-      DataStatisticModule[[input$StatAnalysis]] -> results
-      do.call(rbind,results) -> results
+    result <- readfile(
+      filename = input$loadStatAnalysis_file$datapath, 
+      type = "RDsMulti",
+      isFileUploaded = !is.null(input$loadStatAnalysis_file)
+    )
+    
+    if (!is.null(result$error)) {
+      showAlert("Error", result$error, "error", 5000)
+      manageSpinner(FALSE)
+      return()
+    }
+    
+    datapaths <- input$loadStatAnalysis_file$datapath
+    for(dpath in 1:length(datapaths)){
+      mess <- readRDS(datapaths[dpath])
       
-      res = resTTest = NULL
-      resplot = ggplot()
+      if(!(all(names(mess) %in% names(DataAnalysisModule)) ||
+           all(names(mess) %in% names(elisaResult)) ||
+           all(names(mess) %in% names(wbquantResult)) || 
+           all(names(mess) %in% names(pcrResult)) ||
+           all(names(mess) %in% names(cytotoxResult)) ||
+           all(names(mess) %in% names(endocResult)))){
+        showAlert("Error", paste(mess[["message"]],"\n The file must be RDs saved through the Data Analysis module."), "error", 5000)
+        manageSpinner(FALSE)
+        return()
+      }
       
-      if(input$StatAnalysis == "WB"){
-        resTTest = res = results %>%
-          select(DataSet,SampleName,AdjRelDens) %>%
-          mutate(SampleName = gsub(pattern = "^[0-9]. ",x = SampleName,replacement = "")) %>%
-          tidyr::spread(key = DataSet,value = AdjRelDens ) 
-        
-        res$Mean = apply(res[,paste(unique(results$DataSet))],1,mean)
-        res$Sd = apply(res[,paste(unique(results$DataSet))],1,sd)
-
-        resplot =ggplot(res, aes(x = SampleName,
-                                 y = Mean)) + 
-          geom_bar(stat="identity", color="black", fill = "#BAE1FF",
-                          position=position_dodge()) +
-          geom_errorbar(aes(ymin=Mean-Sd, ymax=Mean+Sd), width=.2,
-                        position=position_dodge(.9)) +
-          theme_bw()
-        
-        combo = expand.grid(resTTest$SampleName,resTTest$SampleName)
-        combo = combo[combo$Var1 != combo$Var2, ]
-        resTTest = do.call(rbind,
-                           lapply(1:dim(combo)[1],function(x){
-          sn = combo[x,]
-          ttest = t.test(resTTest[resTTest$SampleName == sn$Var1, -1],resTTest[resTTest$SampleName == sn$Var2, -1]) 
-          data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
-                     pValue = ttest$p.value,
-                     conf.int = paste(ttest$conf.int,collapse = ";")
-                    )
-          })
-        )
-        
-        }
+      DataStatisticModule$Flag <- TRUE
       
-      output$TabStat = renderDT({res})
-      output$PlotStat = renderPlot({resplot})
-      output$TabTTest = renderDT({resTTest})
+      if(all(names(mess) %in% names(wbquantResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+        DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
+      } else if(all(names(mess) %in% names(pcrResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+        DataAnalysisModule$PRCC[[dpath]]  <- mess
+      } else if(all(names(mess) %in% names(endocResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+        DataAnalysisModule$ENDOC[[dpath]]  <- mess
+      } else if(all(names(mess) %in% names(elisaResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+        DataAnalysisModule$ELISA[[dpath]]  <- mess
+      } else if(all(names(mess) %in% names(cytotoxResult)) || all(names(mess) %in% names(DataAnalysisModule))){
+        DataAnalysisModule$CYTOTOX[[dpath]]  <- mess
+      }
+    }
+    manageSpinner(FALSE)
+    showAlert("Success", "The RDs files have been uploaded with success", "success", 2000)
+    return(NULL)
+  })
+  
+  StatisticalAnalysisResults <- reactive({
+    if (!is.null(input$StatAnalysis) && input$StatAnalysis != "") {
+      results <- DataStatisticModule[[input$StatAnalysis]]
+      do.call(rbind, results) -> results
+      
+      switch(input$StatAnalysis, 
+             "WB" =  {
+               res <- results %>%
+                 select(DataSet, SampleName, AdjRelDens) %>%
+                 mutate(SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
+                        ColorSet = as.character(DataSet)) 
+               
+               points <- res %>%
+                 mutate(SampleName = as.factor(SampleName))
+               
+               stats <- points %>%
+                 group_by(SampleName) %>%
+                 summarise(Mean = mean(AdjRelDens), Sd = sd(AdjRelDens), .groups = 'drop')
+               
+               combo = expand.grid(stats$SampleName,stats$SampleName)
+               combo = combo[combo$Var1 != combo$Var2, ]
+               resTTest = do.call(rbind,
+                                  lapply(1:dim(combo)[1],function(x){
+                                    sn = combo[x,]
+                                    ttest = t.test(stats[stats$SampleName == sn$Var1, -1],stats[stats$SampleName == sn$Var2, -1]) 
+                                    data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
+                                               pValue = ttest$p.value,
+                                               conf.int = paste(ttest$conf.int,collapse = ";")
+                                    )
+                                  })
+               )
+               
+               resplot <- ggplot(stats, aes(x = SampleName, y = Mean)) + 
+                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+                 geom_errorbar(aes(ymin=Mean-Sd, ymax=Mean+Sd), width=.2, position=position_dodge(.9)) +
+                 geom_point(data = points, aes(x = SampleName, y = AdjRelDens, color = ColorSet),
+                            position = position_jitter(width = 0.2), size = 3) +
+                 theme_bw()+
+                 labs(color = "Sample Name")
+               
+               list(Table = stats, TableTest = resTTest, Plot = resplot)
+             }
+      )
+    } else {
+      list(Table = NULL,TableTest = NULL, Plot = NULL)
     }
   })
+  
+  # Render statistical analysis results
+  output$TabStat <- renderDT({
+    StatisticalAnalysisResults()$Table
+    },
+    options = list(
+      searching = FALSE,
+      dom = 't' # Only display the table
+    )
+  )
+  
+  output$PlotStat <- renderPlot({
+    StatisticalAnalysisResults()$Plot
+  })
+  
+  output$TabTTest <- renderDT({
+    StatisticalAnalysisResults()$TableTest
+  },
+  options = list(
+    searching = FALSE,
+    dom = 't' # Only display the table
+  ))
   
   ### End Statistic ####
   
-  ### DATAVERSE ####
   
-  observeEvent(input$APIkey,{
-    pathORCA <- system.file("Data", package = "ORCA")
-    
-    if(input$APIkey != "") # the last key used is saved
-      write(input$APIkey,file = paste0(pathORCA,"/.APIkey"))
-
-  })
+  #----------------------------------------------------------------------------------
+  # OTHER ANALYSIS TO DO
+  cytotoxResult  = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    CYTOTOXcell_EXP = NULL,
+    CYTOTOXcell_REP = NULL,
+    CYTOTOXcell_SN = NULL,
+    MapBaseline = NULL)
   
-  DataAnalysisModule0 <- list(wbResult = wbResult0,
-                              wbquantResult = wbquantResult0,
-                              endocResult = endocResult0,
-                              elisaResult = elisaResult0,
-                              pcrResult = pcrResult0,
-                              cytotoxResult = cytotoxResult0)
-  
-  observe({
-    listDataAnalysisModule = reactiveValuesToList(DataAnalysisModule)
-    namesAnalysis = sapply(names(listDataAnalysisModule), function(x){
-      if(x == "wbquantResult"){
-        if(! identical(DataAnalysisModule[[x]]$NormWBanalysis,DataAnalysisModule0[[x]]$NormWBanalysis) )
-           return(x)
-        else
-          return("")
-      }
-      else if(!is.null(DataAnalysisModule[[x]]$Initdata) || !identical(DataAnalysisModule[[x]]$Initdata,DataAnalysisModule0[[x]]$Initdata) )
-        return(x)
-      else
-        return("")
-      })
-    namesAnalysis = namesAnalysis[namesAnalysis!= ""]
-    if(length(namesAnalysis)>0)
-      updateSelectizeInput(inputId = "selectAnalysis_DV",
-                          choices = MapAnalysisNames[namesAnalysis])
-  })
-  
-  observeEvent(input$DataverseUpload_Button,{
-
-    if(input$selectAnalysis_DV != ""){
-  
-      if(input$Title_DV == "" && input$Author_DV == "" && input$Description_DV == "" &&
-         input$AuthorAff_DV== "" && input$ContactN_DV == "" && input$ContactEmail_DV == "")
-          output$LoadingError_DATAVERSE = renderText("Error: missing information")
-      else{
-        # creation of a temporary folder
-        tempfolder = paste0(tempdir(check = T),"/ORCA")
-        system(paste0("mkdir ",tempfolder))
-        system(paste0("mkdir ",tempfolder,"/dataset"))
-        # create the metadata
-        result <- rjson::fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
-        result$dataset_title = input$Title_DV
-        result$dataset_description = paste0(input$Description_DV,"\n This dataset has been obtained using the ORCA application, specifically the module: ", input$selectAnalysis_DV)
-        result$author_name = input$Author_DV
-        result$author_affiliation= input$AuthorAff_DV
-        result$dataset_contact_name = input$ContactN_DV
-        result$dataset_contact_email = input$ContactEmail_DV
-        # result$subject = as.vector(result$subject)
-        write(rjson::toJSON(result), file=paste0(tempfolder,"/metadata.json") )
-  
-        # move the file in the temporary folder
-  
-        saveExcel(filename = paste0(tempfolder,"/dataset/",
-                                    gsub(pattern = " ", 
-                                         x = input$selectAnalysis_DV,
-                                         replacement = ""),".xlsx"),
-                  ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
-                  analysis = input$selectAnalysis_DV )
-        
-        saveRDS(DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
-                file = paste0(tempfolder,"/dataset/ORCA_",
-                                         gsub(pattern = " ", 
-                                              x = input$selectAnalysis_DV,
-                                              replacement = ""),".RDs"))
-        # docker run
-        ORCA::docker.run(params = paste0("--volume ", tempfolder,
-                   ":/Results/ -d qbioturin/orca-upload-dataverse python3 main.py /Results/metadata.json /Results/dataset") 
-        )
-  
-      }
-    
-    }
-  })
-  
-  #initiate_sword_dataset()
-  #add_dataset_file()
-  #publish_dataset()
-  
-  #### End DATAVERSE
-  
-  ### Loading files ####
-  UploadDataAnalysisModuleAllFalse  = reactiveValues(FlagALL = F,
-                                                     FlagUpdate = F,
-                                                     FlagWB = F,
-                                                     FlagPRCC = F,
-                                                     FlagELISA = F,
-                                                     FlagCYTOTOX = F,
-                                                     FlagENDOC = F)
-  UploadDataAnalysisModule = reactiveValues(FlagALL = F,
-                                            FlagUpdate = F,
-                                            FlagWB = F,
-                                            FlagPRCC = F,
-                                            FlagELISA = F,
-                                            FlagCYTOTOX = F,
-                                            FlagENDOC = F)
-  
-  
-  # upload in the statistic module
-  observeEvent(input$loadStatAnalysis_file_Button,{
-    output$loadStatAnalysis_Error <- renderText({
-      validate(
-        need(!is.null(input$loadStatAnalysis_file) && all(file.exists(input$loadStatAnalysis_file$datapath)) ,
-             "Please select one RDs file generated throught the Data Analysis module." )
-      )
-      
-      datapaths = input$loadStatAnalysis_file$datapath
-      for(dpath in 1:length(datapaths)){
-        mess = readRDS(datapaths[dpath])
-        
-        validate(
-          need(all(names(mess) %in% names(DataAnalysisModule)) ||
-                 all(names(mess) %in% names(elisaResult)) ||
-                 all(names(mess) %in% names(wbquantResult)) || 
-                 all(names(mess) %in% names(pcrResult)) ||
-                 all(names(mess) %in% names(cytotoxResult)) ||
-                 all(names(mess) %in% names(endocResult)) ,
-               paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
-        )
-        
-        DataStatisticModule$Flag = T
-        
-        if( all(names(mess) %in% names(wbquantResult)) || all(names(mess) %in% names(DataAnalysisModule)) ){
-          DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
-        }else if( all(names(mess) %in% names(pcrResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-          DataAnalysisModule$PRCC[[dpath]]  <- mess
-        }else if(all(names(mess) %in% names(endocResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-          DataAnalysisModule$ENDOC[[dpath]]  <- mess
-        }else if(all(names(mess) %in% names(elisaResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-          DataAnalysisModule$ELISA[[dpath]]  <- mess
-        }else if(all(names(mess) %in% names(cytotoxResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-          DataAnalysisModule$CYTOTOX[[dpath]]  <- mess
-        }
-        
-      }
-      
-      "The RDs files have been uploaded  with success."
-      
-    })
-  })
-  
-  # general upload in the app
-  observeEvent(input$loadAnalysis_Button,{
-    output$loadAnalysis_Error <- renderText({
-      validate(
-        need(!is.null(input$loadAnalysis_file) && all(file.exists(input$loadAnalysis_file$datapath)) ,
-             "Please select one RDs file generated throught the Data Analysis module." )
-      )
-      
-      mess = readRDS(input$loadAnalysis_file$datapath)
-      
-      messNames = names(mess)
-      if("Flags"%in% messNames) messNames = messNames[ messNames != "Flags"]
-      
-      validate(
-        need(all(messNames %in% names(DataAnalysisModule)) ||
-               all(messNames %in% names(elisaResult)) ||
-               all(messNames %in% names(wbResult)) || 
-               all(messNames %in% names(pcrResult)) ||
-               all(messNames %in% names(cytotoxResult)) ||
-               all(messNames %in% names(endocResult)) ,
-             paste(mess[["message"]],"\n The file must be RDs saved throught the Data Analysis module." ))
-      )
-      
-      if(all(messNames %in% names(DataAnalysisModule)) ){
-        DataAnalysisModule <- mess
-        UploadDataAnalysisModule$FlagALL = T
-      }else if( all(messNames %in% names(wbResult)) ){
-        DataAnalysisModule$wbResult <- mess
-        UploadDataAnalysisModule$FlagWB = T
-      }else if( all(messNames %in% names(pcrResult)) ){
-        DataAnalysisModule$pcrResult <- mess
-        UploadDataAnalysisModule$FlagPRCC = T
-      }else if(all(messNames %in% names(endocResult)) ){
-        DataAnalysisModule$endocResult <- mess
-        UploadDataAnalysisModule$FlagENDOC = T
-      }else if(all(messNames %in% names(elisaResult)) ){
-        DataAnalysisModule$elisaResult <- mess
-        UploadDataAnalysisModule$FlagELISA = T
-      }else if(all(messNames %in% names(cytotoxResult)) ){
-        DataAnalysisModule$cytotoxResult <- mess
-        UploadDataAnalysisModule$FlagCYTOTOX = T
-      }
-      
-      UploadDataAnalysisModule$FlagUpdate = T
-      
-      "The RDs file has been uploaded  with success."
-      
-    })
-  })
-  
-  observeEvent(UploadDataAnalysisModule$FlagUpdate,{
-    if(UploadDataAnalysisModule$FlagUpdate){
-      
-      if(UploadDataAnalysisModule$FlagWB || UploadDataAnalysisModule$FlagALL){
-        UploadRDs(Flag = "WB",
-                  session = session,
-                  output = output,
-                  DataAnalysisModule = DataAnalysisModule,
-                  Result = wbResult, 
-                  FlagsExp = Flags,
-                  PanelStructures = PanelStructures)
-      }
-      else if(UploadDataAnalysisModule$FlagPRCC || UploadDataAnalysisModule$FlagALL){
-        UploadRDs(Flag = "PRCC",
-                  session = session,
-                  output = output,
-                  DataAnalysisModule = DataAnalysisModule,
-                  Result = prccResult, 
-                  FlagsExp = FlagsPRCC)
-      }
-      else if(UploadDataAnalysisModule$FlagENDOC || UploadDataAnalysisModule$FlagALL){
-        UploadRDs(Flag = "ENDOC",
-                  session = session,
-                  output = output,
-                  DataAnalysisModule = DataAnalysisModule,
-                  Result = endocResult, 
-                  FlagsExp = FlagsENDOC)
-      }
-      else if(UploadDataAnalysisModule$FlagELISA || UploadDataAnalysisModule$FlagALL){
-        UploadRDs(Flag = "ELISA",
-                  session = session,
-                  output = output,
-                  DataAnalysisModule = DataAnalysisModule,
-                  Result = elisaResult, 
-                  FlagsExp = FlagsELISA)
-        
-      }
-      else if(UploadDataAnalysisModule$FlagCYTOTOX || UploadDataAnalysisModule$FlagALL){
-        
-        UploadRDs(Flag = "CYTOTX",
-                  session = session,
-                  output = output,
-                  DataAnalysisModule = DataAnalysisModule,
-                  Result = cytotoxResult, 
-                  FlagsExp = FlagsCYTOTOX)
-        
-      }
-
-            UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
-    }
-    
-  })
-  ### Download files ####
-  
-  output$downloadButtonExcel_ELISA <- downloadHandler(
+  # DOWNLOAD REPORT E RDS
+  output$downloadReport <- downloadHandler(
     filename = function() {
-      paste('ELISAanalysis-', Sys.Date(), '.xlsx', sep='')
+      "Report.html"
     },
     content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$elisaResult , analysis = "ELISA")
-    }
-  )
-  
-  output$downloadButtonExcel_PCR <- downloadHandler(
-    filename = function() {
-      paste('RTqPCRanalysis-', Sys.Date(), '.xlsx', sep='')
-    },
-    content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$pcrResult , analysis = "RT-qPCR")
-    }
-  )
-  
-  output$downloadButtonExcel_WB <- downloadHandler(
-    filename = function() {
-      paste('WBanalysis-', Sys.Date(), '.xlsx', sep='')
-    },
-    content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$wbResult , analysis = "WB")
-    }
-  )
-  
-  output$downloadButtonExcel_WBquant <- downloadHandler(
-    filename = function() {
-      paste('WBquant_analysis-', Sys.Date(), '.xlsx', sep='')
-    },
-    content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$wbquantResult , analysis = "WB comparison")
-    }
-  )
-  output$downloadButtonExcel_CYTOTOX <- downloadHandler(
-    filename = function() {
-      paste('CYTOTOXanalysis-', Sys.Date(), '.xlsx', sep='')
-    },
-    content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$cytotoxResult , analysis = "Cytotoxicity")
-    }
-  )
-  
-  output$downloadButtonExcel_ENDOC <- downloadHandler(
-    filename = function() {
-      paste('ENDOCanalysis-', Sys.Date(), '.xlsx', sep='')
-    },
-    content = function(file) {
-      saveExcel(filename = file, ResultList=DataAnalysisModule$endocResult , analysis = "Endocytosis")
+      if (checkAnalysis()) {
+        showAlert("Error", "no analyzes to download", "error", 5000)
+        return(NULL)
+      }
+      
+      manageSpinner(TRUE)
+      parmsList = list(ResultList = reactiveValuesToList(DataAnalysisModule))
+      rmarkdown::render("inst/shiny/report.Rmd",
+                        output_file = file, output_format = "html_document",
+                        params = parmsList)
+      manageSpinner(FALSE)
+      showAlert("Success", "Download completed successfully", "success", 2000)
     }
   )
   
@@ -2998,86 +3543,67 @@ server <- function(input, output, session) {
       paste('DataIntegrationModuleAnalysis-', Sys.Date(), '.RDs', sep='')
     },
     content = function(file) {
+      if (checkAnalysis()) {
+        showAlert("Error", "no analyzes to download", "error", 5000)
+        return(NULL)
+      }
+      manageSpinner(TRUE)
       saveRDS(reactiveValuesToList(DataAnalysisModule), file = file)
+      manageSpinner(FALSE)
+      showAlert("Success", "Download completed successfully", "success", 2000)
     }
   )
   
-  output$downloadReport <- downloadHandler(
+  # Download statistical analysis button
+  output$downloadStatisticalAnalysis <- downloadHandler(
     filename = function() {
-      "Report.html"
+      paste("Statistical_Analysis_", input$StatAnalysis, ".RDs", sep = "")
     },
     content = function(file) {
-      parmsList = list(ResultList = reactiveValuesToList(DataAnalysisModule))
-      rmarkdown::render(system.file("Shiny","report.Rmd", package = "ORCA"),
-                        output_file = file,output_format = "html_document",
-                        params = parmsList )
+      results <- StatisticalAnalysisResults()
+      if (!is.null(results$Table)) {
+        manageSpinner(TRUE)
+        saveRDS(results, file = file)
+        manageSpinner(FALSE)
+        showAlert("Success", "Download completed successfully", "success", 2000)
+      }
     }
   )
   
-  output$downloadButton_WB <- downloadHandler(
-    filename = function() {
-      paste('WBanalysis-', Sys.Date(), '.RDs', sep='')
-    },
-    content = function(file) {
-      results = DataAnalysisModule$wbResult
-      saveRDS(results, file = file)
-    }
-  )
+  checkAnalysis <- function() {
+    if (!is.null(wbResult$Normalizer) || !is.null(wbResult$Im) || !is.null(wbResult$Planes) ||
+        !is.null(wbResult$TruncatedPanelsValue) || !is.null(wbResult$PanelsValue) ||
+        !is.null(wbResult$Plots) || !is.null(wbResult$TruncatedPlots) || !is.null(wbResult$pl) ||
+        !identical(wbResult$AUCdf, data.frame(SampleName = "-", Truncation = "-", AUC = "-")))
+      return (FALSE)
+    if (!is.null(wbquantResult$NormWBanalysis) || !is.null(wbquantResult$NormWBanalysis_filtered) ||
+        !is.null(wbquantResult$WBanalysis) || !is.null(wbquantResult$WBanalysis_filtered) ||
+        !is.null(wbquantResult$AdjRelDensitiy))
+      return (FALSE)
+    if (!is.null(pcrResult$Initdata) || !is.null(pcrResult$selectPCRcolumns) ||
+        !is.null(pcrResult$data) || !is.null(pcrResult$PCRnorm) || !is.null(pcrResult$NewPCR) ||
+        !is.null(pcrResult$plotPRC))
+      return (FALSE)
+    if (!is.null(elisaResult$Initdata) || !is.null(elisaResult$data) ||
+        !is.null(elisaResult$TablePlot) || !is.null(elisaResult$dataFinal) ||
+        !is.null(elisaResult$ELISAcell_EXP) || !is.null(elisaResult$ELISAcell_SN) ||
+        !is.null(elisaResult$MapBaseline) || !is.null(elisaResult$MapBlank) ||
+        !is.null(elisaResult$Tablestandcurve) || !is.null(elisaResult$Regression))
+      return (FALSE)
+    if (!is.null(cytotoxResult$Initdata) || !is.null(cytotoxResult$data) ||
+        !is.null(cytotoxResult$TablePlot) || !is.null(cytotoxResult$dataFinal) ||
+        !is.null(cytotoxResult$CYTOTOXcell_EXP) || !is.null(cytotoxResult$CYTOTOXcell_REP) ||
+        !is.null(cytotoxResult$CYTOTOXcell_SN) || !is.null(cytotoxResult$MapBaseline))
+      return (FALSE)
+    if (!is.null(endocResult$Initdata) || !is.null(cytotoxResult$data) ||
+        !is.null(endocResult$TablePlot) || !is.null(cytotoxResult$dataFinal) ||
+        !is.null(endocResult$ENDOCcell_TIME) || !is.null(cytotoxResult$ENDOCcell_SN) ||
+        !is.null(endocResult$MapBaseline) || !is.null(cytotoxResult$MapBlank))
+      return (FALSE)
+    
+    return (TRUE)
+  }
   
-  output$downloadButton_WBquant <- downloadHandler(
-    filename = function() {
-      paste('WBanalysisQuantification-', Sys.Date(), '.RDs', sep='')
-    },
-    content = function(file) {
-      results = DataAnalysisModule$wbquantResult
-      saveRDS(results, file = file)
-    }
-  )
-  
-  output$downloadButton_PCR <- downloadHandler(
-    filename = function() {
-      paste('PCRanalysis-', Sys.Date(), '.RDs', sep='')
-    },
-    content = function(file) {
-      results = DataAnalysisModule$pcrResult
-      saveRDS(results, file = file)
-    }
-  )
-  
-  output$downloadButton_ENDOC <- downloadHandler(
-    filename = function() {
-      paste('ENDOCanalysis-', Sys.Date(), '.RDs', sep='')
-    },
-    content = function(file) {
-      results = DataAnalysisModule$endocResult
-      saveRDS(results, file = file)
-    }
-  )
-  
-  
-  output$downloadButton_CYTOTOX <- downloadHandler(
-    filename = function() {
-      paste('CYTOTOXanalysis-', Sys.Date(), '.RDs', sep='')
-    },
-    content = function(file) {
-      results = DataAnalysisModule$cytotoxResult
-      saveRDS(results, file = file)
-    }
-  )
-  
-  output$downloadButton_ELISA <- downloadHandler(
-    filename = function() {
-      paste('ELISAanalysis-', Sys.Date(), '.RDs', sep='')
-    },
-    content = function(file) {
-      results = DataAnalysisModule$elisaResult
-      saveRDS(results, file = file)
-    }
-  )
-  #### end save files ###
-  
-  observe({namesAll <<- unique( c("Flags",names(wbResult), names(wbquantResult), names(pcrResult), names(endocResult)) )})
-  
-  return()
-  
+  # END DOWNLOAD
 }
+

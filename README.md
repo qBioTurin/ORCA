@@ -25,8 +25,7 @@ To install it you can use  **devtools**:
 
 ```
 install.packages("devtools")
-library(devtools)
-install_github("qBioTurin/ORCA", ref="main",dependencies=TRUE)
+devtools::install_github("qBioTurin/ORCA", ref="ORCAv2.0.0",dependencies=TRUE)
 ```
 
 ## How to run 

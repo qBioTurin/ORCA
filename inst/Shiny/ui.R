@@ -1,196 +1,98 @@
 library(shinydashboard)
 library(shiny)
+library(shinyjs)
+library(jsonlite)
+library(shinyalert)
+library(shinybusy)
 library(zoo)
 library(knitr)
-library(ggplot2) 
-library(shinythemes) 
+library(ggplot2)
+library(shinythemes)
 library(OpenImageR)
 library(dplyr)
-library("shinyWidgets")
+library(shinyWidgets)
 library(DT)
 library(openxlsx)
 library(patchwork)
-
+library(stringr)
 
 ui <- dashboardPage(
-  #theme = shinytheme("paper"),
   dashboardHeader(title = "ORCA",
-                  tags$li(a(onclick = "onclick =window.open('https://github.com/qBioTurin/ORCA')",
+                  tags$li(a(onclick = "window.open('https://github.com/qBioTurin/ORCA')",
                             href = NULL,
                             icon("github"),
                             title = "GitHub",
                             style = "cursor: pointer;"),
                           class = "dropdown"),
-                  ## DOWNLOAD
                   tags$li(class = "dropdown",
-                          tags$style("#mydropdown{cursor: pointer; background-color: #852fb4 ;
-                              color: white;
-                              border: 1px solid #852fb4; height: 50px;left:0;}"),
-                          dropdownButton(inputId = "mydropdown",label = "",
-                                         right = T,
-                                         circle = FALSE,
-                                         icon = icon("download"),
+                          tags$style("#mydropdown {cursor: pointer; background-color: #852fb4; color: white; border: 1px solid #852fb4; height: 50px; left: 0;}"),
+                          dropdownButton(inputId = "mydropdown", label = "", right = TRUE, circle = FALSE, icon = icon("download"),
                                          tags$li(shinyjs::useShinyjs(),
-                                                 downloadButton(outputId = 'downloadReport',
-                                                                href = "report.html",
-                                                                download = "report.html",
-                                                                label = "Report",title = "Report generation",
-                                                                style = "cursor: pointer; width: 98%;
-                                      text-align: center; vertical-align: middle;
-                                      border: 1px solid #9809AF;",
-                                                                class="dlButton")
-                                         ),
+                                                 downloadButton(outputId = 'downloadReport', label = "Report", title = "Report generation", style = "cursor: pointer; width: 98%; text-align: center; vertical-align: middle; border: 1px solid #9809AF;", class = "dlButton")),
                                          tags$li(shinyjs::useShinyjs(),
-                                                 downloadButton(outputId = 'downloadRDSwholeAnalysis',
-                                                                label = "RDs",title = "RDS storing the whole analysis",
-                                                                style = "cursor: pointer; width: 98%;
-                                      text-align: center; vertical-align: middle;
-                                      border: 1px solid #9809AF;",
-                                                                class="dlButton")
-                                         )
+                                                 downloadButton(outputId = 'downloadRDSwholeAnalysis', label = "RDs", title = "RDS storing the whole analysis", style = "cursor: pointer; width: 98%; text-align: center; vertical-align: middle; border: 1px solid #9809AF;", class = "dlButton"))
                           ),
                           block = TRUE)
   ),
-  dashboardSidebar(   
+  dashboardSidebar(
     sidebarMenu(id = "SideTabs",
-                menuItem('Home',
-                         tabName = 'Home',
-                         icon = icon('home')
-                ),
-                menuItem("Data Analysis",
-                         tabName = 'DataAnaslysis',
-                         icon = icon('chart-line'),
-                         menuItem('Western Blot analysis',
-                                  tabName = 'wb',
+                menuItem('Home', tabName = 'Home', icon = icon('home')),
+                menuItem("Data Analysis", tabName = 'DataAnaslysis', icon = icon('chart-line'),
+                         menuItem('Western Blot analysis', tabName = 'wb',
                                   menuSubItem("Upload Image", tabName = "uploadIm"),
                                   menuSubItem("Protein Bands", tabName = "plane"),
                                   menuSubItem("Profile Plots", tabName = "grey"),
-                                  menuSubItem("Quantification", tabName = "quantification")
-                         ),
-                         menuItem('RT-qPCR analysis',
-                                  tabName = 'pcr',
+                                  menuSubItem("Quantification", tabName = "quantification")),
+                         menuItem('RT-qPCR analysis', tabName = 'pcr',
                                   menuSubItem("Upload data", tabName = "uploadPCR"),
-                                  menuSubItem("Quantification", tabName = "tablesPCR")
-                                 # menuSubItem("Plot", tabName = "plotsPCR")
-                         ),
-                         menuItem('ELISA analysis',
-                                  tabName = 'elisa',
+                                  menuSubItem("Quantification", tabName = "tablesPCR")),
+                         menuItem('ELISA analysis', tabName = 'elisa',
                                   menuSubItem("Upload data", tabName = "uploadELISA"),
-                                  menuSubItem("Quantification", tabName = "tablesELISA")
-                         ),
-                         menuItem('Endocytosis assay',
-                                  tabName = 'endoc',
+                                  menuSubItem("Quantification", tabName = "tablesELISA")),
+                         menuItem('Endocytosis assay', tabName = 'endoc',
                                   menuSubItem("Upload data", tabName = "uploadENDOC"),
-                                  menuSubItem("Quantification", tabName = "tablesENDOC")
-                         ),
-                         menuItem('Cytotoxicity assay',
-                                  tabName = 'cytotox',
+                                  menuSubItem("Quantification", tabName = "tablesENDOC")),
+                         menuItem('Cytotoxicity assay', tabName = 'cytotox',
                                   menuSubItem("Upload data", tabName = "uploadCYTOTOX"),
-                                  menuSubItem("Quantification", tabName = "tablesCYTOTOX")
-                         )
+                                  menuSubItem("Quantification", tabName = "tablesCYTOTOX")),
+                         menuItem('Facs analysis', tabName = 'facs',
+                                  menuSubItem("Upload data", tabName = "uploadFACS"),
+                                  menuSubItem("Quantification", tabName = "tablesFACS"))
                 ),
-                # menuItem('Model Integration',
-                #          tabName = 'integ',
-                #          icon = icon('file'),
-                #          menuSubItem("Omics Data", tabName = "Omics_tab"),
-                #          menuSubItem("WB, RT-qPCR, ENDOC ", tabName = "WbPcrElisa_tab"),
-                #          menuSubItem("IF, and other data ", tabName = "otherData_tab")
-                # ),
-                menuItem('Statistical analysis',
-                         tabName = 'StatAnalysis_tab',
-                         icon = icon('magnifying-glass-chart')
+                menuItem('Statistical analysis', tabName = 'StatAnalysis_tab', icon = icon('magnifying-glass-chart')),
+                menuItem('Model Integration',
+                         tabName = 'integ',
+                         icon = icon('file'),
+                         menuSubItem("Omics Data", tabName = "Omics_tab"),
+                         menuSubItem("WB, RT-qPCR, ENDOC ", tabName = "WbPcrElisa_tab"),
+                         menuSubItem("IF, and other data ", tabName = "otherData_tab")
                 ),
-                menuItem('Dataverse',
-                         tabName = 'Dataverse_tab',
-                         icon = icon('eye')
-                ),
-                menuItem('Load analysis',
-                         tabName = 'LoadAnalysis',
-                         icon = icon('upload')
-                )
+                menuItem('Dataverse', tabName = 'Dataverse_tab', icon = icon('eye')),
+                menuItem('Load analysis', tabName = 'LoadAnalysis', icon = icon('upload'))
     )
   ),
   dashboardBody(
     tabItems(
-      ## HOME ####
-      tabItem(
-        tabName = "Home",
-        h1("ORCA: Omni Reproducible Cell Analysis"),
-        h1("  "),
-        fluidRow(
-          column(width = 6,
-                 p(img(src = "ORCAlogo.png",
-                 #p(img(src = system.file("Shiny/www/images","ORCAlogo.png", package = "ORCA"),
-                       height="30%", width="30%"), align = "center"),
-          ),
-        column(width = 6,
-               h2(em("A cellular biologist’s toolbox for data analysis.")),
-               h4("ORCA  provides an exhaustive platform where scientists can analyze raw:"),
-               tags$ol(
-                 tags$li(
-                   h4(strong("Western Blot")," (WB), ")
-                 ),
-                 tags$li(
-                   h4(strong("Reverse Transcription-quantitative PCR ")," (RT-qPCR),")
-                 ),
-                 tags$li(
-                   h4(strong("Enzyme-Linked ImmunoSorbent Assay ")," (ELISA),")
-                 ),
-                 tags$li(
-                   h4(strong("Endocytosis")," and,")
-                 ),
-                 tags$li(
-                   h4(strong("Cytotoxicity experiments"),".")
-                 )
-               )
-               )
-        ),
-        p(img(src = "Logo_QBio.png",
-              height="15%", width="15%",style = "margin:100px 0px"), align = "center")
-        # h4("ORCA consists of two modules:"),
-        # tags$ol(
-        #   tags$li(
-        #     h4("The ", strong("Data Analysis module"), "includes tools specifically developed or adapted for the elaboration
-        #    of raw Western Blot (WB), Reverse Transcription-quantitative PCR (RT-qPCR) and Enzyme-Linked ImmunoSorbent Assay (ELISA) experiments.")
-        #   ),
-        #   tags$li(
-        #     h4("The ",strong("Model Integration module"),"supports scientists in the process of integration of lab data resulting from any type of experiment into a computational model.")
-        #   )
-        # ),
-        # h4(em("Check", a("here", href="https://www.google.com/")," for a brief video presentation of the ORCA framework, or ",
-        #       a("here", href="https://www.google.com/"),"to download the user guide.")),
-      ),
-      
-      ###### BEGIN LOAD ANALYSIS ####
-      tabItem(tabName = "LoadAnalysis",
-              h2("Load analysis"),
-              box(
-                width = 12,
-                fluidRow(
-                  column(
-                    10,
-                    fileInput(
-                      inputId = "loadAnalysis_file",
-                      label = "",
-                      placeholder = "Select the RDs files storing ORCA analyses",
-                      width = "80%", 
-                      multiple = TRUE)
-                  ),
-                  column(
-                    1,
-                    actionButton( label = "Load",style = "margin-top: 20px;",
-                                  icon = shiny::icon("upload"),
-                                  inputId = "loadAnalysis_Button" )
-                  )
+      tabItem(tabName = "Home",
+              h1("ORCA: Omni Reproducible Cell Analysis"),
+              h1(" "),
+              fluidRow(
+                column(width = 6,
+                       p(img(src = "ORCAlogo.png", height = "30%", width = "30%"), align = "center")
                 ),
-                fluidRow(
-                  column(
-                    width = 10,
-                    offset = 1,
-                    verbatimTextOutput("loadAnalysis_Error")
-                  )
+                column(width = 6,
+                       h2(em("A cellular biologist’s toolbox for data analysis.")),
+                       h4("ORCA provides an exhaustive platform where scientists can analyze raw:"),
+                       tags$ol(
+                         tags$li(h4(strong("Western Blot"), " (WB),")),
+                         tags$li(h4(strong("Reverse Transcription-quantitative PCR"), " (RT-qPCR),")),
+                         tags$li(h4(strong("Enzyme-Linked ImmunoSorbent Assay"), " (ELISA),")),
+                         tags$li(h4(strong("Endocytosis"), " and,")),
+                         tags$li(h4(strong("Cytotoxicity experiments"), "."))
+                       )
                 )
-              )
+              ),
+              p(img(src = "Logo_QBio.png", height = "15%", width = "15%", style = "margin:100px 0px"), align = "center")
       ),
       ###### BEGIN MODEL INTEGRATION ####
       ## BEGIN model integration: Omics ####
@@ -226,13 +128,13 @@ ui <- dashboardPage(
                              actionButton(
                                label = "Load",
                                icon = shiny::icon("upload"),
-                               inputId = "LoadProt_Button" 
+                               inputId = "LoadOmics_Button" 
                              )
                       ),
                       column(1,
                              actionButton(
                                label = "Reset",
-                               inputId = "ResetProt_Button" 
+                               inputId = "ResetOmics_Button" 
                              )
                       )
                     ),
@@ -275,6 +177,22 @@ ui <- dashboardPage(
       tabItem(
         tabName = "WbPcrElisa_tab",
         h2("Data harmonization as initial marking into the Petri Net model "),
+        fluidRow(
+          box(
+            width = 12,
+            collapsible = T,
+            title = "Selected rows in the Omics",
+            column(
+              10,
+              fluidRow(
+                DTOutput("SelectedOmicsDefault_table")
+              ),
+              fluidRow(
+                DTOutput("SelectedOmicsUser_table")
+              )
+            )
+          )
+        ),
         fluidRow(
           box(
             width = 12,
@@ -410,545 +328,58 @@ ui <- dashboardPage(
       ######### END MODEL INTEGRATION
       
       ###### BEGIN DATA ANALYSIS ####
-      ## BEGIN data integration: RT-PCR  #######
-      # First tab content
-      tabItem(tabName = "uploadPCR",
-              h2("Load RT-qPCR raw data"),
-              fluidRow(
-                column(10,
-                       fileInput(inputId = "PCRImport",
-                                 label = "",
-                                 placeholder = "Select an Excel file",
-                                 width = "80%"),
-                ),
-                column(1,
-                       style = "margin-top: 20px;",
-                       actionButton( label = "Load",
-                                     icon = shiny::icon("upload"),
-                                     inputId = "LoadPCR_Button")
-                )
-              ),
+      ## BEGIN data analysis: WB  #######
+      tabItem(tabName = "LoadAnalysis",
+              h2("Load analysis"),
               fluidRow(
                 column(
-                  width = 10,offset = 1,
-                  verbatimTextOutput("LoadingError_PCR")
-                )
-              ),
-              fluidRow(
-                box(width = 12, title = "Experimental Setup:",
-                    column(width = 6,
-                           h2("Select the columns to assign"),
-                           fluidRow(
-                             column(width = 3,
-                                    selectInput(inputId = "PCR_gene",
-                                                label = "Gene names:",
-                                                choices = "" )
-                             ),
-                             column(width = 3,
-                                    selectInput(inputId = "PCR_sample",
-                                                label = "Sample names:",
-                                                choices = "" )
-                             ),
-                             column(width = 3,
-                                    selectInput(inputId = "PCR_value",
-                                                label = "Values:",
-                                                choices = "" )
-                             ),
-                             column(width = 3,
-                                    selectInput(inputId = "PCR_time",
-                                                label = "Times:",
-                                                choices = "" )
-                             )
-                           ),
-                           tableOutput("PCRpreview")
-                    ),
-                    column(width = 3,
-                           checkboxGroupInput(inputId = "PCRnorm",
-                                              "Select housekeeping genes:")
-                    ),
-                    column(width = 3,
-                           selectInput(inputId = "PCRbaseline",
-                                       label = "Select baseline sample:",
-                                       choices = "ID" )
-                    ),
-                    column(width = 3,offset = 9,
-                           actionButton(inputId = "NextQuantif",
-                                        label = 'Proceed to Quantification',
-                                        align = "right",
-                                        icon = shiny::icon("forward"))
-                    )
-                )
-              )
-      ),
-      # Second tab content
-      tabItem(tabName = "tablesPCR",
-              h2("Quantification"),
-              fluidRow(
-                box(width= 12,
-                    #title = "Single Gene Quantification",
-                    title = "Normalization on Housekeeping Genes",
-                    collapsible = TRUE,
-                    collapsed = TRUE,
-                    uiOutput("PCRtables")
-                )
-              ),
-              # fluidRow(
-              #   box(width= 12,title = "Normalization on Housekeeping Genes",
-              #       collapsible = TRUE,
-              #       collapsed = TRUE,
-              #       uiOutput("PCRtablesComp")
-              #   )
-              # ),
-              fluidRow(
-                box(width= 12,title = "Plot",
-                    plotOutput("PCRplot",width = "100%"),
-                    fluidRow(
-                      # column(width = 1,offset = 7,
-                      #        actionButton(inputId = "NextpcrPlots",
-                      #                     label = 'Proceed to Plots',
-                      #                     align = "right",
-                      #                     icon = shiny::icon("forward"))
-                      # ),
-                      column(width = 1,offset = 1,
-                             downloadButton( label = "Download the analysis", 
-                                             outputId = "downloadButton_PCR",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      ),
-                      column(width = 1,offset = 2,
-                             downloadButton( label = "Download xlsx", 
-                                             outputId = "downloadButtonExcel_PCR",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      )
-                    )
-                )
-              )
-      ),
-      # Second tab content
-      # tabItem(tabName = "plotsPCR",
-      #         h2("Plots"),
-      #         fluidRow(
-      #           box(width= 12,title = "",
-      #               plotOutput("PCRplot",width = "100%")
-      #           )
-      #         )
-      # ),
-      ## END data analysis:  RT-PCR 
-      ## BEGIN data analysis: ELISA  #######
-      tabItem(
-        tabName = "uploadELISA",
-        h2("Load ELISA data"),
-        fluidRow(
-          box(
-            width = 12,
-            fluidRow(
-              column(
-                8,
-                fileInput(
-                  inputId = "ELISAImport",
-                  label = "",
-                  placeholder = "Select an Excel file.",
-                  width = "100%", 
-                  multiple = TRUE
-                )
-              ),
-              column(1,style = "margin-top: 20px;",
-                     actionButton(
-                       label = "Load",
-                       icon = shiny::icon("upload"),
-                       inputId = "LoadELISA_Button"
-                     )
-              )
-            ),
-            fluidRow(
-              column(
-                width = 10,offset = 1,
-                verbatimTextOutput("LoadingError_ELISA")
-              )
-            )
-          )
-        ),
-        fluidRow(
-          box(width = 12,
-              title = "Assign experimental information to values:",
-              column(width = 6,
-                     dataTableOutput("ELISAmatrix")
-              ),
-              column(width = 6,
-                     selectizeInput("ELISAcell_SN",
-                                    label = "Sample name:",
-                                    choices = "",
-                                    options = list(create = TRUE)),
-                     selectizeInput("ELISAcell_EXP",label = "Experimental condition:",
-                                    choices = "",
-                                    options = list(create = TRUE)),
-                     fluidRow(
-                       column(4,
-                              selectizeInput(inputId = "ELISA_standcurve",
-                                             label = "Select standard curve:",
-                                             choices = NULL)
-                       ),
-                       column(4,
-                              checkboxGroupInput(inputId = "ELISA_baselines",
-                                                 "Select control:")
-                       ),
-                       column(4,
-                              checkboxGroupInput(inputId = "ELISA_blanks",
-                                                 "Select blank:")
-                       )
-                     )
-              ),
-              fluidRow(
-                column(width = 1,offset = 9,
-                       actionButton(inputId = "NextElisaQuantif",
-                                    label = 'Proceed to Quantification',
-                                    align = "right",
-                                    icon = shiny::icon("forward"))
-                )
-              )
-          )
-        )
-      ),
-      # Second tab content
-      tabItem(tabName = "tablesELISA",
-              h2("Quantification"),
-              fluidRow(
-                tags$head(tags$script(src = "message-handler.js")),
-                box(width = 12,
-                    title = "Regression of the standard curve:",
-                    collapsible = TRUE,
-                    fluidRow(column(4,
-                                    selectizeInput("regressionType",
-                                            label="Select the regression model:",
-                                            choices = c("Linear","Hyperbola"))
-                                    ),
-                             column(3,
-                                    actionButton(inputId = "ELISA_buttonRegression",
-                                          label = 'Calculate the regression',
-                                          align = "right")
-                             )
-                             ),
-                    fluidRow(
-                      column(6,
-                             DTOutput("ELISA_Table_stdcurve")
-                      ),
-                      column(6,
-                             plotOutput("ELISAregression")
-                      )
-                    )
+                  9,
+                  fileInput(inputId = "loadAnalysis_file", 
+                            label = "", 
+                            placeholder = "Select the RDs files storing ORCA analyses", 
+                            width = "80%", 
+                            multiple = TRUE)
                 ),
-                box(width= 12,
-                    title = "Select a blank for the following experimental conditions",
-                    collapsible = TRUE,
-                    collapsed = T,
-                    h4("If time information is associated with the experimental conditions
-                       defined as blank, then it will be lost during the averaging of its values."),
-                    uiOutput("ElisaBlankSelection")
-                ),
-                box(width= 12,
-                    title = "Select a baseline for the following experimental conditions",
-                    collapsible = TRUE,
-                    collapsed = T,
-                    uiOutput("ElisaBaselineSelection")
-                ),
-                box(width= 12,
-                    title = "Quantification",
-                    collapsible = TRUE,
-                    collapsed = TRUE,
-                    plotOutput("ELISAplots"),
-                    DTOutput("ELISAtables"),
-                    fluidRow(
-                      column(width = 1,offset = 9,
-                             downloadButton( label = "Download the RDs", 
-                                             outputId = "downloadButton_ELISA",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      ),
-                      column(width = 1,offset = 7,
-                             downloadButton( label = "Download xlsx", 
-                                             outputId = "downloadButtonExcel_ELISA",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      )
-                    )
-                )
-              )
-      ),
-      ## END data analysis: ELISA
-      
-      ## BEGIN data analysis: ENDOC  #######
-      tabItem(
-        tabName = "uploadENDOC",
-        h2("Load Endocytosis data"),
-        fluidRow(
-          box(
-            width = 12,
-            fluidRow(
-              column(
-                8,
-                fileInput(
-                  inputId = "ENDOCImport",
-                  label = "",
-                  placeholder = "Select an Excel file.",
-                  width = "100%", 
-                  multiple = TRUE
+                column(
+                  2,
+                  actionButton(label = "Load", 
+                               style = "margin-top: 20px;  width: 100%;", 
+                               icon = shiny::icon("upload"), 
+                               inputId = "loadAnalysis_Button")
                 )
               ),
-              column(1,style = "margin-top: 20px;",
-                     actionButton(
-                       label = "Load",
-                       icon = shiny::icon("upload"),
-                       inputId = "LoadENDOC_Button"
-                     )
-              )
-            ),
-            fluidRow(
-              column(
-                width = 10,offset = 1,
-                verbatimTextOutput("LoadingError_ENDOC")
-              )
-            )
-          )
-        ),
-        fluidRow(
-          box(width = 12,
-              title = "Assign experimental information to values:",
-              column(width = 6,
-                     dataTableOutput("ENDOCmatrix")
-              ),
-              column(width = 6,
-                     selectizeInput("ENDOCcell_SN",
-                                    label = "Experimental condition:",
-                                    choices = "",
-                                    options = list(create = TRUE)),
-                     selectizeInput("ENDOCcell_TIME",label = "Time:",
-                                    choices = "",
-                                    options = list(create = TRUE)),
-                     fluidRow(
-                       column(6,
-                              checkboxGroupInput(inputId = "ENDOC_baselines",
-                                                 "Select baselines:")
-                       ),
-                       column(6,
-                              checkboxGroupInput(inputId = "ENDOC_blanks",
-                                                 "Select blank:")
-                       )
-                     )
-              ),
-              fluidRow(
-                column(width = 1,offset = 9,
-                       actionButton(inputId = "NextEndocQuantif",
-                                    label = 'Proceed to Quantification',
-                                    align = "right",
-                                    icon = shiny::icon("forward"))
-                )
-              )
-          ),
-          plotOutput("ENDOCinitplots")
-        )
+              tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
       ),
-      # Second tab content
-      tabItem(tabName = "tablesENDOC",
-              h2("Quantification"),
-              fluidRow(
-                tags$head(tags$script(src = "message-handler.js")),
-                box(width= 12,
-                    title = "Select a blank for the following experimental conditions",
-                    collapsible = TRUE,
-                    collapsed = FALSE,
-                    h4("If time information is associated with the experimental conditions
-                       defined as blank, then it will be lost during the averaging of its values."),
-                    uiOutput("EndocBlankSelection")
-                ),
-                box(width= 12,
-                    title = "Select a baseline for the following experimental conditions",
-                    collapsible = TRUE,
-                    collapsed = FALSE,
-                    uiOutput("EndocBaselineSelection")
-                ),
-                box(width= 12,
-                    title = "Quantification",
-                    collapsible = TRUE,
-                    collapsed = TRUE,
-                    DTOutput("ENDOCtables"),
-                    plotOutput("ENDOCplots"),
-                    fluidRow(
-                      column(width = 1,offset = 9,
-                             downloadButton( label = "Download the RDs", 
-                                             outputId = "downloadButton_ENDOC",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      ),
-                      column(width = 1,offset = 7,
-                             downloadButton( label = "Download xlsx", 
-                                             outputId = "downloadButtonExcel_ENDOC",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      )
-                    )
-                )
-              )
-      ),
-      ## END data analysis: ENDOC
-      ## BEGIN data analysis: CYTOTOX  #######
-      tabItem(
-        tabName = "uploadCYTOTOX",
-        h2("Load Cytotoxicity data"),
-        fluidRow(
-          box(
-            width = 12,
-            fluidRow(
-              column(
-                8,
-                fileInput(
-                  inputId = "CYTOTOXImport",
-                  label = "",
-                  placeholder = "Select an Excel file.",
-                  width = "100%", 
-                  multiple = TRUE
-                )
-              ),
-              column(1,style = "margin-top: 20px;",
-                     actionButton(
-                       label = "Load",
-                       icon = shiny::icon("upload"),
-                       inputId = "LoadCYTOTOX_Button"
-                     )
-              )
-            ),
-            fluidRow(
-              column(
-                width = 10,offset = 1,
-                verbatimTextOutput("LoadingError_CYTOTOX")
-              )
-            ),
-            fluidRow(
-              box(width = 12,
-                  title = "Assign experimental information to values:",
-                  column(width = 6,
-                         dataTableOutput("CYTOTOXmatrix")
-                  ),
-                  column(width = 6,
-                         selectizeInput("CYTOTOXcell_SN",
-                                        label = "Sample name:",
-                                        choices = "",
-                                        options = list(create = TRUE)),
-                         selectizeInput("CYTOTOXcell_EXP",
-                                        label = "Experimental condition:",
-                                        choices = "",
-                                        options = list(create = TRUE)),
-                         selectizeInput("CYTOTOXcell_REP",
-                                        label = "Replicate number:",
-                                        choices = "",
-                                        options = list(create = TRUE)),
-                         fluidRow(
-                           column(4,
-                                  selectizeInput(inputId = "CYTOTOX_baselines",
-                                                     "Select baseline cell:",
-                                                 choices = "")
-                           )
-                         )
-                  ),
-                  fluidRow(
-                    column(width = 1,offset = 9,
-                           actionButton(inputId = "NextCytotoxQuantif",
-                                        label = 'Proceed to Quantification',
-                                        align = "right",
-                                        icon = shiny::icon("forward"))
-                    )
-                  )
-              )
-            )
-          )
-        )
-      ),
-      # Second tab content
-      tabItem(tabName = "tablesCYTOTOX",
-              h2("Quantification"),
-              # fluidRow(
-              #   box(width= 12,
-              #       title = "Select a baseline for the following experimental conditions",
-              #       collapsible = TRUE,
-              #       collapsed = T,
-              #       uiOutput("CytotoxBaselineSelection")
-              #   )
-              # ),
-              fluidRow(
-                box(width= 12,
-                    title = "Quantification",
-                    collapsible = TRUE,
-                    collapsed = TRUE,
-                    plotOutput("CYTOTOXplots"),
-                    DTOutput("CYTOTOXtables"),
-                    fluidRow(
-                      column(width = 1,
-                             downloadButton( label = "Download the RDs", 
-                                             outputId = "downloadButton_CYTOTOX",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      ),
-                      column(width = 1,offset = 2,
-                             downloadButton( label = "Download xlsx", 
-                                             outputId = "downloadButtonExcel_CYTOTOX",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      )
-                    )
-                )
-              )
-      ),
-      ## END data analysis: CYTOTOX
-      ## BEGIN data analysis: WB  #######
-      # First tab content
       tabItem(tabName = "uploadIm",
               h2("Upload Image"),
               fluidRow(
                 column(9,
                        fileInput(
                          inputId = "imImport",
-                         label = "",
+                         label = "Select a tif file",
                          placeholder = "Select a tif file",
                          width = "90%"
                        )
                 ),
                 column(2,
-                       actionButton( 
-                         label = "Load",
-                         width = "100%",
-                         inputId = "LoadingTif"
+                       actionButton(label = "Load",style = "margin-top: 20px;",
+                                    icon = shiny::icon("upload"),
+                                    inputId = "LoadingTif"
                        )
                 ),
                 tags$style(type='text/css', "#LoadingTif { width:100%; margin-top: 20px;}")
               ),
               fluidRow(
-                column(
-                  width = 10,
-                  offset = 1,
-                  verbatimTextOutput("LoadingError")
+                column(9, offset = 1,
+                       tags$h5("In section «Upload Image», you have to upload the original file.tif and then you are directly redirected to «Protein Band» section.",
+                               style = "margin-top: 20px; text: center") # Stile aggiunto per un po' di margine
                 )
               )
       ),
-      # Second tab content
       tabItem(tabName = "plane",
               h2("Select Protein Bands"),
               fluidRow(
-                #shinydashboard::box( width = 12,
-                     #column(12,align="center",
-                            uiOutput("TiffBox")
-                     # plotOutput("TifPlot2",
-                     #            hover = "plot_hover",
-                     #            brush = "plot_brush")
-                     #)
-                #)
+                uiOutput("TiffBox")
               ),
               fluidRow(
                 box( width = 6,
@@ -965,7 +396,6 @@ ui <- dashboardPage(
                 )
               )
       ),
-      ## Third tab content
       tabItem(tabName = "grey",
               h2("Signal Profiles"),
               fluidRow(
@@ -975,12 +405,6 @@ ui <- dashboardPage(
                                    choices = c("")
                        ) 
                 )
-                # column(width = 5,
-                #        textInput(inputId = "text_LaneName",
-                #                  label = "Assign a name to the lane",
-                #                  value = ""
-                #                  )
-                # )
               ),
               box(width = 12,
                   plotOutput("DataPlot")
@@ -1010,22 +434,13 @@ ui <- dashboardPage(
                     DTOutput('AUC'),
                     fluidRow(
                       column(width = 3,
-                             actionButton( label = "Reset all", 
-                                           inputId = "actionButton_ResetPlanes")
-                             ),
-                      column(width = 3,
-                             downloadButton( label = "Download the analysis", 
-                                             outputId = "downloadButton_WB",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") ) 
+                             actionButton(label = "Reset all", 
+                                          inputId = "actionButton_ResetPlanes")
                       ),
-                      column(width = 3,
-                             downloadButton( label = "Download xlsx", 
-                                             outputId = "downloadButtonExcel_WB",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )  
+                      column(width = 4,
+                             downloadButton(label = "Download Analysis & Excel", 
+                                            outputId = "downloadWBAnalysis",
+                                            icon = icon("download"))
                       ),
                       column(width = 3,
                              actionButton(inputId = "NextWBQuantif",
@@ -1037,7 +452,6 @@ ui <- dashboardPage(
                 )
               )
       ),
-      # fourth tab content
       tabItem(tabName = "quantification",
               h2("WB quantification"),
               fluidRow(
@@ -1139,17 +553,9 @@ ui <- dashboardPage(
                    ),
                    plotOutput("plot_AdjRelDens"),
                    fluidRow(
-                     column(width = 1, offset = 7,
-                            downloadButton( label = "Download the analysis", 
-                                            outputId = "downloadButton_WBquant",
-                                            #href = "Results.RData",
-                                            #download = "Results.RData",
-                                            icon = icon("download") 
-                            )
-                     ),
                      column(width = 1,offset = 9,
-                            downloadButton( label = "Download xlsx", 
-                                            outputId = "downloadButtonExcel_WBquant",
+                            downloadButton( label = "Download Analysis & Excel", 
+                                            outputId = "downloadWBquantAnalysis",
                                             #href = "Results.RData",
                                             #download = "Results.RData",
                                             icon = icon("download") )
@@ -1157,9 +563,498 @@ ui <- dashboardPage(
                    )
               )
       ),
-      ## END data analysis: WB
-      ###### END DATA ANALYSIS ####
-      ###### BEGIN Statistic ####
+      ## END data analysis: WB  #######
+      #### BEGIN data analysis: RT-PCR ####
+      tabItem(tabName = "uploadPCR",
+              h2("Load RT-qPCR raw data"),
+              fluidRow( 
+                column(
+                  9,
+                  fileInput(
+                    inputId = "PCRImport",
+                    label = "",
+                    placeholder = "Select an Excel file",
+                    width = "80%"
+                  )
+                ),
+                column(
+                  2,
+                  actionButton(
+                    label = "Load",
+                    style = "margin-top: 20px; width: 100%;",
+                    icon = shiny::icon("upload"),
+                    inputId = "LoadPCR_Button"
+                  )
+                ),
+                tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+              ),
+              fluidRow(
+                column(
+                  width = 10,offset = 1,
+                  verbatimTextOutput("LoadingError_PCR")
+                )
+              ),
+              fluidRow(
+                box(
+                  width = 12,
+                  title = "Experimental Setup:",
+                  column(
+                    width = 6,
+                    h2("Select the columns to assign"),
+                    fluidRow(
+                      column(
+                        width = 3,
+                        selectInput(
+                          inputId = "PCR_gene",
+                          label = "Gene names:",
+                          choices = ""
+                        )
+                      ),
+                      column(
+                        width = 3,
+                        selectInput(
+                          inputId = "PCR_sample",
+                          label = "Sample names:",
+                          choices = ""
+                        )
+                      ),
+                      column(
+                        width = 3,
+                        selectInput(
+                          inputId = "PCR_value",
+                          label = "Values:",
+                          choices = ""
+                        )
+                      ),
+                      column(
+                        width = 3,
+                        selectInput(
+                          inputId = "PCR_time",
+                          label = "Times:",
+                          choices = ""
+                        )
+                      )
+                    ),
+                    tableOutput("PCRpreview")
+                  ),
+                  column(
+                    width = 3,
+                    checkboxGroupInput(
+                      inputId = "PCRnorm",
+                      "Select housekeeping genes:"
+                    )
+                  ),
+                  column(
+                    width = 3,
+                    selectInput(
+                      inputId = "PCRbaseline",
+                      label = "Select baseline sample:",
+                      choices = "ID"
+                    )
+                  ),
+                  column(
+                    width = 3,
+                    offset = 9,
+                    actionButton(
+                      inputId = "NextQuantif",
+                      label = 'Proceed to Quantification',
+                      align = "right",
+                      icon = shiny::icon("forward")
+                    )
+                  )
+                )
+              )
+      ),
+      tabItem(tabName = "tablesPCR",
+              h2("Quantification"),
+              fluidRow(
+                box(width= 12,
+                    #title = "Single Gene Quantification",
+                    title = "Normalization on Housekeeping Genes",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    uiOutput("PCRtables")
+                )
+              ),
+              # fluidRow(
+              #   box(width= 12,title = "Normalization on Housekeeping Genes",
+              #       collapsible = TRUE,
+              #       collapsed = TRUE,
+              #       uiOutput("PCRtablesComp")
+              #   )
+              # ),
+              fluidRow(
+                box(width= 12,title = "Plot",
+                    plotOutput("PCRplot",width = "100%"),
+                    fluidRow(
+                      column(width = 8, offset = 2, 
+                             downloadButton(outputId = "downloadRTPCRAnalysis", 
+                                            label = "Download Analysis & Excel", 
+                                            icon = icon("download"),
+                                            style = "float: right;"), 
+                      )
+                    )
+                )
+              )
+      ),
+      #### END data analysis:  RT-PCR ####
+      
+      #### START data analysis:  ELISA ####
+      tabItem(
+        tabName = "uploadELISA",
+        h2("Load ELISA data"),
+        fluidRow(
+          column(9,
+                 fileInput(
+                   inputId = "ELISAImport",
+                   label = "",
+                   placeholder = "Select an Excel file.",
+                   width = "80%", 
+                   multiple = TRUE
+                 )
+          ),
+          column(2,
+                 actionButton(
+                   label = "Load",
+                   style = "margin-top: 20px; width: 100%;",
+                   icon = shiny::icon("upload"),
+                   inputId = "LoadELISA_Button"
+                 )
+          ),
+          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+        ),
+        fluidRow(
+          box(width = 12,
+              title = "Assign experimental information to values:",
+              column(width = 6,
+                     dataTableOutput("ELISAmatrix")
+              ),
+              column(width = 6,
+                     selectizeInput("ELISAcell_SN",
+                                    label = "Sample name:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     selectizeInput("ELISAcell_EXP",label = "Experimental condition:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     fluidRow(
+                       column(4,
+                              selectizeInput(inputId = "ELISA_standcurve",
+                                             label = "Select standard curve:",
+                                             choices = NULL)
+                       ),
+                       column(4,
+                              checkboxGroupInput(inputId = "ELISA_baselines",
+                                                 "Select control:")
+                       ),
+                       column(4,
+                              checkboxGroupInput(inputId = "ELISA_blanks",
+                                                 "Select blank:")
+                       )
+                     ),
+                     fluidRow(
+                       column(12,
+                              tags$div(
+                                textOutput("ELISASelectedValues"),
+                                style = "font-size: 24px; text-align: center; color: green;
+                                             width: 100%; margin-top: 20px;"
+                              )
+                       )
+                     )
+              )
+          ),
+          fluidRow(
+            column(6, dataTableOutput("leftTableElisa")),
+            column(6, dataTableOutput("rightTableElisa"))
+          ),
+          fluidRow(
+            column(width = 1,offset = 9,
+                   actionButton(inputId = "NextElisaQuantif",
+                                label = 'Proceed to Quantification',
+                                align = "right",
+                                icon = shiny::icon("forward"))
+            )
+          )
+        )
+      ),
+      # Second tab content
+      tabItem(tabName = "tablesELISA",
+              h2("Quantification"),
+              fluidRow(
+                tags$head(tags$script(src = "message-handler.js")),
+                box(width = 12,
+                    title = "Regression of the standard curve:",
+                    collapsible = TRUE,
+                    fluidRow(column(4,
+                                    selectizeInput("regressionType",
+                                                   label="Select the regression model:",
+                                                   choices = c("Linear","Hyperbola"))
+                    ),
+                    column(3,
+                           actionButton(inputId = "ELISA_buttonRegression",
+                                        label = 'Calculate the regression',
+                                        align = "right")
+                    )
+                    ),
+                    fluidRow(
+                      column(6,
+                             DTOutput("ELISA_Table_stdcurve")
+                      ),
+                      column(6,
+                             plotOutput("ELISAregression")
+                      )
+                    )
+                ),
+                box(width= 12,
+                    title = "Select a blank for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = T,
+                    h4("If time information is associated with the experimental conditions
+                       defined as blank, then it will be lost during the averaging of its values."),
+                    uiOutput("ElisaBlankSelection")
+                ),
+                box(width= 12,
+                    title = "Select a baseline for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = T,
+                    uiOutput("ElisaBaselineSelection")
+                ),
+                box(width= 12,
+                    title = "Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    plotOutput("ELISAplots"),
+                    DTOutput("ELISAtables"),
+                    fluidRow(
+                      column(width = 1,offset = 9,
+                             downloadButton( label = "Download the RDs", 
+                                             outputId = "downloadButton_ELISA",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      ),
+                      column(width = 1,offset = 7,
+                             downloadButton( label = "Download xlsx", 
+                                             outputId = "downloadButtonExcel_ELISA",
+                                             #href = "Results.RData",
+                                             #download = "Results.RData",
+                                             icon = icon("download") )
+                      )
+                    )
+                )
+              )
+      ),
+      #### END data analysis: ELISA ####
+      
+      ## START data analysis:  endocytosis ####
+      tabItem(
+        tabName = "uploadENDOC",
+        h2("Load Endocytosis data"),
+        fluidRow(
+          column(
+            9,
+            fileInput(
+              inputId = "ENDOCImport",
+              label = "",
+              placeholder = "Select an Excel file.",
+              width = "80%", 
+              multiple = TRUE
+            )
+          ),
+          column(2,
+                 actionButton(
+                   label = "Load",
+                   style = "margin-top: 20px; width: 100%;",
+                   icon = shiny::icon("upload"),
+                   inputId = "LoadENDOC_Button"
+                 )
+          ),
+          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+        ),
+        fluidRow(
+          column(
+            width = 10,offset = 1,
+            verbatimTextOutput("LoadingError_ENDOC")
+          )
+        ),
+        fluidRow(
+          box(width = 12,
+              title = "Assign experimental information to values:",
+              column(width = 6,
+                     dataTableOutput("ENDOCmatrix")
+              ),
+              column(width = 6,
+                     fluidRow(
+                       column(width = 8, offset = 2,
+                              selectizeInput("ENDOCcell_EXP",
+                                             label = "Experimental condition:",
+                                             choices = c(),  
+                                             options = list(create = TRUE))
+                       )
+                     ),
+                     fluidRow(
+                       column(width = 8, offset = 2,
+                              selectizeInput("ENDOCcell_TIME",
+                                             label = "Time:",
+                                             choices = c(),  
+                                             options = list(create = TRUE))
+                       )
+                     ),
+                     fluidRow(
+                       column(5, offset = 2,
+                              checkboxGroupInput(inputId = "ENDOC_baselines",
+                                                 "Select baselines:")
+                       ),
+                       column(4, offset = 1,
+                              checkboxGroupInput(inputId = "ENDOC_blanks",
+                                                 "Select blank:")
+                       )
+                     ),
+                     fluidRow(
+                       column(12,
+                              tags$div(
+                                textOutput("ENDOCSelectedValues"),
+                                style = "font-size: 24px; text-align: center; color: green;
+                                             width: 100%; margin-top: 20px;"
+                              )
+                       )
+                     )
+              )
+          ),
+          fluidRow(
+            column(6, dataTableOutput("leftTableEndoc")),
+            column(6, dataTableOutput("rightTableEndoc"))
+          ),
+          fluidRow(
+            column(width = 1,offset = 9,
+                   actionButton(inputId = "NextEndocQuantif",
+                                label = 'Proceed to Quantification',
+                                align = "right",
+                                icon = shiny::icon("forward"))
+            )
+          )
+        ),
+        plotOutput("ENDOCinitplots")
+      ),
+      # Second tab content
+      tabItem(tabName = "tablesENDOC",
+              h2("Quantification"),
+              fluidRow(
+                box(width= 12,
+                    title = "Select a blank for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = FALSE,
+                    h4("If time information is associated with the experimental conditions
+                       defined as blank, then it will be lost during the averaging of its values."),
+                    uiOutput("EndocBlankSelection")
+                ),
+                box(width= 12,
+                    title = "Select a baseline for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = FALSE,
+                    uiOutput("EndocBaselineSelection")
+                ),
+                box(width= 12,
+                    title = "Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    DTOutput("ENDOCtables"),
+                    plotOutput("ENDOCplots"),
+                    fluidRow(
+                      column(width = 4, offset = 8,
+                             downloadButton(label = "Download Analysis & Excel", 
+                                            outputId = "downloadENDOCAnalysis",
+                                            icon = icon("download"))
+                      )
+                    )
+                )
+              )
+      ),
+      #### END data analysis: ENDOC ####
+      
+      #### START data analysis: FACS ####
+      tabItem(
+        tabName = "uploadFACS",
+        h2("Load FACS data"),
+        fluidRow(
+          column(
+            9,
+            fileInput(
+              inputId = "FACSImport",
+              label = "",
+              placeholder = "Select an Excel file.",
+              width = "80%", 
+              multiple = TRUE
+            )
+          ),
+          column(2,
+                 actionButton(
+                   label = "Load",
+                   style = "margin-top: 20px; width: 100%;",
+                   icon = shiny::icon("upload"),
+                   inputId = "LoadFACS_Button"
+                 )
+          ),
+          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+        ),
+      ),
+      tabItem(tabName = "tablesFACS",
+              h2("Quantification"),
+              box(width = 12,
+                  fluidRow(
+                    tags$head(
+                      tags$style(HTML("
+                      #dynamicSelectize { 
+                        margin-right: 40px;
+                      }
+                    "))
+                    ),
+                    uiOutput("dynamicSelectize")
+                  ),
+                  fluidRow(
+                    tags$head(
+                      tags$style(HTML("
+                      #FACSmatrix { 
+                        float: left;
+                      }
+                    "))
+                    ),
+                    column(12, 
+                           dataTableOutput("FACSmatrix")          
+                    )
+                  ),
+                  fluidRow(
+                    column(1, offset = 7,
+                           selectizeInput(inputId = "selectBaseGate",
+                                          label = "Destarting gate for calculation",
+                                          choices = ""
+                           )
+                    ),
+                    column(2,
+                           actionButton(inputId = "SaveFACSanalysis",
+                                        label = 'Save',
+                                        style = "width: 100%",
+                                        align = "right",
+                                        icon = shiny::icon("forward"))
+                    )
+                  )
+              ),
+              box(width = 12,
+                  fluidRow(
+                    style="width: 95%; margin-left: 30px;", 
+                    dataTableOutput("FACSresult")           
+                  ),
+              ),
+              fluidRow(
+                column(width = 2,offset = 9,
+                       downloadButton( label = "Download Analysis & Excel", 
+                                       outputId = "downloadButtoFACSanalysis",
+                                       icon = icon("download") 
+                       )
+                )
+              )
+      ),
+      #### START statistical analysis ####
       tabItem(tabName = "StatAnalysis_tab",
               h2("Statistical analysis"),
               fluidRow(
@@ -1167,7 +1062,7 @@ ui <- dashboardPage(
                     title = "Upload the analysis",
                     fluidRow(
                       column(
-                        10,
+                        9,
                         fileInput(
                           inputId = "loadStatAnalysis_file",
                           label = "",
@@ -1176,19 +1071,13 @@ ui <- dashboardPage(
                           multiple = TRUE)
                       ),
                       column(
-                        1,
-                        actionButton( label = "Load",style = "margin-top: 20px;",
+                        2,
+                        actionButton( label = "Load",
+                                      style = "margin-top: 20px; width: 100%;",
                                       icon = shiny::icon("upload"),
                                       inputId = "loadStatAnalysis_file_Button" )
                       )
                     )
-                )
-              ),
-              fluidRow(
-                column(
-                  width = 10,
-                  offset = 1,
-                  verbatimTextOutput("loadStatAnalysis_Error")
                 )
               ),
               box(
@@ -1200,112 +1089,21 @@ ui <- dashboardPage(
                                label = "Select the analysis:",
                                choices = ""),
                 fluidRow(
+                  column(10,
+                         fluidRow(plotOutput("PlotStat")),
+                         fluidRow(DTOutput("TabStat")),
+                         fluidRow(DTOutput("TabTTest"))
+                  )
+                ),
+                fluidRow(
                   column(12,
-                         plotOutput("PlotStat"),
-                         DTOutput("TabStat"),
-                         DTOutput("TabTTest")
+                         # New download button for statistical analysis
+                         downloadButton("downloadStatisticalAnalysis", "Download Statistical Analysis")
                   )
                 )
               )
-      ),
-      ###### END Statitcs ###
-      ###### BEGIN DATAVERSE #####
-      tabItem(tabName = "Dataverse_tab",
-              h2("Dataverse"),
-              fluidRow(
-                box(width = 12,
-                    title = "Upload and Maintain",
-                    collapsible = T,
-                    h4(
-                      em(
-                        "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
-                        " for obtaining an account and setting up an API key."
-                      ) 
-                    ),
-                    fluidRow(
-                      column(
-                        width = 10,offset = 1,
-                        verbatimTextOutput("LoadingError_DATAVERSE")
-                      )
-                    ),
-                    fluidRow(
-                      column(width=6, 
-                             textInput("APIkey",
-                                       value = ifelse(system.file("Data",".APIkey", package = "ORCA") != "",
-                                                      read.table(paste0(system.file("Data", package = "ORCA"),
-                                                                        "/.APIkey"),
-                                                                 quote="\"",
-                                                                 comment.char=""),
-                                                      ""), 
-                                       label = "API key linked to a Dataverse installation account:")),
-                      column(2,
-                             selectizeInput("selectAnalysis_DV",
-                                            label = "Select the analysis:",
-                                            choices = "")
-                      )
-                    ),
-                    fluidRow(
-                      column(3,
-                             textInput("Title_DV",
-                                       label = "Title:",
-                                       value=""
-                             )
-                      ),
-                      column(4,
-                             textInput("Description_DV",
-                                       label = "Description:",
-                                       value=""
-                             )
-                      )
-                    ),
-                    fluidRow(
-                      column(3,
-                             textInput("Author_DV",
-                                       label = "Author name:",
-                                       value=""
-                             )
-                      ),
-                      column(3,
-                             textInput("AuthorAff_DV",
-                                       label = "Author affiliation:",
-                                       value=""
-                             )
-                      )
-                      ),
-                    fluidRow(
-                      column(3,
-                             textInput("ContactN_DV",
-                                       label = "Contact name:",
-                                       value=""
-                             )
-                      ),
-                      column(3,
-                             textInput("ContactEmail_DV",
-                                       label = "Contact email:",
-                                       value=""
-                             )
-                      )
-                    ),
-                    fluidRow(
-                      actionButton(
-                        label = "Upload",
-                        inputId = "DataverseUpload_Button" 
-                      )
-                    )
-                )
-              ),
-              fluidRow(
-                box(width = 12,
-                    title = "Search and Get",
-                    collapsible = T
-                )
-              )
       )
-      ####### END DATAVERSE ####
-      
-      # Here ends the ui body
     )
-    
   )
-  
 )
+
