@@ -38,6 +38,9 @@ ui <- dashboardPage(
     sidebarMenu(id = "SideTabs",
                 menuItem('Home', tabName = 'Home', icon = icon('home')),
                 menuItem("Data Analysis", tabName = 'DataAnaslysis', icon = icon('chart-line'),
+                         menuItem('BCA analysis', tabName = 'bca',
+                                  menuSubItem("Upload data", tabName = "uploadBCA"),
+                                  menuSubItem("Quantification", tabName = "tablesBCA")),
                          menuItem('Western Blot analysis', tabName = 'wb',
                                   menuSubItem("Upload Image", tabName = "uploadIm"),
                                   menuSubItem("Protein Bands", tabName = "plane"),
@@ -55,6 +58,9 @@ ui <- dashboardPage(
                          menuItem('Cytotoxicity assay', tabName = 'cytotox',
                                   menuSubItem("Upload data", tabName = "uploadCYTOTOX"),
                                   menuSubItem("Quantification", tabName = "tablesCYTOTOX")),
+                         menuItem('IF analysis', tabName = 'if',
+                                  menuSubItem("Upload data", tabName = "uploadIF"),
+                                  menuSubItem("Quantification", tabName = "tablesIF")),
                          menuItem('Facs analysis', tabName = 'facs',
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
                                   menuSubItem("Quantification", tabName = "tablesFACS"))
@@ -328,7 +334,8 @@ ui <- dashboardPage(
       ######### END MODEL INTEGRATION
       
       ###### BEGIN DATA ANALYSIS ####
-      ## BEGIN data analysis: WB  #######
+      
+      ## BEGIN load analysis  #######
       tabItem(tabName = "LoadAnalysis",
               h2("Load analysis"),
               fluidRow(
@@ -350,6 +357,9 @@ ui <- dashboardPage(
               ),
               tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
       ),
+      ## END load analysis  #######
+      
+      ## BEGIN data analysis: WB  #######
       tabItem(tabName = "uploadIm",
               h2("Upload Image"),
               fluidRow(
@@ -564,6 +574,7 @@ ui <- dashboardPage(
               )
       ),
       ## END data analysis: WB  #######
+      
       #### BEGIN data analysis: RT-PCR ####
       tabItem(tabName = "uploadPCR",
               h2("Load RT-qPCR raw data"),
@@ -698,6 +709,154 @@ ui <- dashboardPage(
               )
       ),
       #### END data analysis:  RT-PCR ####
+      
+      #### BEGIN data analysis: BCA ####
+      tabItem(
+        tabName = "uploadBCA",
+        h2("Load BCA data"),
+        fluidRow(
+          column(9,
+                 fileInput(
+                   inputId = "BCAImport",
+                   label = "",
+                   placeholder = "Select an Excel file.",
+                   width = "80%", 
+                   multiple = TRUE
+                 )
+          ),
+          column(2,
+                 actionButton(
+                   label = "Load",
+                   style = "margin-top: 20px; width: 100%;",
+                   icon = shiny::icon("upload"),
+                   inputId = "LoadBCA_Button"
+                 )
+          ),
+          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+        ),
+        fluidRow(
+          box(width = 12,
+              title = "Assign experimental information to values:",
+              column(width = 6,
+                     dataTableOutput("BCAmatrix")
+              ),
+              column(width = 6,
+                     selectizeInput("BCAcell_SN",
+                                    label = "Sample name:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     selectizeInput("BCAcell_EXP",label = "Experimental condition or Concetrations (standard curve):",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     fluidRow(
+                       column(4,
+                              selectizeInput(inputId = "BCA_standcurve",
+                                             label = "Select standard curve:",
+                                             choices = NULL)
+                       ),
+                       # column(4,
+                       #        checkboxGroupInput(inputId = "BCA_baselines",
+                       #                           "Select control:")
+                       # ),
+                       column(4,
+                              checkboxGroupInput(inputId = "BCA_blanks",
+                                                 "Select blank:")
+                       )
+                     ),
+                     fluidRow(
+                       column(12,
+                              tags$div(
+                                textOutput("BCASelectedValues"),
+                                style = "font-size: 24px; text-align: center; color: green;
+                                             width: 100%; margin-top: 20px;"
+                              )
+                       )
+                     )
+              )
+          ),
+          fluidRow(
+            column(6, dataTableOutput("leftTableBCA")),
+            column(6, dataTableOutput("rightTableBCA"))
+          ),
+          fluidRow(
+            column(width = 1,offset = 9,
+                   actionButton(inputId = "NextBCAQuantif",
+                                label = 'Proceed to Quantification',
+                                align = "right",
+                                icon = shiny::icon("forward"))
+            )
+          )
+        )
+      ),
+      # Second tab content
+      tabItem(tabName = "tablesBCA",
+              h2("Quantification"),
+              fluidRow(
+                tags$head(tags$script(src = "message-handler.js")),
+                box(width = 12,
+                    title = "Regression of the standard curve:",
+                    collapsible = TRUE,
+                    fluidRow(
+                      column(3,
+                             actionButton(inputId = "BCA_buttonRegression",
+                                          label = 'Calculate the regression',
+                                          align = "right")
+                      )
+                    ),
+                    fluidRow(
+                      column(6,
+                             DTOutput("BCA_Table_stdcurve")
+                      ),
+                      column(6,
+                             plotOutput("BCAregression")
+                      )
+                    )
+                ),
+                box(width= 12,
+                    title = "Select a blank for the following experimental conditions",
+                    collapsible = TRUE,
+                    collapsed = T,
+                    h4("If time information is associated with the experimental conditions
+                       defined as blank, then it will be lost during the averaging of its values."),
+                    uiOutput("BCABlankSelection")
+                ),
+                # box(width= 12,
+                #     title = "Select a baseline for the following experimental conditions",
+                #     collapsible = TRUE,
+                #     collapsed = T,
+                #     uiOutput("BCABaselineSelection")
+                # ),
+                box(width= 12,
+                    title = "Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    #plotOutput("BCAplots"),
+                    DTOutput("BCAtables")
+                ),
+                box(width= 12,
+                    title = "Transformation",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    fluidRow(
+                      column(width = 4,
+                             textInput(inputId = "BCA_UGvalue" , label = "Write an ug value", value = "")
+                      ),
+                      column(width = 4,
+                            actionButton(inputId = "confirmBCA_UGvalue", label= "Confirm")
+                      )
+                    ),
+                    DTOutput("BCAtablesUG")
+                ),
+                fluidRow(
+                  column(width = 4, offset = 8,
+                         downloadButton(label = "Download Analysis & Excel", 
+                                        outputId = "downloadBCAAnalysis",
+                                        icon = icon("download"))
+                  )
+                )
+              )
+      ),
+      #### END data analysis: BCA ####
       
       #### START data analysis:  ELISA ####
       tabItem(
@@ -846,7 +1005,7 @@ ui <- dashboardPage(
       ),
       #### END data analysis: ELISA ####
       
-      ## START data analysis:  endocytosis ####
+      ## START data analysis:  ENDOC ####
       tabItem(
         tabName = "uploadENDOC",
         h2("Load Endocytosis data"),
@@ -1024,7 +1183,7 @@ ui <- dashboardPage(
                     )
                   ),
                   fluidRow(
-                    column(1, offset = 7,
+                    column(2, offset = 7,
                            selectizeInput(inputId = "selectBaseGate",
                                           label = "Destarting gate for calculation",
                                           choices = ""
@@ -1033,7 +1192,7 @@ ui <- dashboardPage(
                     column(2,
                            actionButton(inputId = "SaveFACSanalysis",
                                         label = 'Save',
-                                        style = "width: 100%",
+                                        style = "width: 100%; margin-top: 25px;",
                                         align = "right",
                                         icon = shiny::icon("forward"))
                     )
@@ -1048,7 +1207,7 @@ ui <- dashboardPage(
               fluidRow(
                 column(width = 2,offset = 9,
                        downloadButton( label = "Download Analysis & Excel", 
-                                       outputId = "downloadButtoFACSanalysis",
+                                       outputId = "downloadFACSanalysis",
                                        icon = icon("download") 
                        )
                 )

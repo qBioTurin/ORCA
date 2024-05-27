@@ -104,6 +104,35 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            flags$EXPselected <- ""
            flags$EXPcol <- NULL
          },
+         "BCA" = {
+           FlagsBCA <- reactiveValues(cellCoo = NULL,
+                                        AllExp = "",
+                                        BASEselected = "",
+                                        STDCselected = "",
+                                        BLANCHEselected = "",
+                                        EXPselected = "",
+                                        EXPcol = NULL)
+           
+           result$Initdata <- NULL
+           result$data <- NULL
+           result$TablePlot <- NULL
+           result$dataFinal <- NULL
+           result$BCAcell_EXP <- NULL
+           result$BCAcell_SN <- NULL
+           result$BCAcell_COLOR <- NULL
+           result$MapBaseline <- NULL
+           result$MapBlank <- NULL
+           result$Tablestandcurve <- NULL
+           result$Regression <- NULL
+           
+           flags$cellCoo <- NULL
+           flags$AllExp <- NULL
+           flags$BASESelected <- ""
+           flags$STDCselected <- ""
+           flags$BLANCHEselected
+           flags$EXPselected <- ""
+           flags$EXPcol <- NULL
+         },
          "FACS" = {
            result$Initdata <- NULL
            result$data <- NULL
@@ -430,6 +459,92 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            } else {
              print("dataFinal non disponibile o non è un data.frame")
            }
+         },
+         "ELISA" = {
+           ## Create a new workbook
+           wb <- createWorkbook("ELISA")
+           
+           ## initial data
+           addWorksheet(wb,"TablePlot")
+           writeDataTable(wb, sheet = "TablePlot", ResultList[["TablePlot"]]$x$data)
+           
+           ## Linear regression analysis
+           addWorksheet(wb,"standard curve")
+           standcurve = ResultList[["Tablestandcurve"]]
+           lmStancurve = ResultList[["Regression"]]$data
+           print(ResultList[["Regression"]]$plot)
+           
+           writeDataTable(wb,standcurve, sheet="standard curve")
+           insertPlot(wb = wb,  sheet="standard curve",
+                      startCol=dim(standcurve)[2]+ 2)
+           
+           ## Analysis
+           addWorksheet(wb,"Analysis")
+           writeDataTable(wb,ResultList[["dataFinal"]], sheet="Analysis")
+           print(ResultList[["dataFinal"]] %>%
+                   ggplot( aes(x = Time, y = Quantification,
+                               fill= Experiment, group = Experiment ) )+
+                   geom_bar(position = "dodge",stat = "identity")+
+                   theme_bw()+
+                   labs(x = "Time", col = "Experiments",
+                        y = "Average quantifications obtained\n from the lm "))
+           insertPlot(wb = wb,  sheet="Analysis",
+                      startCol=dim(ResultList[["dataFinal"]] )[2]+ 2)
+         },
+         "FACS" = {
+           wb <- createWorkbook("FACS")
+           
+           print(ResultList$Initdata)
+           print(ResultList$data)
+           print(ResultList$dataFinal)
+           
+           if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
+             addWorksheet(wb, "Init data") 
+             writeDataTable(wb, ResultList$Initdata, sheet = "Init data")  
+           }
+           if (!is.null(ResultList$dataFinal) && is.data.frame(ResultList$dataFinal)) {
+             addWorksheet(wb, "Final data") 
+             writeDataTable(wb, ResultList$dataFinal, sheet = "Final data")  
+           }
+         },
+         "BCA" = {
+           wb <- createWorkbook("BCA")  
+           
+           if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
+             addWorksheet(wb, "TablePlot")  # Aggiunge un nuovo foglio al workbook
+             writeDataTable(wb, ResultList$Initdata, sheet = "TablePlot")  # Scrive i dati nel foglio
+             print("Initdata scritto nel foglio Excel")
+           } else {
+             print("Errore: Initdata non disponibile o non è un data.frame")
+           }
+           
+           ## Linear regression analysis
+           if (!is.null(ResultList$Regression)) {
+           addWorksheet(wb,"standard curve")
+           standcurve = ResultList[["Tablestandcurve"]]
+           lmStancurve = ResultList[["Regression"]]$data
+           print(ResultList[["Regression"]]$plot)
+           
+           writeDataTable(wb,standcurve, sheet="standard curve")
+           insertPlot(wb = wb,  sheet="standard curve",
+                      startCol=dim(standcurve)[2]+ 2)
+           }
+           # Se esiste anche dataQuant e vuoi scriverlo su un altro foglio
+           if (!is.null(ResultList$dataQuant) && is.data.frame(ResultList$dataQuant)) {
+             addWorksheet(wb, "Quantification Analysis")  # Aggiunge un foglio per l'analisi finale
+             writeDataTable(wb, ResultList$dataQuant, sheet = "Quantification Analysis")  # Scrive i dati di analisi finale
+             print("dataQuant scritto nel foglio Excel")
+           } else {
+             print("dataQuant non disponibile o non è un data.frame")
+           }
+           # Se esiste anche dataFinal e vuoi scriverlo su un altro foglio
+           if (!is.null(ResultList$dataFinal) && is.data.frame(ResultList$dataFinal)) {
+             addWorksheet(wb, "Results Analysis")  # Aggiunge un foglio per l'analisi finale
+             writeDataTable(wb, ResultList$dataFinal, sheet = "Results Analysis")  # Scrive i dati di analisi finale
+             print("dataFinal scritto nel foglio Excel")
+           } else {
+             print("dataFinal non disponibile o non è un data.frame")
+           }
          }
   )
   
@@ -576,7 +691,7 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
   column_TIME <- paste0(analysis, "cell_TIME")  
   
   # Set variable names based on analysis type
-  if (analysis == "ELISA") {
+  if (analysis %in% c("ELISA","BCA") ){
     value1 = "Sample Name"
     value2 = "Experimental condition"
     column_EXP <- paste0(analysis, "cell_SN") 
@@ -596,8 +711,12 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
       formatted_output <- paste(unlist(selected_values), collapse = " - ")
       
       time_values <- apply(matching_indices, 1, function(idx) {
-        val <- if (analysis == "ELISA") result$ELISAcell_EXP[idx["row"], idx["col"]]
-        else result$ENDOCcell_TIME[idx["row"], idx["col"]]
+        if (analysis == "ELISA")
+          val <- result$ELISAcell_EXP[idx["row"], idx["col"]]
+        if (analysis == "BCA")
+          val <- result$BCAcell_EXP[idx["row"], idx["col"]]
+        else val <- result$ENDOCcell_TIME[idx["row"], idx["col"]]
+        
         if (!is.na(val) && !is.null(val) && val != "") val else ""
       })
       
@@ -668,7 +787,7 @@ updateTable <- function(position, analysis, info, data, result, flag) {
           
           result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
           # if ELISA, modify SN otherwise modify EXP
-          if (analysis == "ELISA") {
+          if (analysis %in% c("ELISA","BCA") ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
           } else if (analysis == "ENDOC") {
             result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
@@ -721,4 +840,403 @@ updateTable <- function(position, analysis, info, data, result, flag) {
     }
   }
   return(paste("Updated values: ", new_value))
+}
+
+UploadRDs = function(Flag, session, output,
+                     DataAnalysisModule,
+                     Result, FlagsExp,PanelStructures=NULL){
+  
+  if(Flag == "WB"){
+    
+    for(nameList in names(Result)) 
+      Result[[nameList]] <- DataAnalysisModule$wbResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$wbResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$wbResult$Flags[[nameList]]
+    
+    # update image WB
+    if(!is.null(Result$Im)){
+      im = Result$Im$WB
+      output$TifPlot2 <- renderPlot({
+        plot(c(1,dim(im)[2]),c(1,dim(im)[1]), type='n',ann=FALSE)
+        rasterImage(im,1,1,dim(im)[2],dim(im)[1])
+        if (nrow(Result$Planes) > 0) {
+          r <- Result$Planes
+          rect(r$xmin, r$ymin, r$xmax, r$ymax, border = "red")
+        }
+      })
+      
+      output$PlanesStructureTable <- renderDT(
+        Result$Planes,
+        server = FALSE,
+        editable = list(target = "cell", 
+                        disable = list(columns = 1:4)),
+        options = list(lengthChange = FALSE, autoWidth = TRUE),
+        rownames= FALSE
+      )
+      
+      PanelStructures$data = Result$Planes
+      
+    }
+    
+    # update lanes
+    
+    if(!is.null(Result$PanelsValue)){
+      updateSelectInput(session = session, "LaneChoice",
+                        choices = unique(Result$PanelsValue$ID),
+                        selected = ""
+      )
+    }
+    
+    if(!is.null(Result$TruncatedPlots)){
+      output$DataPlot <- renderPlot({Result$TruncatedPlots})
+      FlagsExp$LanesCut = T
+    }else if(!is.null(Result$Plots)){
+      output$DataPlot <- renderPlot({Result$Plots})
+      FlagsExp$LanesCut = T
+    }
+    
+    output$AUC <- renderDT({
+      Result$AUCdf %>% 
+        dplyr::select(SampleName,Truncation, AUC)
+    },
+    selection = 'none',
+    #session = session,
+    rownames= FALSE
+    )
+    
+    # output$AUC <- renderTable({
+    #   wbResult$AUCdf  %>% dplyr::select(Lane,Truncation, AUC)
+    # },width = "100%")
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "grey")
+    
+  }
+  else if(Flag == "PRCC"){
+    
+    for(nameList in names(DataAnalysisModule$pcrResult)) 
+      Result[[nameList]] <- DataAnalysisModule$pcrResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$pcrResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$pcrResult$Flags[[nameList]]
+    
+    choices = ""
+    selected = rep("",3)
+    
+    if(!is.null(Result$Initdata)){
+      choices = c("",colnames(Result$Initdata))
+    }
+    
+    if(!is.null(Result$selectPCRcolumns)){
+      selected = Result$selectPCRcolumns
+    }
+    
+    updateSelectInput(session = session,"PCR_gene",
+                      choices = choices,
+                      selected = selected[1]
+    )
+    updateSelectInput(session = session,"PCR_sample",
+                      choices = choices,
+                      selected = selected[2]
+    )
+    updateSelectInput(session = session,"PCR_value",
+                      choices = choices,
+                      selected = selected[3]
+    )
+    
+    
+    if(!is.null(Result$PCRnorm))
+      FlagsExp$norm = T
+    
+    if(!is.null(Result$PCRbaseline))
+      FlagsExp$baseline = T
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "uploadPCR")
+    
+    
+  }
+  else if(Flag == "ENDOC"){
+    
+    for(nameList in names(DataAnalysisModule$endocResult)) 
+      Result[[nameList]] <- DataAnalysisModule$endocResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$endocResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$endocResult$Flags[[nameList]]
+    
+    if(!is.null(Result$TablePlot)){
+      output$ENDOCmatrix <- renderDT(
+        Result$TablePlot,
+        server = FALSE
+      )
+    }
+    
+    if(!is.null(Result$ENDOCcell_TIME)){
+      
+      updateSelectizeInput(inputId = "ENDOCcell_TIME",session = session,
+                           choices = unique(c(Result$ENDOCcell_TIME))
+      )
+      
+      updateSelectizeInput(inputId = "ENDOCcell_SN",session = session,
+                           choices = unique(c(Result$ENDOCcell_SN))
+      )
+      
+      FlagsExp$AllExp = unique(c(Result$ENDOCcell_SN))
+    }
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "uploadENDOC")
+    
+  }  else if(Flag == "BCA"){
+    
+    for(nameList in names(DataAnalysisModule$bcaResult)) 
+      Result[[nameList]] <- DataAnalysisModule$bcaResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$bcaResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$bcaResult$Flags[[nameList]]
+    
+    if(!is.null(Result$TablePlot)){
+      output$BCAmatrix <- renderDT(
+        Result$TablePlot,
+        server = FALSE
+      )
+    }
+    
+    if(!is.null(Result$BCAcell_EXP)){
+      
+      updateSelectizeInput(inputId = "BCAcell_EXP",
+                           session = session,
+                           choices = unique(c(Result$BCAcell_EXP))
+      )
+      
+      updateSelectizeInput(inputId = "BCAcell_SN",
+                           session =session,
+                           choices = unique(c(Result$BCAcell_SN))
+      )
+      
+      FlagsExp$AllExp = unique(c(Result$BCAcell_SN))
+    }
+    if(!is.null(Result$MapBaseline)){
+      FlagsExp$BASEselected = unique(Result$MapBaseline$Baseline)
+    }
+    if(!is.null(Result$MapBlanche)){
+      FlagsExp$BLANCHEselected = unique(Result$MapBlanche$Blanche)
+    }
+    if(!is.null(Result$Tablestandcurve)){
+      output$BCA_Table_stdcurve <- DT::renderDataTable({
+        DT::datatable( Result$Tablestandcurve,
+                       selection = 'none',
+                       editable = list(target = "cell",
+                                       disable = list(columns = 0:2) ),
+                       options = list(lengthChange = FALSE, autoWidth = TRUE),
+                       rownames= FALSE
+        )
+      })
+      
+      if(length(FlagsExp$AllExp) > 1){
+        exp = FlagsExp$AllExp
+        exp = exp[exp != ""]
+        
+        bool.tmp = exp %in% unique(c(FlagsExp$BLANCHEselected,FlagsExp$BASEselected))
+        if( length(bool.tmp) > 0  )
+          exp = exp[!bool.tmp]
+        
+        updateSelectizeInput(session = session,
+                             inputId = "BCA_standcurve",
+                             choices = exp,
+                             selected = unique(Result$Tablestandcurve$exp) )
+        
+        FlagsExp$STDCselected= unique(Result$Tablestandcurve$exp)
+      }
+    }
+    
+    ### updating check boxes
+    if(!is.null(FlagsExp$BLANCHEselected)){
+      exp = FlagsExp$AllExp
+      exp = exp[exp != ""]
+      
+      bool.tmp = exp %in% unique(c(FlagsExp$STDselected,FlagsExp$BASEselected))
+      if( length(bool.tmp) > 0  )
+        exp = exp[!bool.tmp]
+      
+      updateCheckboxGroupInput(session = session,
+                               inputId = "BCA_blanches",
+                               choices = exp,
+                               selected = unique(FlagsExp$BLANCHEselected) )
+    }
+    if(!is.null(FlagsExp$BASEselected)){
+      exp = FlagsExp$AllExp
+      exp = exp[exp != ""]
+      
+      bool.tmp = exp %in% unique(c(FlagsExp$STDselected,FlagsExp$BLANCHEselected))
+      if( length(bool.tmp) > 0  )
+        exp = exp[!bool.tmp]
+      
+      updateCheckboxGroupInput(session = session,
+                               inputId = "BCA_baselines",
+                               choices = exp,
+                               selected = unique(FlagsExp$BASEselected) )
+    }
+    ###
+    if(!is.null(Result$Regression)){
+      Result$Regression$data -> lmStancurve
+      Result$Tablestandcurve -> standcurve
+      
+      output$BCAregression <- renderPlot(
+        Result$Regression$plot
+      )
+    }
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "uploadBCA")
+    
+  }
+  else if(Flag == "ELISA"){
+    
+    for(nameList in names(DataAnalysisModule$elisaResult)) 
+      Result[[nameList]] <- DataAnalysisModule$elisaResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$elisaResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$elisaResult$Flags[[nameList]]
+    
+    if(!is.null(Result$TablePlot)){
+      output$ELISAmatrix <- renderDT(
+        Result$TablePlot,
+        server = FALSE
+      )
+    }
+    
+    if(!is.null(Result$ELISAcell_EXP)){
+      
+      updateSelectizeInput(inputId = "ELISAcell_EXP",
+                           session = session,
+                           choices = unique(c(Result$ELISAcell_EXP))
+      )
+      
+      updateSelectizeInput(inputId = "ELISAcell_SN",
+                           session =session,
+                           choices = unique(c(Result$ELISAcell_SN))
+      )
+      
+      FlagsExp$AllExp = unique(c(Result$ELISAcell_SN))
+    }
+    if(!is.null(Result$MapBaseline)){
+      FlagsExp$BASEselected = unique(Result$MapBaseline$Baseline)
+    }
+    if(!is.null(Result$MapBlanche)){
+      FlagsExp$BLANCHEselected = unique(Result$MapBlanche$Blanche)
+    }
+    if(!is.null(Result$Tablestandcurve)){
+      output$ELISA_Table_stdcurve <- DT::renderDataTable({
+        DT::datatable( Result$Tablestandcurve,
+                       selection = 'none',
+                       editable = list(target = "cell",
+                                       disable = list(columns = 0:2) ),
+                       options = list(lengthChange = FALSE, autoWidth = TRUE),
+                       rownames= FALSE
+        )
+      })
+      
+      if(length(FlagsExp$AllExp) > 1){
+        exp = FlagsExp$AllExp
+        exp = exp[exp != ""]
+        
+        bool.tmp = exp %in% unique(c(FlagsExp$BLANCHEselected,FlagsExp$BASEselected))
+        if( length(bool.tmp) > 0  )
+          exp = exp[!bool.tmp]
+        
+        updateSelectizeInput(session = session,
+                             inputId = "ELISA_standcurve",
+                             choices = exp,
+                             selected = unique(Result$Tablestandcurve$exp) )
+        
+        FlagsExp$STDCselected= unique(Result$Tablestandcurve$exp)
+      }
+    }
+    
+    ### updating check boxes
+    if(!is.null(FlagsExp$BLANCHEselected)){
+      exp = FlagsExp$AllExp
+      exp = exp[exp != ""]
+      
+      bool.tmp = exp %in% unique(c(FlagsExp$STDselected,FlagsExp$BASEselected))
+      if( length(bool.tmp) > 0  )
+        exp = exp[!bool.tmp]
+      
+      updateCheckboxGroupInput(session = session,
+                               inputId = "ELISA_blanches",
+                               choices = exp,
+                               selected = unique(FlagsExp$BLANCHEselected) )
+    }
+    if(!is.null(FlagsExp$BASEselected)){
+      exp = FlagsExp$AllExp
+      exp = exp[exp != ""]
+      
+      bool.tmp = exp %in% unique(c(FlagsExp$STDselected,FlagsExp$BLANCHEselected))
+      if( length(bool.tmp) > 0  )
+        exp = exp[!bool.tmp]
+      
+      updateCheckboxGroupInput(session = session,
+                               inputId = "ELISA_baselines",
+                               choices = exp,
+                               selected = unique(FlagsExp$BASEselected) )
+    }
+    ###
+    if(!is.null(Result$Regression)){
+      Result$Regression$data -> lmStancurve
+      Result$Tablestandcurve -> standcurve
+      
+      output$ELISAregression <- renderPlot(
+        Result$Regression$plot
+      )
+    }
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "uploadELISA")
+    
+  }
+  else if(Flag == "CYTOTX"){
+    
+    for(nameList in names(DataAnalysisModule$cytotoxResult)) 
+      Result[[nameList]] <- DataAnalysisModule$cytotoxResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$cytotoxResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$cytotoxResult$Flags[[nameList]]
+    
+    if(!is.null(Result$TablePlot)){
+      output$CYTOTOXmatrix <- renderDT(
+        Result$TablePlot,
+        server = FALSE
+      )
+    }
+    
+    if(!is.null(Result$CYTOTOXcell_EXP)){
+      
+      updateSelectizeInput(inputId = "CYTOTOXcell_EXP",
+                           session = session,
+                           choices = unique(c(Result$CYTOTOXcell_EXP))
+      )
+      
+      updateSelectizeInput(inputId = "CYTOTOXcell_SN",
+                           session =session,
+                           choices = unique(c(Result$CYTOTOXcell_SN))
+      )
+      updateSelectizeInput(inputId = "CYTOTOXcell_REP",
+                           session =session,
+                           choices = unique(c(Result$CYTOTOXcell_REP))
+      )
+      # FlagsExp$AllExp = unique(c(Result$CYTOTOXcell_SN))
+    }
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "uploadCYTOTOX")
+    
+  }
 }

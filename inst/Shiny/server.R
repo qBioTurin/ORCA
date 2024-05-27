@@ -4,7 +4,7 @@
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "ORCA")
 
-source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
+#source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
 #source("./inst/Shiny/AuxFunctions.R")
 
 # Define server logic required to draw a histogram
@@ -16,7 +16,9 @@ server <- function(input, output, session) {
                                        endocResult = NULL,
                                        elisaResult = NULL,
                                        pcrResult = NULL,
-                                       cytotoxResult = NULL)
+                                       cytotoxResult = NULL,
+                                       facsResult = NULL,
+                                       bcaResult = NULL)
   
   DataIntegrationModule <- reactiveValues(dataLoaded = NULL,
                                           data = NULL,
@@ -27,8 +29,8 @@ server <- function(input, output, session) {
                                           otherTabs = NULL,
                                           otherTabsMean = NULL)
   
-  MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity") 
-  names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult") 
+  MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity", "FACS","BCA") 
+  names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult", "facsResult","bcaResult") 
   
   #### DATA INTEGRATION ####
   ### Omics ####
@@ -489,6 +491,823 @@ server <- function(input, output, session) {
   ### END DATA INTEGRATION ####
   
   #### DATA ANALYSIS ####
+  
+  #### BCA analysis ####
+  observeEvent(input$NextBCAQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "tablesBCA")
+  })
+  #
+  
+  bcaResult = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    dataQuant = NULL,
+    BCAcell_EXP = "",
+    BCAcell_SN = NULL,
+    BCAcell_COLOR = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL,
+    Tablestandcurve = NULL,
+    Regression = NULL)
+  
+  bcaResult0 = list(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    dataQuant = NULL,
+    BCAcell_EXP = "",
+    BCAcell_SN = NULL,
+    BCAcell_COLOR = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL,
+    Tablestandcurve = NULL,
+    Regression = NULL)
+  
+  left_data_bca <- reactiveVal()
+  right_data_bca <- reactiveVal()
+  
+  # save everytime there is a change in the results
+  BCAresultListen <- reactive({
+    reactiveValuesToList(bcaResult)
+  })
+  observeEvent(BCAresultListen(), {
+    DataAnalysisModule$bcaResult = reactiveValuesToList(bcaResult)
+    DataAnalysisModule$bcaResult$Flags = reactiveValuesToList(FlagsBCA)
+  })
+  
+  ##
+  FlagsBCA <- reactiveValues(cellCoo = NULL,
+                             AllExp = "",
+                             BASEselected = "",
+                             STDCselected = "",
+                             BLANCHEselected = "",
+                             EXPselected = "",
+                             EXPcol = NULL)
+  
+  observeEvent(input$LoadBCA_Button,{
+    alert$alertContext <- "BCA-reset"
+    if( !is.null(bcaResult$Initdata) ) {
+      shinyalert(
+        title = "Important message",
+        text = "Do you want to update the BCA data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadExcelFileBCA()
+  })
+  
+  observeEvent(input$shinyalert, {
+    removeModal()
+    if (input$shinyalert && alert$alertContext == "BCA-reset") {  
+      resetPanel("BCA", flags = FlagsBCA, result = bcaResult)
+      
+      loadExcelFileBCA()
+    }
+  })
+  
+  loadExcelFileBCA <- function() {
+    alert$alertContext <- ""
+    mess = readfile(
+      filename = input$BCAImport$datapath,
+      isFileUploaded = !is.null(input$BCAImport) && file.exists(input$BCAImport$datapath),
+      type = "Excel",
+      allDouble = T,
+      colname = F,
+      colors = T
+    )
+    
+    if(setequal(names(mess), c("message", "call"))) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+    } else {
+      bcaResult$Initdata = mess$x
+      FlagsBCA$EXPcol = mess$fill
+      bcaResult$BCAcell_COLOR = mess$SNtable
+      bcaResult$BCAcell_SN = matrix("", nrow = nrow(bcaResult$BCAcell_COLOR), ncol = ncol(bcaResult$BCAcell_COLOR))
+      
+      removeModal()
+      showAlert("Success", "The Excel has been uploaded  with success", "success", 2000)
+    }
+  }
+  
+  observe({
+    if (!is.null(bcaResult$Initdata) && is.null(bcaResult$TablePlot)) {
+      tableExcelColored(session = session,
+                        Result = bcaResult, 
+                        FlagsExp = FlagsBCA,
+                        type = "Initialize")
+    }
+  })
+  
+  observeEvent(c(bcaResult$TablePlot,bcaResult$BCAcell_EXP), {
+    if (!is.null(bcaResult$TablePlot)) {
+      BCAtb <- bcaResult$TablePlot
+      output$BCAmatrix <- renderDT(BCAtb, server = FALSE)
+      
+      if (!is.null(bcaResult$BCAcell_EXP) && !is.null(bcaResult$BCAcell_COLOR)) {
+        matTime <- as.matrix(bcaResult$BCAcell_EXP)
+        matExp <- as.matrix(bcaResult$BCAcell_COLOR)
+        
+        #if (!(all(matTime == "") || all(matExp == ""))) {
+        mat <- as.matrix(bcaResult$Initdata)
+        bcaV <- expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
+          rowwise() %>%
+          mutate(values = mat[Var1, Var2])
+        bcaT <- expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
+          rowwise() %>%
+          mutate(time = matTime[Var1, Var2])
+        bcaE <- expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
+          rowwise() %>%
+          mutate(exp = matExp[Var1, Var2])
+        bcaTot <- merge(bcaV, merge(bcaT, bcaE)) %>%
+          na.omit()
+          #filter(time != "", exp != "")
+        
+        bcaResult$data <- bcaTot
+        #}
+      }
+    } 
+  })
+  
+  observe({
+    color_codes <- FlagsBCA$EXPcol
+    color_names <- names(FlagsBCA$EXPcol)
+    
+    valid_colors <- color_codes != "white"
+    color_codes <- color_codes[valid_colors]
+    color_names <- color_names[valid_colors]
+    
+    mid_point <- ceiling(length(color_codes) / 2)
+    left_colors <- color_codes[1:mid_point]
+    right_colors <- color_codes[(mid_point+1):length(color_codes)]
+    
+    left_formatted_data <- get_formatted_data(left_colors, color_names[1:mid_point], bcaResult, bcaResult$BCAcell_EXP,"BCA")
+    right_formatted_data <- get_formatted_data(right_colors, color_names[(mid_point+1):length(color_codes)], bcaResult, bcaResult$BCAcell_EXP, "BCA")
+    
+    left_data_bca(left_formatted_data)
+    right_data_bca(right_formatted_data)
+    
+    output$leftTableBCA <- renderDataTable(
+      left_data_bca(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE, 
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '200px', targets = 3),
+          list(width = '80px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+    
+    output$rightTableBCA <- renderDataTable(
+      right_data_bca(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE,
+        editable = TRUE,
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '200px', targets = 3),
+          list(width = '80px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+  })
+  
+  observeEvent(input$leftTableBCA_cell_edit, {
+    info <- input$leftTableBCA_cell_edit
+    data <- left_data_bca() 
+    updatedText <- updateTable("left", "BCA", info, data, bcaResult, FlagsBCA)
+    
+    output$BCASelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$rightTableBCA_cell_edit, {
+    info <- input$rightTableBCA_cell_edit
+    data <- right_data_bca() 
+    updatedText <- updateTable("right", "BCA", info, data, bcaResult, FlagsBCA)
+    
+    output$BCASelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$BCAmatrix_cell_clicked, {
+    req(input$BCAmatrix_cell_clicked)  
+    
+    cellSelected = as.numeric(input$BCAmatrix_cell_clicked)
+    FlagsBCA$cellCoo = cellCoo = c(cellSelected[1], cellSelected[2] + 1)
+    
+    allExp <- unique(na.omit(c(bcaResult$BCAcell_EXP)))  
+    selectedExp <- ifelse(is.null(bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "BCAcell_EXP", 
+                         choices = allExp,
+                         selected = selectedExp)
+    
+    allSN <- unique(na.omit(c(bcaResult$BCAcell_SN)))  
+    selectedSN <- ifelse(is.null(bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "BCAcell_SN",
+                         choices = allSN,
+                         selected = selectedSN)
+  })
+  
+  observeEvent(input$BCAcell_SN, {
+    if (!is.null(bcaResult$BCAcell_COLOR) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
+      BCAtb = bcaResult$TablePlot
+      cellCoo = FlagsBCA$cellCoo
+      
+      value.bef = bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] 
+      value.now = input$BCAcell_SN
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- bcaResult$Initdata[cellCoo[1], cellCoo[2]]
+        
+        bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
+        bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]] = value.now
+        BCAtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] = value.now
+        
+        if (!input$BCAcell_SN %in% FlagsBCA$AllExp) {
+          exp = unique(c(FlagsBCA$AllExp, input$BCAcell_SN))
+          FlagsBCA$AllExp = exp
+        }
+        
+        tableExcelColored(session = session,
+                          Result = bcaResult, 
+                          FlagsExp = FlagsBCA,
+                          type = "Update")
+        
+        output$BCASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": sample name ", value.now))
+        output$BCAmatrix <- renderDataTable({bcaResult$TablePlot})
+      }
+    } else return()
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$BCAcell_EXP, {
+    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
+      BCAtb = bcaResult$TablePlot
+      cellCoo = FlagsBCA$cellCoo
+      
+      value.bef = bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] 
+      value.now = input$BCAcell_EXP
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- bcaResult$Initdata[cellCoo[1], cellCoo[2]]
+        
+        bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] = value.now
+        tableExcelColored(session = session,
+                          Result = bcaResult, 
+                          FlagsExp = FlagsBCA,
+                          type = "Update"
+        )
+        
+        output$BCASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": Exp Condition ", value.now))
+        output$BCAmatrix <- renderDataTable({bcaResult$TablePlot})
+      }
+    } else return()
+  }, ignoreInit = TRUE)
+  
+  ## update Baselines checkBox
+  observeEvent(c(FlagsBCA$AllExp,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected),{
+    if(length(FlagsBCA$AllExp) > 1){
+      exp = FlagsBCA$AllExp
+      exp = exp[exp != ""]
+      
+      bool.tmp = exp %in% unique(c(FlagsBCA$BLANCHEselected,FlagsBCA$BASEselected))
+      if( length(bool.tmp) > 0  )
+        exp = exp[!bool.tmp]
+      
+      updateSelectizeInput(session,"BCA_standcurve",
+                           choices = exp,
+                           selected = ifelse(FlagsBCA$STDCselected %in% exp,FlagsBCA$STDCselected,"") 
+      )
+    }
+  })
+  observeEvent(c(FlagsBCA$AllExp,FlagsBCA$BASEselected,FlagsBCA$STDCselected),{
+    if(length(FlagsBCA$AllExp) > 1){
+      exp = FlagsBCA$AllExp
+      exp = exp[exp != ""]
+      
+      bool.tmp = exp %in% unique(c(FlagsBCA$STDCselected,FlagsBCA$BASEselected))
+      if( length(bool.tmp) > 0  )
+        exp = exp[!bool.tmp]
+      
+      updateCheckboxGroupInput(session,"BCA_blanks",
+                               choices = exp,
+                               selected = FlagsBCA$BLANCHEselected )
+    }
+  })
+  observeEvent(c(FlagsBCA$AllExp,FlagsBCA$BLANCHEselected,FlagsBCA$STDCselected),{
+    if(length(FlagsBCA$AllExp) > 1){
+      exp = FlagsBCA$AllExp
+      exp = exp[exp != ""]
+      
+      bool.tmp = exp %in% unique(c(FlagsBCA$STDCselected,FlagsBCA$BLANCHEselected))
+      if( length(bool.tmp) > 0  )
+        exp = exp[!bool.tmp]
+      
+      exp_selec = input$BCA_baselines
+      
+      updateCheckboxGroupInput(session,"BCA_baselines",
+                               choices = exp,
+                               selected = FlagsBCA$BASEselected )
+    }
+  })
+  
+  ## select the baselines, std curves, and blank
+  observeEvent(input$BCA_baselines,{
+    FlagsBCA$BASEselected = input$BCA_baselines
+    FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
+  },ignoreNULL = F)
+  observeEvent(input$BCA_standcurve,{
+    FlagsBCA$STDCselected = input$BCA_standcurve
+    FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
+  },ignoreNULL = F)
+  observeEvent(input$BCA_blanks,{
+    FlagsBCA$BLANCHEselected = input$BCA_blanks
+    FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
+  },ignoreNULL = F)
+  
+  toListen_bca <- reactive({
+    exp = FlagsBCA$EXPselected
+    baseline = FlagsBCA$BASELINEselected
+    stcd = FlagsBCA$STDCselected
+    
+    exp = exp[exp != ""]
+    allexpNOTblank = unique(c(stcd,exp,baseline))
+    
+    if(length(allexpNOTblank) > 0 )
+    {
+      Input_baselEXP = lapply(exp,
+                              function(i) input[[paste0("bca_Exp",i)]])
+      Input_blEXP = lapply(allexpNOTblank,
+                           function(i) input[[paste0("bca_blExp",i)]] )
+      InputEXP = c(Input_baselEXP,Input_blEXP)
+      
+      which(sapply(InputEXP, function(x) 
+        ifelse(is.null(x), T, ifelse(x == "", T, F) ) ) ) -> indexesEXPnull
+      
+      if(length(indexesEXPnull) > 0 )
+        listReturn = InputEXP[-indexesEXPnull]
+      else
+        listReturn = InputEXP
+    }else{
+      listReturn = list()
+    }
+    
+    if(length(listReturn) == 0){
+      return(list("Nothing",bcaResult$BCAcell_EXP,bcaResult$BCAcell_SN))
+    }else{
+      return(c(listReturn,list(bcaResult$BCAcell_EXP,bcaResult$BCAcell_SN)) )
+    }
+  })
+  
+  observeEvent(toListen_bca(),{
+    baselines = FlagsBCA$BASEselected
+    baselines = baselines[baselines != ""]
+    stcd = FlagsBCA$STDCselected
+    
+    if(toListen_bca()[[1]] != "Nothing" ){
+      exp = FlagsBCA$EXPselected
+      
+      exp = exp[exp != ""]
+      expNotBlank = unique(c(stcd,exp,baselines))
+      
+      MapBaseline = do.call(rbind,
+                            lapply(exp,function(i){
+                              if( length(input[[paste0("bca_Exp",i)]]) > 0 && input[[paste0("bca_Exp",i)]] != ""){
+                                data.frame(Exp = i, Baseline = input[[paste0("bca_Exp",i)]])
+                              }else{
+                                data.frame(Exp = i, Baseline = NA)
+                              }
+                            })
+      ) %>% na.omit()
+      
+      MapBlank = do.call(rbind,
+                         lapply(expNotBlank,
+                                function(i){
+                                  if( length(input[[paste0("bca_blExp",i)]]) > 0 && input[[paste0("bca_blExp",i)]] != ""){
+                                    data.frame(Exp = i, Blank = input[[paste0("bca_blExp",i)]])
+                                  }else{
+                                    data.frame(Exp = i, Blank = NA)
+                                  }
+                                })
+      ) %>% na.omit()
+      
+      bcaResult$MapBaseline = MapBaseline
+      bcaResult$MapBlank = MapBlank
+    }
+  })
+  
+  ## update the data with the blank and baseline
+  observe({
+    if(!is.null(bcaResult$Initdata)){
+    mat = as.matrix(bcaResult$Initdata)
+    bcaResult$MapBaseline -> MapBaseline
+    bcaResult$MapBlank -> MapBlank
+    stcd = input$BCA_standcurve
+    bcaResult$Regression -> Regression
+    isolate({
+      if(!is.null(MapBlank)){
+        bcaV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
+          rowwise() %>%
+          mutate(values = mat[Var1, Var2])
+        matTime =  as.matrix(bcaResult$BCAcell_EXP)
+        bcaT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
+          rowwise() %>%
+          mutate(time = matTime[Var1, Var2])
+        matExp =  as.matrix(bcaResult$BCAcell_SN)
+        bcaE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
+          rowwise() %>%
+          mutate(exp = matExp[Var1, Var2])
+        bcaTot = merge(bcaV,merge(bcaT,bcaE)) %>%
+          filter(exp != "")
+        
+        bcaTotAverage = bcaTot %>%
+          #mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
+          group_by(time, exp) %>%
+          summarize(meanValues = mean(values))
+        
+        # merging exp with blank for the substraction
+        bcaTot_bl = right_join( bcaTotAverage,MapBlank, 
+                                by= c("exp"= "Blank") )%>%
+          rename(BlankValues = meanValues, Blank =  exp, exp = Exp )
+        
+        # if blank has ExpCond empty than is associated to each ExpCond if the other SampleNames
+        timesBlank = bcaTotAverage %>% filter(exp %in% unique(MapBlank$Blank)) %>% select(time) %>% distinct() %>% pull(time)
+        if(length(timesBlank)>1 || timesBlank !=""){
+          bcaTotAverage = merge( bcaTotAverage %>% filter( exp %in% bcaTot_bl$exp ),
+                                 bcaTot_bl %>% ungroup(),
+                                 all.x = T, by = c("exp","time") )
+        }else{
+          bcaTotAverage = merge( bcaTotAverage %>% filter( exp %in% bcaTot_bl$exp ),
+                                 bcaTot_bl %>% ungroup() %>% select(-time),
+                                 all.x = T, by = c("exp") )
+        }
+        bcaTotAverage[is.na(bcaTotAverage[,])] = 0
+        bcaTotAverage = bcaTotAverage %>% mutate(meanValues = meanValues - BlankValues )
+        
+        # # merging exp with baseline
+        # bcaTot_base = merge(MapBaseline, bcaTotAverage,
+        #                     by.y = "exp", by.x = "Baseline",all = T) %>%
+        #   rename(BaseValues = meanValues) %>% select(-Blank,-BlankValues)
+        # 
+        # bcaTot_base = merge(bcaTotAverage, bcaTot_base, 
+        #                     by.x = c("exp","time"), by.y = c("Exp","time"),
+        #                     all.x = T  )
+        
+        # bcaResult$data = bcaTot
+        
+        #if(length(bcaTot_base[,1]) != 0 && !is.null(bcaResult$Regression) ){
+        if( !is.null(Regression) ){  
+          bcamean = bcaTotAverage %>%
+            filter(exp != stcd) %>%
+            rename( AverageValues = meanValues) %>%
+            dplyr::mutate(Quantification =  Regression$fun(AverageValues) ) %>%
+            #MeanExperiment/MeanBaseline * 100) %>%
+            rename(SampleName = exp,ExpCondition = time) 
+          
+          output$BCAtables = renderDT(bcamean)
+          
+          bcaResult$dataQuant = bcamean
+          
+          bcameanNew = bcamean %>%
+            select(SampleName,ExpCondition,Quantification) %>%
+            rename(Ug = Quantification)
+          bcaResult$dataFinal = bcameanNew
+          output$BCAtablesUG = renderDT(bcameanNew)
+          
+          # output$BCAplots = renderPlot(
+          #   {
+          #     bcamean %>%
+          #       ggplot( aes(x = Time, y = Quantification,
+          #                   fill= Experiment, group = Experiment ) )+
+          #       geom_bar(position = "dodge",stat = "identity")+
+          #       theme_bw()+
+          #       labs(x = "Time", col = "Experiments",
+          #            y = "Average quantifications obtained\n from the lm ")
+          #   }
+          # )
+        }else{
+          output$BCAtables = renderDT(data.frame(Error = "No linear model!"))
+        }
+      }
+    })
+    }
+  })
+  # here the Exp boxes are updated every time a new experiment is added 
+  observe({
+    expToselect = FlagsBCA$EXPselected
+    baselines =  FlagsBCA$BASEselected
+    blanks = FlagsBCA$BLANCHEselected
+    stdc = FlagsBCA$STDCselected
+    
+    isolate({
+      expToselect = expToselect[expToselect != ""]
+      
+      # baselines updating
+      output$BCABaselineSelection <- renderUI({
+        select_output_list <- lapply(expToselect[! expToselect %in% baselines],
+                                     function(i) {
+                                       if(length(input[[paste0("bca_Exp",i)]])>0)
+                                         expsel = input[[paste0("bca_Exp",i)]]
+                                       else 
+                                         expsel = ""
+                                       
+                                       selectInput(inputId = paste0("bca_Exp",i),
+                                                   label = i,
+                                                   choices = c("",baselines),
+                                                   selected = expsel)
+                                     })
+        do.call(tagList, select_output_list)
+      })
+      # blanks updating
+      output$BCABlankSelection <- renderUI({
+        select_output_list <- lapply(unique(c(stdc,expToselect,baselines)), function(i) {
+          
+          if(length(input[[paste0("bca_blExp",i)]])>0)
+            expsel = input[[paste0("bca_blExp",i)]]
+          else 
+            expsel = ""
+          
+          selectInput(inputId = paste0("bca_blExp",i),
+                      label = i,
+                      choices = c("",blanks),
+                      selected = expsel)
+        })
+        do.call(tagList, select_output_list)
+      })
+    })
+  })
+  
+  observe({
+      input$BCA_standcurve -> BCA_standcurve
+      bcaResult$data -> data
+      
+      isolate({
+        if(BCA_standcurve != ""){
+          
+          standcurve = data %>%
+            filter(exp %in% BCA_standcurve) %>%
+            # group_by(exp,time) %>%
+            # summarise(AverageMeasures = mean(values)) %>%
+            # ungroup() %>%
+            select(exp,time,values) %>%
+            rename(Measures = values, Concentrations = time) %>%
+            filter(Concentrations != "")
+          
+          # If nothing changes w..r.t. the already saved table then I keep the old one!
+          if(is.null(bcaResult$Tablestandcurve) || 
+             !identical(bcaResult$Tablestandcurve,standcurve) )
+          {
+            bcaResult$Tablestandcurve = standcurve
+          }
+        } 
+      })
+    })
+  
+  observe({
+    standcurve = bcaResult$Tablestandcurve 
+    MapBlank = bcaResult$MapBlank
+    input$BCA_standcurve -> stdc
+    bcaResult$data -> Data
+    
+    isolate({
+      if(!is.null(standcurve) && dim(standcurve)[1]!=0){
+        standcurve = standcurve %>% select(exp, Concentrations,  Measures)
+        
+        if(!is.null(MapBlank) && nrow(MapBlank %>% filter(Exp %in% stdc ))>0){
+          DataBlank = Data %>% filter(exp %in% unique(MapBlank$Blank) ) %>% group_by(time,exp) %>% 
+            summarise(BlankValues = mean(values)) %>%
+            rename( Blank =  exp )
+          bcaTot_bl = merge( DataBlank, MapBlank) %>% ungroup()
+           
+          # if blank has ExpCond empty than is associated to each ExpCond if the other SampleNames
+          timesBlank = bcaTot_bl %>% select(time) %>% distinct() %>% pull(time)
+          if(length(timesBlank)>1 || timesBlank !=""){
+            bcaTotAverage = merge( standcurve,bcaTot_bl,
+                                   all.x = T, by.x = c("exp","Concentrations"), by.y = c("Exp","time") )
+          }else{
+            bcaTotAverage = merge( standcurve,bcaTot_bl,
+                                   all.x = T, by.x = c("exp"),by.y = "Exp" )
+          }
+          #bcaTotAverage[is.na(bcaTotAverage[,])] = 0
+          standcurveNew = bcaTotAverage %>% mutate(MeasuresWithoutBlank = Measures - BlankValues )
+          
+        }else{
+          standcurveNew = standcurve %>% mutate(Blank = NA,BlankValues = NA,MeasuresWithoutBlank = NA)
+        }
+        
+        bcaResult$Tablestandcurve = standcurveNew
+        
+        output$BCA_Table_stdcurve <- DT::renderDataTable({
+          DT::datatable( standcurveNew %>% 
+                           select(exp, Blank, Concentrations,  Measures,  BlankValues, MeasuresWithoutBlank) %>%
+                           rename(SampleName = exp),
+                         selection = 'none',
+                         # editable = list(target = "cell",
+                         #                 disable = list(columns = 0:2) ),
+                         rownames= FALSE,
+                         options = list(scrollX = TRUE,
+                           searching = FALSE,
+                           dom = 't' # Only display the table
+                         )
+          )
+        })
+      } 
+    })
+  })
+  observeEvent(input$BCA_buttonRegression,{
+    standcurve = bcaResult$Tablestandcurve
+    
+    if(!is.null(standcurve)){
+      standcurve$Concentrations = as.numeric(standcurve$Concentrations)
+      if(!all(is.na(standcurve$BlankValues)) ){
+        standcurve = standcurve %>%
+          select(Concentrations, MeasuresWithoutBlank) %>%
+          rename( Measures = MeasuresWithoutBlank ) %>% na.omit()
+        y="Measures Without Blank"
+      }else{
+        y="Measures"
+        standcurve = standcurve %>% 
+          select(Concentrations, Measures) %>% na.omit()
+      }
+     
+      regressionPlot = ggplot(standcurve,aes(Concentrations, Measures)) +
+        geom_point() +
+        theme_bw()
+      
+      #if(input$regressionType == "Linear"){
+      modelStancurve = lm(Measures~Concentrations, data = standcurve)
+      
+      infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
+                          y = max(standcurve$Measures) + c(2,1.75),
+                          text = c( paste0("y = ", signif(modelStancurve$coef[[2]], 5), "x + ",signif(modelStancurve$coef[[1]],5 )),
+                                    paste0("Adj R2 = ",signif(summary(modelStancurve)$adj.r.squared, 5))) )
+      
+      fun = paste0("(x - ",modelStancurve$coef[[1]],")/", modelStancurve$coef[[2]])
+      
+      regressionPlot =  regressionPlot +
+        geom_smooth(method='lm', col = "red") +
+        geom_text(data= infoLM,
+                  aes(x = x, y = y, label =text ),
+                  vjust = "inward", hjust = "inward" )+
+        labs(x = "Concentrations", y = y) 
+      
+      # }
+      # else if(input$regressionType == "Quadratic")
+      # {
+      #   #this is not implemented
+      #   standcurve$Concentrations2 = standcurve$Concentrations^2
+      #   modelStancurve = lm(Measures~Concentrations+Concentrations2, data = standcurve)
+      #   
+      #   infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
+      #                       y = max(standcurve$Measures) + c(2,1.75),
+      #                       text = c( paste0("y = ", signif(modelStancurve$coef[[3]], 5), "x^2 + ",
+      #                                        signif(modelStancurve$coef[[2]], 5), "x + ",signif(modelStancurve$coef[[1]],5 )),
+      #                                 paste0("Adj R2 = ",signif(summary(modelStancurve)$adj.r.squared, 5))) )
+      #   
+      #   fun = paste0(modelStancurve$coef[[3]],"*x^2 + ",modelStancurve$coef[[2]],"*x + ",modelStancurve$coef[[1]] )
+      #   
+      #   regressionPlot =  regressionPlot  +
+      #     geom_point() +
+      #     stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1,col="red")+
+      #     geom_text(data= infoLM,
+      #               aes(x = x, y = y, label =text ),
+      #               vjust = "inward", hjust = "inward" )
+      # }
+      # else if(input$regressionType == "Hyperbola"){
+      #   
+      #   outNLreg = tryCatch(
+      #     {
+      #       modelStancurve<-nls(
+      #         Measures ~ a*Concentrations/(b+Concentrations), 
+      #         data = standcurve, #%>% group_by(Concentrations) %>% summarise(Measures = mean(Measures)),
+      #         start = list(a = 1,b = 1)
+      #       )
+      #     }, 
+      #     error = function(e){
+      #       return(e)
+      #     })
+      #   
+      #   if(!is.null(outNLreg$mess)){
+      #     modelStancurve = NULL
+      #     regressionPlot = ggplot()+ geom_text(data = data.frame(x = 1,y =1,text = paste0("Error: ",outNLreg$mess)),
+      #                                          aes(x,y,label = text),color = "red")
+      #   }else{
+      #     modelStancurve = outNLreg
+      #     coef = modelStancurve$m$getPars()
+      #     r2 = 1- sum(modelStancurve$m$resid()^2)/(sum(( mean(standcurve$Measures) - modelStancurve$m$predict() )^2))
+      #     
+      #     infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
+      #                         y = max(standcurve$Measures) + c(2,1.75),
+      #                         text = c( paste0("y = ", signif(coef["a"], 5), "x / ( ",
+      #                                          signif(coef["b"], 5), " + x ) "),
+      #                                   paste0("R2 = ",signif(r2, 5))) )
+      #     
+      #     dfHyperbola = data.frame(x = seq(min(standcurve$Concentrations),max(standcurve$Concentrations),length.out = 20)) %>%
+      #       mutate(y = (coef["a"]*x/((coef["b"]+x)) ) )
+      #     
+      #     fun = paste0(coef["b"],"*x/(",coef["a"],"-x)")
+      #     
+      #     regressionPlot =  regressionPlot  +
+      #       geom_point() +
+      #       geom_line(data = dfHyperbola,aes(x = x,y = y),size = 1,col="red" )+
+      #       geom_text(data= infoLM,
+      #                 aes(x = x, y = y, label =text ),
+      #                 vjust = "inward", hjust = "inward" )
+      #   }
+      # }
+      
+      bcaResult$Regression = list(data = modelStancurve, plot = regressionPlot, fun = function(x){ eval( parse(text = fun ) ) } )
+      
+    }else{
+      regressionPlot = ggplot()
+    }
+    output$BCAregression <- renderPlot(regressionPlot)
+  })
+  
+  observeEvent(input$confirmBCA_UGvalue,{
+    
+    bcaResult$dataFinal -> bcamean
+    
+    if(!is.null(bcamean)){
+      BCA_UGvalue = as.numeric(input$BCA_UGvalue)
+      if(is.na(BCA_UGvalue)){
+        showAlert("Error", "The value must be numeric!", "error", 5000)
+        return()
+      }else{
+        bcamean[,paste0("Ug/",BCA_UGvalue)] =  bcamean$Ug/BCA_UGvalue
+        
+        bcaResult$dataFinal = bcamean
+        
+        output$BCAtablesUG = renderDT(bcamean)
+        
+      }
+    }else{
+      showAlert("Error", "The quantification step is missing!", "error", 5000)
+      return()
+    }
+  })
+  
+  output$downloadBCAAnalysis <- downloadHandler(
+    filename = function() {
+      paste('BCAanalysis-', Sys.Date(), '.zip', sep='')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      nomeRDS <- paste0("BCA_analysis-", Sys.Date(), ".rds")
+      nomeXLSX <- paste0("BCA_analysis-", Sys.Date(), ".xlsx")
+      
+      tempRdsPath <- file.path(tempDir, nomeRDS)
+      tempXlsxPath <- file.path(tempDir, nomeXLSX)
+      
+      results <- DataAnalysisModule$bcaResult
+      saveRDS(results, file = tempRdsPath)
+      
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "BCA")
+      
+      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      manageSpinner(FALSE)
+      
+    } 
+  )
+  
+  
+  # save everytime there is a change in the results
+  BCAresultListen <- reactive({
+    reactiveValuesToList(bcaResult)
+  })
+  observeEvent(BCAresultListen(), {
+    DataAnalysisModule$bcaResult = reactiveValuesToList(bcaResult)
+    DataAnalysisModule$bcaResult$Flags = reactiveValuesToList(FlagsBCA)
+  })
+  
+  ### End BCA analysis ####  
+  
   ### WB analysis ####
   
   PanelData = data.frame(SampleName = character(),
@@ -2424,6 +3243,7 @@ server <- function(input, output, session) {
   # })
   
   ### End ELISA analysis ####  
+  
   #### ENDOCYTOSIS analysis ####
   observeEvent(input$NextEndocQuantif,{
     updateTabsetPanel(session, "SideTabs",
@@ -3093,6 +3913,8 @@ server <- function(input, output, session) {
     } else {
       if (nrow(mess) > 1) {
         data <- mess[-1, , drop = FALSE]  
+        facsResult$Initdata <- data
+        
         facsResult$depth <- vector("list", nrow(data))
         facsResult$depthCount <- numeric(nrow(data))
         facsResult$name <- vector("list", nrow(data))
@@ -3234,13 +4056,21 @@ server <- function(input, output, session) {
     loadDrop() 
   }, ignoreInit = TRUE)
   
-  observe({FlagsFACS$actualPath
+  observe({
+    FlagsFACS$actualPath
+    choices <- colnames(FlagsFACS$data)
+    choices <- choices[choices != "Name"]
+    
+    # Escludere l'ultima colonna
+    if (length(choices) > 1) {
+      choices <- choices[-length(choices)]
+    }
+    
     updateSelectizeInput(session = session,
                          inputId = "selectBaseGate",
-                         choices = colnames(FlagsFACS$data)
+                         choices = choices
     )
-  }
-  )
+  })
   
   escapeRegex <- function(string) {
     gsub("([\\\\^$.*+?()[{\\]|-])", "\\\\\\1", string)
@@ -3309,30 +4139,58 @@ server <- function(input, output, session) {
     }
   })
   
-  convert_percent_to_final <- function(data_row) {
-    last_percentage_name <- names(data_row)[length(data_row)]
-    start_percent_index <- 2  
+  convert_percent_to_final <- function(data_row, selected_gate) {
+    last_percentage_name <- paste(names(data_row)[length(data_row)], selected_gate, sep = "/")
     
-    percentages = as.numeric(sub("%", "", data_row[start_percent_index:length(data_row)])) / 100
-    final_percentage = Reduce(`*`, percentages) * 100 
+    if (selected_gate == "Start") {
+      initial_value <- as.numeric(data_row[2])
+      percentages <- as.numeric(sub("%", "", data_row[3:length(data_row)])) / 100
+      
+      final_percentage <- (Reduce(`*`, percentages) * 100 / initial_value) * 100
+    } else {
+      selected_gate_index <- which(names(data_row) == selected_gate)
+      
+      if (selected_gate_index == length(data_row) - 1) {
+        final_percentage <- as.numeric(sub("%", "", data_row[selected_gate_index + 1]))
+      } else {
+        percentages <- as.numeric(sub("%", "", data_row[(selected_gate_index + 2):length(data_row)])) / 100
+        
+        if (length(percentages) == 0) {
+          final_percentage <- as.numeric(sub("%", "", data_row[selected_gate_index + 1]))
+        } else {
+          selected_percentage <- as.numeric(sub("%", "", data_row[selected_gate_index + 1])) / 100
+          final_percentage <- selected_percentage * Reduce(`*`, percentages) * 100
+        }
+      }
+    }
     
     data.frame(Name = data_row[1], FinalPercent = sprintf("%.2f%%", final_percentage)) %>%
       setNames(c("Name", last_percentage_name))
   }
   
-  
   observeEvent(input$SaveFACSanalysis, {
-    start_percent_index <- 3
-    current_data <- FlagsFACS$data[, c(1, start_percent_index:ncol(FlagsFACS$data)), drop = FALSE]
+    selected_gate <- input$selectBaseGate
+    selected_gate_index <- which(names(FlagsFACS$data) == selected_gate)
     
-    processed_data <- lapply(split(current_data, seq(nrow(current_data))), convert_percent_to_final)
+    if (length(selected_gate_index) == 0) {
+      showNotification("Selected column not found in the dataset", type = "error")
+      return()
+    }
+    
+    current_data <- FlagsFACS$data[, c(1, 2, selected_gate_index:ncol(FlagsFACS$data)), drop = FALSE]
+    
+    processed_data <- lapply(split(current_data, seq(nrow(current_data))), function(row) {
+      convert_percent_to_final(row, selected_gate)
+    })
+    
     new_data <- do.call(rbind, processed_data)
     
     if (is.null(facsResult$data)) {
       facsResult$data <- new_data
     } else {
-      if (names(facsResult$data)[ncol(facsResult$data)] != names(new_data)[2]) {
-        facsResult$data[names(new_data)[2]] <- new_data[, 2]
+      new_column_name <- names(new_data)[2]
+      if (names(facsResult$data)[ncol(facsResult$data)] != new_column_name) {
+        facsResult$data[new_column_name] <- new_data[, 2]
       }
     }
     
@@ -3340,15 +4198,37 @@ server <- function(input, output, session) {
       datatable(facsResult$data, 
                 options = list(
                   autoWidth = TRUE,
-                  #editable = TRUE,
                   columnDefs = list(
                     list(visible = FALSE, targets = 0)  
                   )
-                ),
-                #editable = list(target = "cell", disable = list(2:ncol(facsResult$data)))
+                )
       )
     })
+    facsResult$dataFinal <- facsResult$data
   })
+  
+  output$downloadFACSanalysis <- downloadHandler(
+    filename = function() {
+      paste('FACSanalysis-', Sys.Date(), '.zip', sep='')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      
+      nomeRDS <- paste0("FACSquant_analysis-", Sys.Date(), ".rds")
+      nomeXLSX <- paste0("FACSquant_analysis-", Sys.Date(), ".xlsx")
+      
+      tempRdsPath <- file.path(tempDir, nomeRDS)
+      tempXlsxPath <- file.path(tempDir, nomeXLSX)
+      results <- DataAnalysisModule$facsResult
+      saveRDS(results, file = tempRdsPath)
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "FACS", PanelStructures)
+      
+      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      manageSpinner(FALSE)
+    }
+  )
   
   ### End FACS analysis ####
   
@@ -3483,11 +4363,11 @@ server <- function(input, output, session) {
   # Render statistical analysis results
   output$TabStat <- renderDT({
     StatisticalAnalysisResults()$Table
-    },
-    options = list(
-      searching = FALSE,
-      dom = 't' # Only display the table
-    )
+  },
+  options = list(
+    searching = FALSE,
+    dom = 't' # Only display the table
+  )
   )
   
   output$PlotStat <- renderPlot({
@@ -3504,6 +4384,138 @@ server <- function(input, output, session) {
   
   ### End Statistic ####
   
+  ### LOAD analysis ####
+  UploadDataAnalysisModuleAllFalse  = reactiveValues(FlagALL = F,
+                                                     FlagUpdate = F,
+                                                     FlagWB = F,
+                                                     FlagPRCC = F,
+                                                     FlagELISA = F,
+                                                     FlagCYTOTOX = F,
+                                                     FlagENDOC = F,
+                                                     FlagBCA = F)
+  UploadDataAnalysisModule = reactiveValues(FlagALL = F,
+                                            FlagUpdate = F,
+                                            FlagWB = F,
+                                            FlagPRCC = F,
+                                            FlagELISA = F,
+                                            FlagCYTOTOX = F,
+                                            FlagENDOC = F,
+                                            FlagBCA = F)
+  
+  # general upload in the app
+  observeEvent(input$loadAnalysis_Button,{
+
+      manageSpinner(TRUE)
+      if( is.null(input$loadAnalysis_file) || !all(file.exists(input$loadAnalysis_file$datapath) ) ) {
+        showAlert("Error", "Please select one RDs file generated throught the Data Analysis module.", "error", 5000)
+        return()
+      }
+      mess = readRDS(input$loadAnalysis_file$datapath)
+      
+      messNames = names(mess)
+      if("Flags"%in% messNames) messNames = messNames[ messNames != "Flags"]
+      
+      if(!(all(messNames %in% names(DataAnalysisModule)) ||
+               all(messNames %in% names(elisaResult)) ||
+               all(messNames %in% names(wbResult)) || 
+               all(messNames %in% names(pcrResult)) ||
+               all(messNames %in% names(cytotoxResult)) ||
+               all(messNames %in% names(endocResult)) ||
+               all(messNames %in% names(bcaResult)) ) ) {
+        showAlert("Error", "The file must be RDs saved throught the Data Analysis module.", "error", 5000)
+        return()
+      }
+      
+      if(all(messNames %in% names(DataAnalysisModule)) ){
+        DataAnalysisModule <- mess
+        UploadDataAnalysisModule$FlagALL = T
+      }else if( all(messNames %in% names(bcaResult)) ){
+        DataAnalysisModule$bcaResult <- mess
+        UploadDataAnalysisModule$FlagBCA = T
+      }else if( all(messNames %in% names(wbResult)) ){
+        DataAnalysisModule$wbResult <- mess
+        UploadDataAnalysisModule$FlagWB = T
+      }else if( all(messNames %in% names(pcrResult)) ){
+        DataAnalysisModule$pcrResult <- mess
+        UploadDataAnalysisModule$FlagPRCC = T
+      }else if(all(messNames %in% names(endocResult)) ){
+        DataAnalysisModule$endocResult <- mess
+        UploadDataAnalysisModule$FlagENDOC = T
+      }else if(all(messNames %in% names(elisaResult)) ){
+        DataAnalysisModule$elisaResult <- mess
+        UploadDataAnalysisModule$FlagELISA = T
+      }else if(all(messNames %in% names(cytotoxResult)) ){
+        DataAnalysisModule$cytotoxResult <- mess
+        UploadDataAnalysisModule$FlagCYTOTOX = T
+      }
+      
+      UploadDataAnalysisModule$FlagUpdate = T
+      manageSpinner(FALSE)
+      showAlert("Success", "The RDs file has been uploaded  with success." , "success", 5000)
+
+  })
+  
+  observeEvent(UploadDataAnalysisModule$FlagUpdate,{
+    if(UploadDataAnalysisModule$FlagUpdate){
+      
+      if(UploadDataAnalysisModule$FlagWB || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "WB",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = wbResult, 
+                  FlagsExp = Flags,
+                  PanelStructures = PanelStructures)
+      } else if(UploadDataAnalysisModule$FlagBCA || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "BCA",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = bcaResult, 
+                  FlagsExp = FlagsBCA)
+      }
+      else if(UploadDataAnalysisModule$FlagPRCC || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "PRCC",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = prccResult, 
+                  FlagsExp = FlagsPRCC)
+      }
+      else if(UploadDataAnalysisModule$FlagENDOC || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "ENDOC",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = endocResult, 
+                  FlagsExp = FlagsENDOC)
+      }
+      else if(UploadDataAnalysisModule$FlagELISA || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "ELISA",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = elisaResult, 
+                  FlagsExp = FlagsELISA)
+        
+      }
+      else if(UploadDataAnalysisModule$FlagCYTOTOX || UploadDataAnalysisModule$FlagALL){
+        
+        UploadRDs(Flag = "CYTOTX",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = cytotoxResult, 
+                  FlagsExp = FlagsCYTOTOX)
+        
+      }
+      
+      UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
+    }
+    
+  })
+  
+  #### 
   
   #----------------------------------------------------------------------------------
   # OTHER ANALYSIS TO DO
