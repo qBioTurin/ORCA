@@ -808,7 +808,7 @@ updateTable <- function(position, analysis, info, data, result, flag) {
           
           result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
           # if ELISA, modify SN otherwise modify EXP
-          if (analysis %in% c("ELISA","BCA",) ) {
+          if (analysis %in% c("ELISA","BCA","IF") ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
           } else if (analysis == "ENDOC") {
             result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
