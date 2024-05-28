@@ -704,7 +704,6 @@ server <- function(input, output, session) {
     
     output$BCASelectedValues <- renderText(updatedText)  
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
-  
   observeEvent(input$rightTableBCA_cell_edit, {
     info <- input$rightTableBCA_cell_edit
     data <- right_data_bca() 
@@ -723,14 +722,14 @@ server <- function(input, output, session) {
     selectedExp <- ifelse(is.null(bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]])
     
     updateSelectizeInput(inputId = "BCAcell_EXP", 
-                         choices = allExp,
+                         choices = c("",allExp),
                          selected = selectedExp)
     
     allSN <- unique(na.omit(c(bcaResult$BCAcell_SN)))  
     selectedSN <- ifelse(is.null(bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]])
     
     updateSelectizeInput(inputId = "BCAcell_SN",
-                         choices = allSN,
+                         choices = c("",allSN),
                          selected = selectedSN)
   })
   
@@ -764,7 +763,6 @@ server <- function(input, output, session) {
       }
     } else return()
   }, ignoreInit = TRUE)
-  
   observeEvent(input$BCAcell_EXP, {
     if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
       BCAtb = bcaResult$TablePlot
@@ -789,58 +787,20 @@ server <- function(input, output, session) {
     } else return()
   }, ignoreInit = TRUE)
   
-  ## update Baselines checkBox
-  observeEvent(c(FlagsBCA$AllExp,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected),{
+  ## update checkBox
+  observeEvent(FlagsBCA$AllExp,{
     if(length(FlagsBCA$AllExp) > 1){
       exp = FlagsBCA$AllExp
       exp = exp[exp != ""]
-      
-      bool.tmp = exp %in% unique(c(FlagsBCA$BLANCHEselected,FlagsBCA$BASEselected))
-      if( length(bool.tmp) > 0  )
-        exp = exp[!bool.tmp]
-      
       updateSelectizeInput(session,"BCA_standcurve",
                            choices = exp,
                            selected = ifelse(FlagsBCA$STDCselected %in% exp,FlagsBCA$STDCselected,"") 
       )
     }
   })
-  observeEvent(c(FlagsBCA$AllExp,FlagsBCA$BASEselected,FlagsBCA$STDCselected),{
-    if(length(FlagsBCA$AllExp) > 1){
-      exp = FlagsBCA$AllExp
-      exp = exp[exp != ""]
-      
-      bool.tmp = exp %in% unique(c(FlagsBCA$STDCselected,FlagsBCA$BASEselected))
-      if( length(bool.tmp) > 0  )
-        exp = exp[!bool.tmp]
-      
-      updateCheckboxGroupInput(session,"BCA_blanks",
-                               choices = exp,
-                               selected = FlagsBCA$BLANCHEselected )
-    }
-  })
-  observeEvent(c(FlagsBCA$AllExp,FlagsBCA$BLANCHEselected,FlagsBCA$STDCselected),{
-    if(length(FlagsBCA$AllExp) > 1){
-      exp = FlagsBCA$AllExp
-      exp = exp[exp != ""]
-      
-      bool.tmp = exp %in% unique(c(FlagsBCA$STDCselected,FlagsBCA$BLANCHEselected))
-      if( length(bool.tmp) > 0  )
-        exp = exp[!bool.tmp]
-      
-      exp_selec = input$BCA_baselines
-      
-      updateCheckboxGroupInput(session,"BCA_baselines",
-                               choices = exp,
-                               selected = FlagsBCA$BASEselected )
-    }
-  })
-  
+
+
   ## select the baselines, std curves, and blank
-  observeEvent(input$BCA_baselines,{
-    FlagsBCA$BASEselected = input$BCA_baselines
-    FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
-  },ignoreNULL = F)
   observeEvent(input$BCA_standcurve,{
     FlagsBCA$STDCselected = input$BCA_standcurve
     FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
@@ -850,143 +810,55 @@ server <- function(input, output, session) {
     FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
   },ignoreNULL = F)
   
-  toListen_bca <- reactive({
-    exp = FlagsBCA$EXPselected
-    baseline = FlagsBCA$BASELINEselected
-    stcd = FlagsBCA$STDCselected
-    
-    exp = exp[exp != ""]
-    allexpNOTblank = unique(c(stcd,exp,baseline))
-    
-    if(length(allexpNOTblank) > 0 )
-    {
-      Input_baselEXP = lapply(exp,
-                              function(i) input[[paste0("bca_Exp",i)]])
-      Input_blEXP = lapply(allexpNOTblank,
-                           function(i) input[[paste0("bca_blExp",i)]] )
-      InputEXP = c(Input_baselEXP,Input_blEXP)
-      
-      which(sapply(InputEXP, function(x) 
-        ifelse(is.null(x), T, ifelse(x == "", T, F) ) ) ) -> indexesEXPnull
-      
-      if(length(indexesEXPnull) > 0 )
-        listReturn = InputEXP[-indexesEXPnull]
-      else
-        listReturn = InputEXP
-    }else{
-      listReturn = list()
-    }
-    
-    if(length(listReturn) == 0){
-      return(list("Nothing",bcaResult$BCAcell_EXP,bcaResult$BCAcell_SN))
-    }else{
-      return(c(listReturn,list(bcaResult$BCAcell_EXP,bcaResult$BCAcell_SN)) )
-    }
-  })
   
-  observeEvent(toListen_bca(),{
-    baselines = FlagsBCA$BASEselected
-    baselines = baselines[baselines != ""]
-    stcd = FlagsBCA$STDCselected
-    
-    if(toListen_bca()[[1]] != "Nothing" ){
-      exp = FlagsBCA$EXPselected
-      
-      exp = exp[exp != ""]
-      expNotBlank = unique(c(stcd,exp,baselines))
-      
-      MapBaseline = do.call(rbind,
-                            lapply(exp,function(i){
-                              if( length(input[[paste0("bca_Exp",i)]]) > 0 && input[[paste0("bca_Exp",i)]] != ""){
-                                data.frame(Exp = i, Baseline = input[[paste0("bca_Exp",i)]])
-                              }else{
-                                data.frame(Exp = i, Baseline = NA)
-                              }
-                            })
-      ) %>% na.omit()
-      
-      MapBlank = do.call(rbind,
-                         lapply(expNotBlank,
-                                function(i){
-                                  if( length(input[[paste0("bca_blExp",i)]]) > 0 && input[[paste0("bca_blExp",i)]] != ""){
-                                    data.frame(Exp = i, Blank = input[[paste0("bca_blExp",i)]])
-                                  }else{
-                                    data.frame(Exp = i, Blank = NA)
-                                  }
-                                })
-      ) %>% na.omit()
-      
-      bcaResult$MapBaseline = MapBaseline
-      bcaResult$MapBlank = MapBlank
-    }
+  observe({
+    BCA_blanks = input$BCA_blanks
+    standcurve = bcaResult$Tablestandcurve
+
+    isolate({
+      if( !is.null(BCA_blanks) && !is.null(standcurve) && BCA_blanks == "yes" ){
+        
+        exp = FlagsBCA$EXPselected
+        stcd = FlagsBCA$STDCselected
+        exp = exp[exp != ""]
+        expNotBlank = unique(c(stcd,exp))
+        
+        BlankV = standcurve %>% filter(Concentrations == min(Concentrations)) %>% summarize(M = mean(Measures)) %>% pull(M)
+        
+        standcurve$BlankValues = BlankV
+        standcurve$MeasuresWithoutBlank =  standcurve$Measures - BlankV
+        
+        bcaResult$MapBlank = BlankV
+        bcaResult$Tablestandcurve = standcurve
+        
+      }else{
+        bcaResult$MapBlank = 0
+      }
+    })
   })
   
   ## update the data with the blank and baseline
   observe({
     if(!is.null(bcaResult$Initdata)){
-    mat = as.matrix(bcaResult$Initdata)
-    bcaResult$MapBaseline -> MapBaseline
     bcaResult$MapBlank -> MapBlank
     stcd = input$BCA_standcurve
     bcaResult$Regression -> Regression
+    bcaTot = bcaResult$data
     isolate({
-      if(!is.null(MapBlank)){
-        bcaV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
-          rowwise() %>%
-          mutate(values = mat[Var1, Var2])
-        matTime =  as.matrix(bcaResult$BCAcell_EXP)
-        bcaT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
-          rowwise() %>%
-          mutate(time = matTime[Var1, Var2])
-        matExp =  as.matrix(bcaResult$BCAcell_SN)
-        bcaE = expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
-          rowwise() %>%
-          mutate(exp = matExp[Var1, Var2])
-        bcaTot = merge(bcaV,merge(bcaT,bcaE)) %>%
-          filter(exp != "")
+      if(!is.null(MapBlank) && !is.null(bcaTot)){
         
         bcaTotAverage = bcaTot %>%
+          filter(exp != stcd) %>%
           #mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
           group_by(time, exp) %>%
-          summarize(meanValues = mean(values))
-        
-        # merging exp with blank for the substraction
-        bcaTot_bl = right_join( bcaTotAverage,MapBlank, 
-                                by= c("exp"= "Blank") )%>%
-          rename(BlankValues = meanValues, Blank =  exp, exp = Exp )
-        
-        # if blank has ExpCond empty than is associated to each ExpCond if the other SampleNames
-        timesBlank = bcaTotAverage %>% filter(exp %in% unique(MapBlank$Blank)) %>% select(time) %>% distinct() %>% pull(time)
-        if(length(timesBlank)>1 || timesBlank !=""){
-          bcaTotAverage = merge( bcaTotAverage %>% filter( exp %in% bcaTot_bl$exp ),
-                                 bcaTot_bl %>% ungroup(),
-                                 all.x = T, by = c("exp","time") )
-        }else{
-          bcaTotAverage = merge( bcaTotAverage %>% filter( exp %in% bcaTot_bl$exp ),
-                                 bcaTot_bl %>% ungroup() %>% select(-time),
-                                 all.x = T, by = c("exp") )
-        }
-        bcaTotAverage[is.na(bcaTotAverage[,])] = 0
-        bcaTotAverage = bcaTotAverage %>% mutate(meanValues = meanValues - BlankValues )
-        
-        # # merging exp with baseline
-        # bcaTot_base = merge(MapBaseline, bcaTotAverage,
-        #                     by.y = "exp", by.x = "Baseline",all = T) %>%
-        #   rename(BaseValues = meanValues) %>% select(-Blank,-BlankValues)
-        # 
-        # bcaTot_base = merge(bcaTotAverage, bcaTot_base, 
-        #                     by.x = c("exp","time"), by.y = c("Exp","time"),
-        #                     all.x = T  )
-        
-        # bcaResult$data = bcaTot
-        
-        #if(length(bcaTot_base[,1]) != 0 && !is.null(bcaResult$Regression) ){
+          summarize(AverageValues = mean(values), 
+                    BlankValues = MapBlank,
+                    AverageValuesWithoutBlank = AverageValues - BlankValues) %>%
+          ungroup()
+
         if( !is.null(Regression) ){  
           bcamean = bcaTotAverage %>%
-            filter(exp != stcd) %>%
-            rename( AverageValues = meanValues) %>%
-            dplyr::mutate(Quantification =  Regression$fun(AverageValues) ) %>%
-            #MeanExperiment/MeanBaseline * 100) %>%
+            dplyr::mutate(Quantification =  Regression$fun(AverageValuesWithoutBlank) ) %>%
             rename(SampleName = exp,ExpCondition = time) 
           
           output$BCAtables = renderDT(bcamean)
@@ -998,18 +870,7 @@ server <- function(input, output, session) {
             rename(Ug = Quantification)
           bcaResult$dataFinal = bcameanNew
           output$BCAtablesUG = renderDT(bcameanNew)
-          
-          # output$BCAplots = renderPlot(
-          #   {
-          #     bcamean %>%
-          #       ggplot( aes(x = Time, y = Quantification,
-          #                   fill= Experiment, group = Experiment ) )+
-          #       geom_bar(position = "dodge",stat = "identity")+
-          #       theme_bw()+
-          #       labs(x = "Time", col = "Experiments",
-          #            y = "Average quantifications obtained\n from the lm ")
-          #   }
-          # )
+
         }else{
           output$BCAtables = renderDT(data.frame(Error = "No linear model!"))
         }
@@ -1017,51 +878,7 @@ server <- function(input, output, session) {
     })
     }
   })
-  # here the Exp boxes are updated every time a new experiment is added 
-  observe({
-    expToselect = FlagsBCA$EXPselected
-    baselines =  FlagsBCA$BASEselected
-    blanks = FlagsBCA$BLANCHEselected
-    stdc = FlagsBCA$STDCselected
-    
-    isolate({
-      expToselect = expToselect[expToselect != ""]
-      
-      # baselines updating
-      output$BCABaselineSelection <- renderUI({
-        select_output_list <- lapply(expToselect[! expToselect %in% baselines],
-                                     function(i) {
-                                       if(length(input[[paste0("bca_Exp",i)]])>0)
-                                         expsel = input[[paste0("bca_Exp",i)]]
-                                       else 
-                                         expsel = ""
-                                       
-                                       selectInput(inputId = paste0("bca_Exp",i),
-                                                   label = i,
-                                                   choices = c("",baselines),
-                                                   selected = expsel)
-                                     })
-        do.call(tagList, select_output_list)
-      })
-      # blanks updating
-      output$BCABlankSelection <- renderUI({
-        select_output_list <- lapply(unique(c(stdc,expToselect,baselines)), function(i) {
-          
-          if(length(input[[paste0("bca_blExp",i)]])>0)
-            expsel = input[[paste0("bca_blExp",i)]]
-          else 
-            expsel = ""
-          
-          selectInput(inputId = paste0("bca_blExp",i),
-                      label = i,
-                      choices = c("",blanks),
-                      selected = expsel)
-        })
-        do.call(tagList, select_output_list)
-      })
-    })
-  })
-  
+
   observe({
       input$BCA_standcurve -> BCA_standcurve
       bcaResult$data -> data
@@ -1088,57 +905,24 @@ server <- function(input, output, session) {
       })
     })
   
-  observe({
-    standcurve = bcaResult$Tablestandcurve 
-    MapBlank = bcaResult$MapBlank
-    input$BCA_standcurve -> stdc
-    bcaResult$data -> Data
-    
-    isolate({
-      if(!is.null(standcurve) && dim(standcurve)[1]!=0){
-        standcurve = standcurve %>% select(exp, Concentrations,  Measures)
-        
-        if(!is.null(MapBlank) && nrow(MapBlank %>% filter(Exp %in% stdc ))>0){
-          DataBlank = Data %>% filter(exp %in% unique(MapBlank$Blank) ) %>% group_by(time,exp) %>% 
-            summarise(BlankValues = mean(values)) %>%
-            rename( Blank =  exp )
-          bcaTot_bl = merge( DataBlank, MapBlank) %>% ungroup()
-           
-          # if blank has ExpCond empty than is associated to each ExpCond if the other SampleNames
-          timesBlank = bcaTot_bl %>% select(time) %>% distinct() %>% pull(time)
-          if(length(timesBlank)>1 || timesBlank !=""){
-            bcaTotAverage = merge( standcurve,bcaTot_bl,
-                                   all.x = T, by.x = c("exp","Concentrations"), by.y = c("Exp","time") )
-          }else{
-            bcaTotAverage = merge( standcurve,bcaTot_bl,
-                                   all.x = T, by.x = c("exp"),by.y = "Exp" )
-          }
-          #bcaTotAverage[is.na(bcaTotAverage[,])] = 0
-          standcurveNew = bcaTotAverage %>% mutate(MeasuresWithoutBlank = Measures - BlankValues )
-          
-        }else{
-          standcurveNew = standcurve %>% mutate(Blank = NA,BlankValues = NA,MeasuresWithoutBlank = NA)
-        }
-        
-        bcaResult$Tablestandcurve = standcurveNew
-        
-        output$BCA_Table_stdcurve <- DT::renderDataTable({
-          DT::datatable( standcurveNew %>% 
-                           select(exp, Blank, Concentrations,  Measures,  BlankValues, MeasuresWithoutBlank) %>%
-                           rename(SampleName = exp),
-                         selection = 'none',
-                         # editable = list(target = "cell",
-                         #                 disable = list(columns = 0:2) ),
-                         rownames= FALSE,
-                         options = list(scrollX = TRUE,
-                           searching = FALSE,
-                           dom = 't' # Only display the table
-                         )
-          )
-        })
-      } 
+  ## update table standCurve
+  observeEvent(bcaResult$Tablestandcurve,{
+    output$BCA_Table_stdcurve <- DT::renderDataTable({
+      DT::datatable( bcaResult$Tablestandcurve %>% 
+                       select(exp, Concentrations,  Measures,  BlankValues, MeasuresWithoutBlank) %>%
+                       rename(SampleName = exp),
+                     selection = 'none',
+                     # editable = list(target = "cell",
+                     #                 disable = list(columns = 0:2) ),
+                     rownames= FALSE,
+                     options = list(scrollX = TRUE,
+                                    searching = FALSE,
+                                    dom = 't' # Only display the table
+                     )
+      )
     })
   })
+  
   observeEvent(input$BCA_buttonRegression,{
     standcurve = bcaResult$Tablestandcurve
     
@@ -1291,7 +1075,7 @@ server <- function(input, output, session) {
       
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "BCA")
       
-      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
       
     } 
@@ -1626,7 +1410,7 @@ server <- function(input, output, session) {
       
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "IF")
       
-      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
       
     } 
@@ -1941,7 +1725,7 @@ server <- function(input, output, session) {
       saveRDS(results, file = tempRdsPath)
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "WB", PanelStructures)
       
-      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
     },
   )
@@ -2530,7 +2314,7 @@ server <- function(input, output, session) {
       resultsExcel <- DataAnalysisModule$wbquantResult
       saveExcel(filename = tempExcelPath, ResultList=resultsExcel, analysis = "WB comparison")
       
-      zip(file, files = c(tempRDSPath, tempExcelPath), flags = "-j")
+      utils::zip(file, files = c(tempRDSPath, tempExcelPath), flags = "-j")
       manageSpinner(FALSE)
     }
   )
@@ -2857,7 +2641,7 @@ server <- function(input, output, session) {
       saveRDS(results, file = tempRdsPath)
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "RT-qPCR")
       
-      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
     },
   )
@@ -4152,7 +3936,7 @@ server <- function(input, output, session) {
       
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "ENDOC")
       
-      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
       
     } 
@@ -4558,7 +4342,7 @@ server <- function(input, output, session) {
       saveRDS(results, file = tempRdsPath)
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "FACS", PanelStructures)
       
-      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
     }
   )

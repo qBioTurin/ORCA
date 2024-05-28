@@ -16,8 +16,45 @@ library(openxlsx)
 library(patchwork)
 library(stringr)
 
+
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
+                  tags$li(
+                    class = "dropdown d-flex align-items-center",
+                    tags$head(tags$link(rel = "shortcut icon", href = "ORCAlogo.png")),
+                    tags$style(".main-header {max-height: 60px;}
+                 .icon-container {
+        position: relative;
+        display: inline-block;
+      }
+      .icon-container .icon-text {
+        visibility: hidden;
+        width:400px;
+        background-color: #333;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 2;
+        top: 50%;
+        left: 110%;
+        transform: translateY(-50%);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .icon-container:hover .icon-text {
+        visibility: visible;
+        opacity: 1;
+      }
+      h3 {
+        padding-top: 0px; /* Adjust the top padding */
+        padding-bottom: 0px; /* Adjust the bottom padding */
+        margin-top: 0; /* Adjust the top margin */
+        margin-bottom: 0; /* Adjust the bottom margin */
+      }"
+                    )
+                  ),
                   tags$li(a(onclick = "window.open('https://github.com/qBioTurin/ORCA')",
                             href = NULL,
                             icon("github"),
@@ -38,14 +75,18 @@ ui <- dashboardPage(
     sidebarMenu(id = "SideTabs",
                 menuItem('Home', tabName = 'Home', icon = icon('home')),
                 menuItem("Data Analysis", tabName = 'DataAnaslysis', icon = icon('chart-line'),
-                         menuItem('BCA analysis', tabName = 'bca',
-                                  menuSubItem("Upload data", tabName = "uploadBCA"),
-                                  menuSubItem("Quantification", tabName = "tablesBCA")),
                          menuItem('Western Blot analysis', tabName = 'wb',
-                                  menuSubItem("Upload Image", tabName = "uploadIm"),
-                                  menuSubItem("Protein Bands", tabName = "plane"),
-                                  menuSubItem("Profile Plots", tabName = "grey"),
-                                  menuSubItem("Quantification", tabName = "quantification")),
+                                  menuItem('Protein quantification', tabName = 'bca',
+                                           menuSubItem("Upload data", tabName = "uploadBCA"),
+                                           menuSubItem("Quantification", tabName = "tablesBCA")
+                                           ),
+                                  menuItem('Image analysis', tabName = 'wbImage',
+                                    menuSubItem("Upload Image", tabName = "uploadIm"),
+                                    menuSubItem("Protein Bands", tabName = "plane"),
+                                    menuSubItem("Profile Plots", tabName = "grey")
+                                  ),
+                                  menuSubItem("Quantification", tabName = "quantification")
+                                  ),
                          menuItem('RT-qPCR analysis', tabName = 'pcr',
                                   menuSubItem("Upload data", tabName = "uploadPCR"),
                                   menuSubItem("Quantification", tabName = "tablesPCR")),
@@ -745,7 +786,11 @@ ui <- dashboardPage(
                                     label = "Sample name:",
                                     choices = "",
                                     options = list(create = TRUE)),
-                     selectizeInput("BCAcell_EXP",label = "Experimental condition or Concetrations (standard curve):",
+                     selectizeInput("BCAcell_EXP",
+                                    div(class = "icon-container",
+                                        h4("Experimental condition or Analyte Concentrations:", icon("info-circle")),
+                                        div(class = "icon-text", "Analyte Concentrations refers to the standard curve sample.")
+                                        ),
                                     choices = "",
                                     options = list(create = TRUE)),
                      fluidRow(
@@ -754,13 +799,16 @@ ui <- dashboardPage(
                                              label = "Select standard curve:",
                                              choices = NULL)
                        ),
-                       # column(4,
-                       #        checkboxGroupInput(inputId = "BCA_baselines",
-                       #                           "Select control:")
-                       # ),
                        column(4,
-                              checkboxGroupInput(inputId = "BCA_blanks",
-                                                 "Select blank:")
+                              radioButtons(
+                                inputId = "BCA_blanks",
+                                label = div(class = "icon-container",
+                                            h4("Removing blank: ", icon("info-circle")),
+                                            div(class = "icon-text", "Blank refers to the standard curve value with the smaller concetrantion.")
+                                ),
+                                choices = c("No" = "no", "Yes" = "yes"),
+                                selected = "no"
+                              )
                        )
                      ),
                      fluidRow(
@@ -792,7 +840,6 @@ ui <- dashboardPage(
       tabItem(tabName = "tablesBCA",
               h2("Quantification"),
               fluidRow(
-                tags$head(tags$script(src = "message-handler.js")),
                 box(width = 12,
                     title = "Regression of the standard curve:",
                     collapsible = TRUE,
@@ -813,39 +860,25 @@ ui <- dashboardPage(
                     )
                 ),
                 box(width= 12,
-                    title = "Select a blank for the following experimental conditions",
+                    title = "Select desired protein quantity and sample volume",
                     collapsible = TRUE,
-                    collapsed = T,
-                    h4("If time information is associated with the experimental conditions
-                       defined as blank, then it will be lost during the averaging of its values."),
-                    uiOutput("BCABlankSelection")
+                    collapsed = TRUE,
+                    fluidRow(
+                      column(width = 4,
+                             textInput(inputId = "BCA_UGvalue" , label = "Write desidered protein quantity (ug)", value = "")
+                      ),
+                      column(width = 4,
+                             actionButton(inputId = "confirmBCA_UGvalue", label= "Confirm")
+                      )
+                    ),
+                    DTOutput("BCAtablesUG")
                 ),
-                # box(width= 12,
-                #     title = "Select a baseline for the following experimental conditions",
-                #     collapsible = TRUE,
-                #     collapsed = T,
-                #     uiOutput("BCABaselineSelection")
-                # ),
                 box(width= 12,
                     title = "Quantification",
                     collapsible = TRUE,
                     collapsed = TRUE,
                     #plotOutput("BCAplots"),
                     DTOutput("BCAtables")
-                ),
-                box(width= 12,
-                    title = "Transformation",
-                    collapsible = TRUE,
-                    collapsed = TRUE,
-                    fluidRow(
-                      column(width = 4,
-                             textInput(inputId = "BCA_UGvalue" , label = "Write an ug value", value = "")
-                      ),
-                      column(width = 4,
-                            actionButton(inputId = "confirmBCA_UGvalue", label= "Confirm")
-                      )
-                    ),
-                    DTOutput("BCAtablesUG")
                 ),
                 fluidRow(
                   column(width = 4, offset = 8,

@@ -25,11 +25,16 @@ ORCA.run <-function()
   source(Appui)
   source(Appserver)
   
-  shinyApp(ui, server,
-           options =  options(shiny.maxRequestSize=1000*1024^2,
-                              shiny.launch.browser = .rs.invokeShinyWindowExternal)
-  )
+  app <-shinyApp(ui, server,
+             options =  options(shiny.maxRequestSize=1000*1024^2,
+                                shiny.launch.browser = .rs.invokeShinyWindowExternal)
+    )
   
+  app$staticPaths <- list(
+      `/` = httpuv::staticPath(system.file("Shiny","www", package = "ORCA"), indexhtml = FALSE, fallthrough = TRUE)
+    )
+  
+  runApp(app)
   # runApp(
   #   appDir = system.file("Shiny", package = "ORCA"),
   #   launch.browser = T

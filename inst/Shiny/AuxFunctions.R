@@ -1012,7 +1012,8 @@ UploadRDs = function(Flag, session, output,
     updateTabsetPanel(session = session, "SideTabs",
                       selected = "uploadENDOC")
     
-  }  else if(Flag == "BCA"){
+  } 
+  else if(Flag == "BCA"){
     
     for(nameList in names(DataAnalysisModule$bcaResult)) 
       Result[[nameList]] <- DataAnalysisModule$bcaResult[[nameList]]
@@ -1031,12 +1032,14 @@ UploadRDs = function(Flag, session, output,
       
       updateSelectizeInput(inputId = "BCAcell_EXP",
                            session = session,
-                           choices = unique(c(Result$BCAcell_EXP))
+                           choices = c("",unique(c(Result$BCAcell_EXP)) ),
+                           selected = ""
       )
       
       updateSelectizeInput(inputId = "BCAcell_SN",
                            session =session,
-                           choices = unique(c(Result$BCAcell_SN))
+                           choices = c("",unique(c(Result$BCAcell_SN)) ),
+                           selected = ""
       )
       
       FlagsExp$AllExp = unique(c(Result$BCAcell_SN))
