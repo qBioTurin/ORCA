@@ -100,7 +100,8 @@ ui <- dashboardPage(
                                   menuSubItem("Upload data", tabName = "uploadCYTOTOX"),
                                   menuSubItem("Quantification", tabName = "tablesCYTOTOX")),
                          menuItem('IF analysis', tabName = 'if',
-                                  menuSubItem("Upload data", tabName = "uploadIF")),
+                                  menuSubItem("Upload data", tabName = "uploadIF"),
+                                  menuSubItem("Quantification", tabName = "tablesIF")),
                          menuItem('Facs analysis', tabName = 'facs',
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
                                   menuSubItem("Quantification", tabName = "tablesFACS"))
@@ -1270,31 +1271,61 @@ ui <- dashboardPage(
                  )
           ),
           tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
-        ),
-        fluidRow(
-          column(
-            width = 3,
-            selectInput(
-              inputId = "IF_expcond",
-              label = "Experimental condition:",
-              choices = ""
-            )
-          )
-        ),
-        fluidRow(
-          column(
-            width = 12,
-            DTOutput("IFtable")
-          )
-        ),
-        fluidRow(
-          column(width = 2,offset = 9,
-                 downloadButton( label = "Download Analysis & Excel", 
-                                 outputId = "downloadIFanalysis",
-                                 icon = icon("download") 
-                 )
-          )
         )
+      ),
+      tabItem(tabName = "tablesIF",
+              h2("Quantification"),
+              fluidRow(
+                column(
+                  width = 3,
+                  selectInput(
+                    inputId = "IF_expcond",
+                    label = "Experimental condition:",
+                    choices = ""
+                  )
+                )
+              ),
+              fluidRow(
+                box(width = 12,title = "Data informations",
+                    fluidRow(
+                      column(
+                        width = 12,
+                        DTOutput("IFtable"),
+                        DTOutput("IFtable_stat")
+                      )
+                    )
+                ),
+                box(width = 12,title = "T-test",
+                    fluidRow(
+                      column(
+                        width = 6,
+                        selectInput(
+                          inputId = "IF_TTestvariable",
+                          label = "Ttest variable:",
+                          choices = ""
+                        )
+                      )
+                    ),
+                    fluidRow(
+                      column(
+                        width = 6,
+                        DTOutput("IFsummariseMean")
+                      ),
+                      column(
+                        width = 6,
+                        DTOutput("IFtable_ttest")
+                      )
+                    )
+                ),
+                fluidRow(
+                  column(width = 2,offset = 9,
+                         downloadButton( label = "Download Analysis & Excel", 
+                                         outputId = "downloadIFanalysis",
+                                         icon = icon("download") 
+                         )
+                  )
+                )
+              )
       ),
       #### END data analysis: IF ####
       

@@ -1191,46 +1191,66 @@ server <- function(input, output, session) {
       IFdata = ifResult$Initdata
       colNames = colnames(IFdata)
       colNames[ colNames == selectIFcolumns] = "ExpCond"
-      colnames(IFdata) = "ExpCond"
+      colnames(IFdata) = colNames
       
-      IFdata %>%
+      IFdataCalc = IFdata %>%
         group_by(ExpCond) %>%
         mutate(nRow = 1:n()) %>%
         ungroup() %>%
         tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars") %>%
         group_by(ExpCond,nRow) %>%
-        mutate(Tot = sum(Values), Perc =  Values/Tot) %>%
-        tidyr::spread(key = ExpCond, value = Values)
+        mutate(Tot = sum(Values), Perc =  Values/Tot)
       
-      output$IFtable = renderTable({
-        if(length(selectIFcolumns)!=0 ){
-          tmp = IF[,selectIFcolumns]
-          #colnames(tmp) = c("Gene", "Sample", "Value")[1:length(colnames(tmp))]
-          head(tmp) 
-        }
-        else
-          NULL
+       IFinalData = IFdataCalc  %>%
+         tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                             values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
+         
+      statisticData = IFdataCalc %>% 
+        group_by(ExpCond,Vars) %>%
+        summarise(MeanValues = mean(Values),
+                  sdValues = sd(Values),
+                  MeanPerc = mean(Perc),
+                  sdPerc = sd(Perc),
+                  MeanTot = mean(Tot),
+                  sdTot = sd(Tot)) %>%
+        tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                            values_from = c(MeanValues, sdValues,MeanPerc,sdPerc)) %>% ungroup()
+      
+      
+      updateSelectInput("IF_TTestvariable",session = session, choices = unique(IFdataCalc$Values))
+      
+      output$IFtable = renderDT({
+        DT::datatable( IFinalData,
+                       selection = 'none',
+                       # editable = list(target = "cell",
+                       #                 disable = list(columns = 0:2) ),
+                       rownames= FALSE,
+                       options = list(scrollX = TRUE,
+                                      searching = FALSE,
+                                      dom = 't' # Only display the table
+                       )
+        )
       })
       
-      if(length(selectIFcolumns)==3 ){
-        tmp = IF[,selectIFcolumns]
-        colnames(tmp) = c("Gene", "Sample", "Value")
-        tmp$Time = ""
-        ifResult$data = tmp
-        ifResult$selectIFcolumns = selectIFcolumns
-      }else if(length(selectIFcolumns)==4 ){
-        tmp = IF[,selectIFcolumns]
-        colnames(tmp) = c("Gene", "Sample", "Value","Time")
-        ifResult$data = tmp
-        ifResult$selectIFcolumns = selectIFcolumns
-      }else{
-        ifResult$data = NULL
-      }
+      output$IFtable_stat = renderDT({
+        DT::datatable(statisticData,
+                      selection = 'none',
+                      # editable = list(target = "cell",
+                      #                 disable = list(columns = 0:2) ),
+                      rownames= FALSE,
+                      options = list(scrollX = TRUE,
+                                     searching = FALSE,
+                                     dom = 't' # Only display the table
+                      )
+        )
+      })
     }
     
   })
   
-
+observeEvent(input$IF_TTestvariable,{
+  
+})
 
   
   observe({
