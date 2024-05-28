@@ -100,8 +100,7 @@ ui <- dashboardPage(
                                   menuSubItem("Upload data", tabName = "uploadCYTOTOX"),
                                   menuSubItem("Quantification", tabName = "tablesCYTOTOX")),
                          menuItem('IF analysis', tabName = 'if',
-                                  menuSubItem("Upload data", tabName = "uploadIF"),
-                                  menuSubItem("Quantification", tabName = "tablesIF")),
+                                  menuSubItem("Upload data", tabName = "uploadIF")),
                          menuItem('Facs analysis', tabName = 'facs',
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
                                   menuSubItem("Quantification", tabName = "tablesFACS"))
@@ -737,7 +736,7 @@ ui <- dashboardPage(
               # ),
               fluidRow(
                 box(width= 12,title = "Plot",
-                    plotOutput("PCRplot",width = "100%"),
+                    uiOutput("PCRplot"),
                     fluidRow(
                       column(width = 8, offset = 2, 
                              downloadButton(outputId = "downloadRTPCRAnalysis", 
@@ -754,7 +753,7 @@ ui <- dashboardPage(
       #### BEGIN data analysis: BCA ####
       tabItem(
         tabName = "uploadBCA",
-        h2("Load BCA data"),
+        h2("Load data"),
         fluidRow(
           column(9,
                  fileInput(
@@ -1273,65 +1272,29 @@ ui <- dashboardPage(
           tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
         ),
         fluidRow(
-          box(width = 12,
-              title = "Assign experimental information to values:",
-              column(width = 6,
-                     dataTableOutput("IFmatrix")
-              ),
-              column(width = 6,
-                     selectizeInput("IFcell_SN",
-                                    label = "Sample name:",
-                                    choices = "",
-                                    options = list(create = TRUE)),
-                     selectizeInput("IFcell_EXP",label = "Experimental condition:",
-                                    choices = "",
-                                    options = list(create = TRUE)),
-                     fluidRow(
-                       column(12,
-                              tags$div(
-                                textOutput("IFSelectedValues"),
-                                style = "font-size: 24px; text-align: center; color: green;
-                                             width: 100%; margin-top: 20px;"
-                              )
-                       )
-                     )
-              )
-          ),
-          fluidRow(
-            column(6, dataTableOutput("leftTableIF")),
-            column(6, dataTableOutput("rightTableIF"))
-          ),
-          fluidRow(
-            column(width = 1,offset = 9,
-                   actionButton(inputId = "NextIFQuantif",
-                                label = 'Proceed to Quantification',
-                                align = "right",
-                                icon = shiny::icon("forward"))
+          column(
+            width = 3,
+            selectInput(
+              inputId = "IF_expcond",
+              label = "Experimental condition:",
+              choices = ""
             )
           )
+        ),
+        fluidRow(
+          column(
+            width = 12,
+            DTOutput("IFtable")
+          )
+        ),
+        fluidRow(
+          column(width = 2,offset = 9,
+                 downloadButton( label = "Download Analysis & Excel", 
+                                 outputId = "downloadIFanalysis",
+                                 icon = icon("download") 
+                 )
+          )
         )
-      ),
-      # Second tab content
-      tabItem(tabName = "tablesIF",
-              h2("Quantification"),
-              fluidRow(
-                box(width= 12,
-                    title = "Quantification",
-                    collapsible = TRUE,
-                    collapsed = TRUE,
-                    DTOutput("IFtables"),
-                    fluidRow(
-                    )
-                )
-              ),
-              fluidRow(
-                column(width = 2,offset = 9,
-                       downloadButton( label = "Download Analysis & Excel", 
-                                       outputId = "downloadIFanalysis",
-                                       icon = icon("download") 
-                       )
-                )
-              )
       ),
       #### END data analysis: IF ####
       
