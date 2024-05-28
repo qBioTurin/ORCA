@@ -4,7 +4,7 @@
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "ORCA")
 
-#source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
+source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
 #source("./inst/Shiny/AuxFunctions.R")
 
 # Define server logic required to draw a histogram
@@ -18,7 +18,8 @@ server <- function(input, output, session) {
                                        pcrResult = NULL,
                                        cytotoxResult = NULL,
                                        facsResult = NULL,
-                                       bcaResult = NULL)
+                                       bcaResult = NULL,
+                                       ifResult = NULL)
   
   DataIntegrationModule <- reactiveValues(dataLoaded = NULL,
                                           data = NULL,
@@ -29,8 +30,8 @@ server <- function(input, output, session) {
                                           otherTabs = NULL,
                                           otherTabsMean = NULL)
   
-  MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity", "FACS","BCA") 
-  names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult", "facsResult","bcaResult") 
+  MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity", "FACS","BCA","IF") 
+  names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult", "facsResult","bcaResult","ifResult") 
   
   #### DATA INTEGRATION ####
   ### Omics ####
@@ -1307,6 +1308,338 @@ server <- function(input, output, session) {
   })
   
   ### End BCA analysis ####  
+  
+  #### IF analysis ####
+  #### IF analysis ####
+  observeEvent(input$NextIFQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "tablesIF")
+  })
+  #
+  
+  ifResult = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    dataQuant = NULL,
+    IFcell_EXP = "",
+    IFcell_SN = NULL,
+    IFcell_COLOR = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL,
+    Tablestandcurve = NULL,
+    Regression = NULL)
+  
+  ifResult0 = list(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    dataQuant = NULL,
+    IFcell_EXP = "",
+    IFcell_SN = NULL,
+    IFcell_COLOR = NULL,
+    MapBaseline = NULL,
+    MapBlank = NULL,
+    Tablestandcurve = NULL,
+    Regression = NULL)
+  
+  left_data_if <- reactiveVal()
+  right_data_if <- reactiveVal()
+  
+  # save everytime there is a change in the results
+  IFresultListen <- reactive({
+    reactiveValuesToList(ifResult)
+  })
+  observeEvent(IFresultListen(), {
+    DataAnalysisModule$ifResult = reactiveValuesToList(ifResult)
+    DataAnalysisModule$ifResult$Flags = reactiveValuesToList(FlagsIF)
+  })
+  
+  ##
+  FlagsIF <- reactiveValues(cellCoo = NULL,
+                            AllExp = "",
+                            BASEselected = "",
+                            STDCselected = "",
+                            BLANCHEselected = "",
+                            EXPselected = "",
+                            EXPcol = NULL)
+  
+  observeEvent(input$LoadIF_Button,{
+    alert$alertContext <- "IF-reset"
+    if( !is.null(ifResult$Initdata) ) {
+      shinyalert(
+        title = "Important message",
+        text = "Do you want to update the IF data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadExcelFileIF()
+  })
+  
+  observeEvent(input$shinyalert, {
+    removeModal()
+    if (input$shinyalert && alert$alertContext == "IF-reset") {  
+      resetPanel("IF", flags = FlagsIF, result = ifResult)
+      
+      loadExcelFileIF()
+    }
+  })
+  
+  loadExcelFileIF <- function() {
+    alert$alertContext <- ""
+    mess = readfile(
+      filename = input$IFImport$datapath,
+      isFileUploaded = !is.null(input$IFImport) && file.exists(input$IFImport$datapath),
+      type = "Excel",
+      allDouble = T,
+      colname = F,
+      colors = T
+    )
+    
+    if(setequal(names(mess), c("message", "call"))) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+    } else {
+      ifResult$Initdata = mess$x
+      FlagsIF$EXPcol = mess$fill
+      ifResult$IFcell_COLOR = mess$SNtable
+      ifResult$IFcell_SN = matrix("", nrow = nrow(ifResult$IFcell_COLOR), ncol = ncol(ifResult$IFcell_COLOR))
+      
+      removeModal()
+      showAlert("Success", "The Excel has been uploaded  with success", "success", 2000)
+    }
+  }
+  
+  observe({
+    if (!is.null(ifResult$Initdata) && is.null(ifResult$TablePlot)) {
+      tableExcelColored(session = session,
+                        Result = ifResult, 
+                        FlagsExp = FlagsIF,
+                        type = "Initialize")
+    }
+  })
+  
+  observeEvent(c(ifResult$TablePlot,ifResult$IFcell_EXP), {
+    if (!is.null(ifResult$TablePlot)) {
+      IFtb <- ifResult$TablePlot
+      output$IFmatrix <- renderDT(IFtb, server = FALSE)
+      
+      if (!is.null(ifResult$IFcell_EXP) && !is.null(ifResult$IFcell_COLOR)) {
+        matTime <- as.matrix(ifResult$IFcell_EXP)
+        matExp <- as.matrix(ifResult$IFcell_COLOR)
+        
+        #if (!(all(matTime == "") || all(matExp == ""))) {
+        mat <- as.matrix(ifResult$Initdata)
+        ifV <- expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
+          rowwise() %>%
+          mutate(values = mat[Var1, Var2])
+        ifT <- expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
+          rowwise() %>%
+          mutate(time = matTime[Var1, Var2])
+        ifE <- expand.grid(seq_len(nrow(matExp)), seq_len(ncol(matExp))) %>%
+          rowwise() %>%
+          mutate(exp = matExp[Var1, Var2])
+        ifTot <- merge(ifV, merge(ifT, ifE)) %>%
+          na.omit()
+        #filter(time != "", exp != "")
+        
+        ifResult$data <- ifTot
+        #}
+      }
+    } 
+  })
+  
+  observe({
+    color_codes <- FlagsIF$EXPcol
+    color_names <- names(FlagsIF$EXPcol)
+    
+    valid_colors <- color_codes != "white"
+    color_codes <- color_codes[valid_colors]
+    color_names <- color_names[valid_colors]
+    
+    mid_point <- ceiling(length(color_codes) / 2)
+    left_colors <- color_codes[1:mid_point]
+    right_colors <- color_codes[(mid_point+1):length(color_codes)]
+    
+    left_formatted_data <- get_formatted_data(left_colors, color_names[1:mid_point], ifResult, ifResult$IFcell_EXP,"IF")
+    right_formatted_data <- get_formatted_data(right_colors, color_names[(mid_point+1):length(color_codes)], ifResult, ifResult$IFcell_EXP, "IF")
+    
+    left_data_if(left_formatted_data)
+    right_data_if(right_formatted_data)
+    
+    output$leftTableIF <- renderDataTable(
+      left_data_if(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE, 
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '200px', targets = 3),
+          list(width = '80px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+    
+    output$rightTableIF <- renderDataTable(
+      right_data_if(), 
+      escape = FALSE, 
+      editable = list(target = "cell", disable = list(columns = 0:3)),
+      options = list(
+        dom = 't',
+        paging = FALSE,
+        info = FALSE,
+        searching = FALSE,
+        editable = TRUE,
+        columnDefs = list(
+          list(targets = 0, visible = FALSE),
+          list(targets = 1, visible = FALSE),
+          list(width = '10px', targets = 2),
+          list(width = '200px', targets = 3),
+          list(width = '80px', targets = 4),
+          list(width = '100px', targets = 5),
+          list(className = 'dt-head-left dt-body-left', targets = 1)
+        )
+      )
+    )
+  })
+  
+  observeEvent(input$leftTableIF_cell_edit, {
+    info <- input$leftTableIF_cell_edit
+    data <- left_data_if() 
+    updatedText <- updateTable("left", "IF", info, data, ifResult, FlagsIF)
+    
+    output$IFSelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$rightTableIF_cell_edit, {
+    info <- input$rightTableIF_cell_edit
+    data <- right_data_if() 
+    updatedText <- updateTable("right", "IF", info, data, ifResult, FlagsIF)
+    
+    output$IFSelectedValues <- renderText(updatedText)  
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  observeEvent(input$IFmatrix_cell_clicked, {
+    req(input$IFmatrix_cell_clicked)  
+    
+    cellSelected = as.numeric(input$IFmatrix_cell_clicked)
+    FlagsIF$cellCoo = cellCoo = c(cellSelected[1], cellSelected[2] + 1)
+    
+    allExp <- unique(na.omit(c(ifResult$IFcell_EXP)))  
+    selectedExp <- ifelse(is.null(ifResult$IFcell_EXP[cellCoo[1], cellCoo[2]]), "", ifResult$IFcell_EXP[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "IFcell_EXP", 
+                         choices = allExp,
+                         selected = selectedExp)
+    
+    allSN <- unique(na.omit(c(ifResult$IFcell_SN)))  
+    selectedSN <- ifelse(is.null(ifResult$IFcell_SN[cellCoo[1], cellCoo[2]]), "", ifResult$IFcell_SN[cellCoo[1], cellCoo[2]])
+    
+    updateSelectizeInput(inputId = "IFcell_SN",
+                         choices = allSN,
+                         selected = selectedSN)
+  })
+  
+  observeEvent(input$IFcell_SN, {
+    if (!is.null(ifResult$IFcell_COLOR) && !is.null(FlagsIF$cellCoo) && !anyNA(FlagsIF$cellCoo)) {
+      IFtb = ifResult$TablePlot
+      cellCoo = FlagsIF$cellCoo
+      
+      value.bef = ifResult$IFcell_COLOR[cellCoo[1], cellCoo[2]] 
+      value.now = input$IFcell_SN
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- ifResult$Initdata[cellCoo[1], cellCoo[2]]
+        
+        ifResult$IFcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
+        ifResult$IFcell_SN[cellCoo[1], cellCoo[2]] = value.now
+        IFtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] = value.now
+        
+        if (!input$IFcell_SN %in% FlagsIF$AllExp) {
+          exp = unique(c(FlagsIF$AllExp, input$IFcell_SN))
+          FlagsIF$AllExp = exp
+        }
+        
+        tableExcelColored(session = session,
+                          Result = ifResult, 
+                          FlagsExp = FlagsIF,
+                          type = "Update")
+        
+        output$IFSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": sample name ", value.now))
+        output$IFmatrix <- renderDataTable({ifResult$TablePlot})
+      }
+    } else return()
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$IFcell_EXP, {
+    if (!is.null(ifResult$IFcell_EXP) && !is.null(FlagsIF$cellCoo) && !anyNA(FlagsIF$cellCoo)) {
+      IFtb = ifResult$TablePlot
+      cellCoo = FlagsIF$cellCoo
+      
+      value.bef = ifResult$IFcell_EXP[cellCoo[1], cellCoo[2]] 
+      value.now = input$IFcell_EXP
+      
+      if (value.now != "" && value.now != value.bef) {
+        currentValues <- ifResult$Initdata[cellCoo[1], cellCoo[2]]
+        
+        ifResult$IFcell_EXP[cellCoo[1], cellCoo[2]] = value.now
+        tableExcelColored(session = session,
+                          Result = ifResult, 
+                          FlagsExp = FlagsIF,
+                          type = "Update"
+        )
+        
+        output$IFSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": Exp Condition ", value.now))
+        output$IFmatrix <- renderDataTable({ifResult$TablePlot})
+      }
+    } else return()
+  }, ignoreInit = TRUE)
+  
+  
+  output$downloadIFAnalysis <- downloadHandler(
+    filename = function() {
+      paste('IFanalysis-', Sys.Date(), '.zip', sep='')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      nomeRDS <- paste0("IF_analysis-", Sys.Date(), ".rds")
+      nomeXLSX <- paste0("IF_analysis-", Sys.Date(), ".xlsx")
+      
+      tempRdsPath <- file.path(tempDir, nomeRDS)
+      tempXlsxPath <- file.path(tempDir, nomeXLSX)
+      
+      results <- DataAnalysisModule$ifResult
+      saveRDS(results, file = tempRdsPath)
+      
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "IF")
+      
+      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      manageSpinner(FALSE)
+      
+    } 
+  )
+  # save everytime there is a change in the results
+  IFresultListen <- reactive({
+    reactiveValuesToList(ifResult)
+  })
+  observeEvent(IFresultListen(), {
+    DataAnalysisModule$ifResult = reactiveValuesToList(ifResult)
+    DataAnalysisModule$ifResult$Flags = reactiveValuesToList(FlagsIF)
+  })
+  #### END IF analysis #####
   
   ### WB analysis ####
   

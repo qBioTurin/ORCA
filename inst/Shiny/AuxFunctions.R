@@ -545,6 +545,25 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            } else {
              print("dataFinal non disponibile o non è un data.frame")
            }
+         },
+         "IF" = {
+           wb <- createWorkbook("IF")  
+           
+           if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
+             addWorksheet(wb, "TablePlot")  # Aggiunge un nuovo foglio al workbook
+             writeDataTable(wb, ResultList$Initdata, sheet = "TablePlot")  # Scrive i dati nel foglio
+             print("Initdata scritto nel foglio Excel")
+           } else {
+             print("Errore: Initdata non disponibile o non è un data.frame")
+           }
+           # Se esiste anche dataFinal e vuoi scriverlo su un altro foglio
+           if (!is.null(ResultList$dataFinal) && is.data.frame(ResultList$dataFinal)) {
+             addWorksheet(wb, "Results Analysis")  # Aggiunge un foglio per l'analisi finale
+             writeDataTable(wb, ResultList$dataFinal, sheet = "Results Analysis")  # Scrive i dati di analisi finale
+             print("dataFinal scritto nel foglio Excel")
+           } else {
+             print("dataFinal non disponibile o non è un data.frame")
+           }
          }
   )
   
@@ -691,7 +710,7 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
   column_TIME <- paste0(analysis, "cell_TIME")  
   
   # Set variable names based on analysis type
-  if (analysis %in% c("ELISA","BCA") ){
+  if (analysis %in% c("ELISA","BCA","IF") ){
     value1 = "Sample Name"
     value2 = "Experimental condition"
     column_EXP <- paste0(analysis, "cell_SN") 
@@ -713,7 +732,9 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
       time_values <- apply(matching_indices, 1, function(idx) {
         if (analysis == "ELISA")
           val <- result$ELISAcell_EXP[idx["row"], idx["col"]]
-        if (analysis == "BCA")
+        else if (analysis == "IF")
+          val <- result$IFcell_EXP[idx["row"], idx["col"]]
+        else if (analysis == "BCA")
           val <- result$BCAcell_EXP[idx["row"], idx["col"]]
         else val <- result$ENDOCcell_TIME[idx["row"], idx["col"]]
         
@@ -787,7 +808,7 @@ updateTable <- function(position, analysis, info, data, result, flag) {
           
           result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
           # if ELISA, modify SN otherwise modify EXP
-          if (analysis %in% c("ELISA","BCA") ) {
+          if (analysis %in% c("ELISA","BCA",) ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
           } else if (analysis == "ENDOC") {
             result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value

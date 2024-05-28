@@ -1213,6 +1213,95 @@ ui <- dashboardPage(
                 )
               )
       ),
+      #### END data analysis: FACS ####
+      
+      #### START data analysis: IF ####
+      tabItem(
+        tabName = "uploadIF",
+        h2("Load IF data"),
+        fluidRow(
+          column(9,
+                 fileInput(
+                   inputId = "IFImport",
+                   label = "",
+                   placeholder = "Select an Excel file.",
+                   width = "80%", 
+                   multiple = TRUE
+                 )
+          ),
+          column(2,
+                 actionButton(
+                   label = "Load",
+                   style = "margin-top: 20px; width: 100%;",
+                   icon = shiny::icon("upload"),
+                   inputId = "LoadIF_Button"
+                 )
+          ),
+          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+        ),
+        fluidRow(
+          box(width = 12,
+              title = "Assign experimental information to values:",
+              column(width = 6,
+                     dataTableOutput("IFmatrix")
+              ),
+              column(width = 6,
+                     selectizeInput("IFcell_SN",
+                                    label = "Sample name:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     selectizeInput("IFcell_EXP",label = "Experimental condition:",
+                                    choices = "",
+                                    options = list(create = TRUE)),
+                     fluidRow(
+                       column(12,
+                              tags$div(
+                                textOutput("IFSelectedValues"),
+                                style = "font-size: 24px; text-align: center; color: green;
+                                             width: 100%; margin-top: 20px;"
+                              )
+                       )
+                     )
+              )
+          ),
+          fluidRow(
+            column(6, dataTableOutput("leftTableIF")),
+            column(6, dataTableOutput("rightTableIF"))
+          ),
+          fluidRow(
+            column(width = 1,offset = 9,
+                   actionButton(inputId = "NextIFQuantif",
+                                label = 'Proceed to Quantification',
+                                align = "right",
+                                icon = shiny::icon("forward"))
+            )
+          )
+        )
+      ),
+      # Second tab content
+      tabItem(tabName = "tablesIF",
+              h2("Quantification"),
+              fluidRow(
+                box(width= 12,
+                    title = "Quantification",
+                    collapsible = TRUE,
+                    collapsed = TRUE,
+                    DTOutput("IFtables"),
+                    fluidRow(
+                    )
+                )
+              ),
+              fluidRow(
+                column(width = 2,offset = 9,
+                       downloadButton( label = "Download Analysis & Excel", 
+                                       outputId = "downloadIFanalysis",
+                                       icon = icon("download") 
+                       )
+                )
+              )
+      ),
+      #### END data analysis: IF ####
+      
       #### START statistical analysis ####
       tabItem(tabName = "StatAnalysis_tab",
               h2("Statistical analysis"),
