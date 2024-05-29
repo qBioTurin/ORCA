@@ -1367,7 +1367,7 @@ ui <- dashboardPage(
                 fluidRow(
                   column(width = 2,offset = 9,
                          downloadButton( label = "Download Analysis & Excel", 
-                                         outputId = "downloadIFanalysis",
+                                         outputId = "downloadIFAnalysis",
                                          icon = icon("download") 
                          )
                   )
