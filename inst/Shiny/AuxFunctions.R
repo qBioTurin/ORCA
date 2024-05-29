@@ -564,6 +564,34 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            } else {
              print("dataFinal non disponibile o non è un data.frame")
            }
+           
+           # Se esiste anche SubStatData e vuoi scriverlo su un altro foglio
+           if (!is.null(ResultList$SubStatData) && is.data.frame(ResultList$SubStatData)) {
+             addWorksheet(wb, "Data selected")  # Aggiunge un foglio per l'analisi finale
+             writeDataTable(wb, ResultList$SubStatData, sheet = "Data selected")  # Scrive i dati di analisi finale
+             print("SubStatData scritto nel foglio Excel")
+           } else {
+             print("SubStatData non disponibile o non è un data.frame")
+           }
+           
+           # Se esiste anche TTestData e vuoi scriverlo su un altro foglio
+           if (!is.null(ResultList$TTestData) && is.data.frame(ResultList$TTestData)) {
+             addWorksheet(wb, "T-Test Analysis")  # Aggiunge un foglio per l'analisi finale
+             writeDataTable(wb, ResultList$TTestData, sheet = "T-Test Analysis")  # Scrive i dati di analisi finale
+             print("TTestData scritto nel foglio Excel")
+           } else {
+             print("TTestData non disponibile o non è un data.frame")
+           }
+           
+           # Se esiste anche resplot e vuoi scriverlo su un altro foglio
+           if (!is.null(ResultList$resplot)) {
+             addWorksheet(wb, "Bar plot") 
+             print(ResultList$resplot)
+             insertPlot(wb = wb,  sheet="Bar plot")
+             print("resplot scritto nel foglio Excel")
+           } else {
+             print("resplot non disponibile o non è un data.frame")
+           }
          }
   )
   
@@ -1263,4 +1291,55 @@ UploadRDs = function(Flag, session, output,
                       selected = "uploadCYTOTOX")
     
   }
+  else if(Flag == "FACS"){
+    
+    for(nameList in names(DataAnalysisModule$facsResult)) 
+      Result[[nameList]] <- DataAnalysisModule$facsResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$facsResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$facsResult$Flags[[nameList]]
+    
+    # facsResult = reactiveValues(
+    #   Initdata= NULL,
+    #   data = NULL,
+    #   dataFinal = NULL,
+    #   depth = NULL,
+    #   depthCount = NULL,
+    #   originalName = NULL,
+    #   name = NULL,
+    #   statistics = NULL,
+    #   cells = NULL,
+    #   ExpConditionDF = NULL,
+    #   Barplot = NULL,
+    #   StatDF = NULL
+    # )
+
+    
+    # change pannel
+    updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
+    
+  }
+}
+
+testStat.function = function(data, var = NULL){
+  vars = data[,1] %>% distinct() %>% pull() 
+  combo = combn( vars , 2 )
+  combo = data.frame(Var1 = combo[1,], Var2 = combo[2,])
+  
+  combo = combo[combo$Var1 != combo$Var2, ]
+  resTTest = do.call(rbind,
+                     lapply(1:dim(combo)[1],function(x){
+                       sn = combo[x,]
+                       ttest = t.test(data[data[,1] ==  sn$Var1 , 2] ,
+                                      data[data[,1] ==  sn$Var2 , 2] ) 
+                       data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
+                                  pValue = ttest$p.value,
+                                  conf.int = paste(ttest$conf.int,collapse = ";")
+                       )
+                     })
+  )
+  if(!is.null(var))
+    resTTest$Var = var
+  
+  return(resTTest)
 }

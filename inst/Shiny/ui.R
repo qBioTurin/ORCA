@@ -102,9 +102,10 @@ ui <- dashboardPage(
                          menuItem('IF analysis', tabName = 'if',
                                   menuSubItem("Upload data", tabName = "uploadIF"),
                                   menuSubItem("Quantification", tabName = "tablesIF")),
-                         menuItem('Facs analysis', tabName = 'facs',
+                         menuItem('Flow Cytometry analysis', tabName = 'facs',
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
-                                  menuSubItem("Quantification", tabName = "tablesFACS"))
+                                  menuSubItem("Hierarchical gating", tabName = "tablesFACS"),
+                                  menuSubItem("Statistics", tabName = "statFACS")) 
                 ),
                 menuItem('Statistical analysis', tabName = 'StatAnalysis_tab', icon = icon('magnifying-glass-chart')),
                 menuItem('Model Integration',
@@ -1167,7 +1168,7 @@ ui <- dashboardPage(
       #### START data analysis: FACS ####
       tabItem(
         tabName = "uploadFACS",
-        h2("Load FACS data"),
+        h2("Load Flow Cytometry data"),
         fluidRow(
           column(
             9,
@@ -1191,7 +1192,7 @@ ui <- dashboardPage(
         ),
       ),
       tabItem(tabName = "tablesFACS",
-              h2("Quantification"),
+              h2("Hierarchical gating"),
               box(width = 12,
                   fluidRow(
                     tags$head(
@@ -1218,7 +1219,10 @@ ui <- dashboardPage(
                   fluidRow(
                     column(2, offset = 7,
                            selectizeInput(inputId = "selectBaseGate",
-                                          label = "Destarting gate for calculation",
+                                          label = div(class = "icon-container",
+                                              h4("Parental gate:", icon("info-circle")),
+                                              div(class = "icon-text", "Parental gate refers to the gate from which the percetages are calculated")
+                                          ),
                                           choices = ""
                            )
                     ),
@@ -1231,11 +1235,48 @@ ui <- dashboardPage(
                     )
                   )
               ),
-              box(width = 12,
+              box(width = 12,collapsible = T,
                   fluidRow(
                     style="width: 95%; margin-left: 30px;", 
                     dataTableOutput("FACSresult")           
                   ),
+              ),
+              box(
+                  title = "FACS Name Update", 
+                  solidHeader = TRUE, 
+                  collapsible = TRUE, 
+                  collapsed = TRUE, 
+                  width = 12,
+                  fluidRow(
+                    column(12,
+                           dataTableOutput("FACSnameUpdate")
+                           )
+                )
+              )
+      ),
+      tabItem(tabName = "statFACS",
+              h2("Statistics"),
+              box(width = 12,
+                  fluidRow(
+                    style="width: 95%; margin-left: 30px;", 
+                    column(6,
+                           dataTableOutput("FACSexpcond_tab") 
+                    ),
+                    column(6,
+                           uiOutput("FACSexpcond_plot")
+                    )
+                  ),
+                  fluidRow(
+                    style="width: 95%; margin-left: 30px;", 
+                      column(6,
+                      actionButton(inputId = "FACSstatButton",
+                                   label = 'Calculate Statistic')
+                    )
+                    ),
+                  fluidRow(
+                    style="width: 95%; margin-left: 30px;", 
+                           dataTableOutput("FACSstat_tab")
+                  )
               ),
               fluidRow(
                 column(width = 2,offset = 9,
@@ -1313,6 +1354,12 @@ ui <- dashboardPage(
                       ),
                       column(
                         width = 6,
+                        plotOutput("IFsummarise_plot")
+                      )
+                    ),
+                    fluidRow(
+                      column(
+                        width = 12,
                         DTOutput("IFtable_ttest")
                       )
                     )

@@ -19,7 +19,8 @@ server <- function(input, output, session) {
                                        cytotoxResult = NULL,
                                        facsResult = NULL,
                                        bcaResult = NULL,
-                                       ifResult = NULL)
+                                       ifResult = NULL,
+                                       facsResult = NULL)
   
   DataIntegrationModule <- reactiveValues(dataLoaded = NULL,
                                           data = NULL,
@@ -1100,14 +1101,20 @@ server <- function(input, output, session) {
     selectIFcolumns = NULL,
     data = NULL,
     StatData = NULL,
-    FinalData = NULL
+    FinalData = NULL,
+    SubStatData = NULL,
+    resplot = NULL,
+    TTestData = NULL
     )
   ifResult0 = reactiveValues(
     Initdata = NULL,
     selectIFcolumns = NULL,
     data = NULL,
     StatData = NULL,
-    FinalData = NULL
+    FinalData = NULL,
+    SubStatData = NULL,
+    resplot = NULL,
+    TTestData = NULL
   )
   
   # save everytime there is a change in the results
@@ -1263,22 +1270,18 @@ server <- function(input, output, session) {
       
       SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values))
       
-      combo = expand.grid(SubDataStat$ExpCond,SubDataStat$ExpCond)
-      combo = combo[combo$Var1 != combo$Var2, ]
-      resTTest = do.call(rbind,
-                         lapply(1:dim(combo)[1],function(x){
-                           sn = combo[x,]
-                           ttest = t.test(SubData %>% filter(ExpCond == sn$Var1) %>% select(Values),
-                                          SubData %>% filter(ExpCond == sn$Var2) %>% select(Values)) 
-                           data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
-                                      pValue = ttest$p.value,
-                                      conf.int = paste(ttest$conf.int,collapse = ";")
-                           )
-                         })
-      )
-      
-      resTTest$Vars = varSel
+      resTTest = testStat.function(SubData, varSel)
         
+      resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
+        geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+        geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+        geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
+                   position = position_jitter(width = 0.2), size = 3) +
+        theme_bw()+
+        labs(color = "Experimental Condition", y = "Percentages (%)" , x = "")
+      
+      output$IFsummarise_plot = renderPlot({resplot})
+      
       output$IFsummariseMean = renderDT({
         DT::datatable(SubDataStat,
                       selection = 'none',
@@ -1303,7 +1306,7 @@ server <- function(input, output, session) {
       
       ifResult$SubStatData = SubDataStat
       ifResult$TTestData = resTTest
-      
+      ifResult$resplot = resplot
     }
     
   })
@@ -3908,9 +3911,13 @@ server <- function(input, output, session) {
     dataFinal = NULL,
     depth = NULL,
     depthCount = NULL,
+    originalName = NULL,
     name = NULL,
     statistics = NULL,
-    cells = NULL
+    cells = NULL,
+    ExpConditionDF = NULL,
+    Barplot = NULL,
+    StatDF = NULL
   )
   
   facsResult0 = reactiveValues(
@@ -3919,9 +3926,13 @@ server <- function(input, output, session) {
     dataFinal = NULL,
     depth = NULL,
     depthCount = NULL,
+    originalName = NULL,
     name = NULL,
     statistics = NULL,
-    cells = NULL
+    cells = NULL,
+    ExpConditionDF = NULL,
+    Barplot = NULL,
+    StatDF = NULL
   )
   
   FACSresultListen <- reactive({
@@ -3935,7 +3946,8 @@ server <- function(input, output, session) {
   FlagsFACS <- reactiveValues(
     actualLevel = NULL,
     allLevel = NULL,
-    actualPath = NULL
+    actualPath = NULL,
+    initLoadSelec = NULL
   )
   
   observeEvent(input$LoadFACS_Button,{
@@ -3989,6 +4001,7 @@ server <- function(input, output, session) {
         facsResult$name <- vector("list", nrow(data))
         facsResult$statistics <- vector("list", nrow(data))
         facsResult$cells <- vector("list", nrow(data))
+        facsResult$originalName <- vector("list", nrow(data))
         
         for (i in 1:nrow(data)) {
           x <- data[i, 1]
@@ -4010,6 +4023,10 @@ server <- function(input, output, session) {
         }
         
         removeModal()
+
+        # FlagsFACS$actualLevel = 0
+        # maxDepth <- max(facsResult$depthCount, na.rm = TRUE)
+        # updateSelectizeUI(maxDepth,session)
         
         maxDepth <- max(facsResult$depthCount, na.rm = TRUE)
         
@@ -4018,28 +4035,37 @@ server <- function(input, output, session) {
         
         # Secondo: Ascolta il cambio della tab e poi esegue le funzioni
         observeEvent(input$SideTabs, {
-          if (input$SideTabs == "tablesFACS") {
+          
+          if (input$SideTabs == "tablesFACS" && length(grep("FACScell_",names(input)))== 0 ) {
             updateSelectizeUI(maxDepth)
             FlagsFACS$actualLevel <- 0
             showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
           }
         }, ignoreInit = TRUE)  # Assicurati di non eseguire al primo caricamento
+        
       }
     }
   }
   
-  updateSelectizeUI <- function(maxDepth) {
+  # observeEvent(FlagsFACS$actualLevel,{
+  #   if(FlagsFACS$actualLevel == 0){
+  #     maxDepth <- max(facsResult$depthCount, na.rm = TRUE)
+  #     updateSelectizeUI(maxDepth,session)
+  #   }
+  # })
+  
+  updateSelectizeUI <- function(maxDepth,session) {
     output$dynamicSelectize <- renderUI({
       rowContent <- fluidRow(
         lapply(1:maxDepth, function(i) {
           column(
             2, offset = 1,
             tags$div(style = "display: none;", id = paste("div_FACScell", i, sep = ""),
-                     selectizeInput(
+                     selectInput( 
                        inputId = paste("FACScell", i, sep = "_"),
                        label = paste("Gate", i),
-                       choices = c(),
-                       options = list(placeholder = 'Select the next gate', create = TRUE)
+                       choices = "",
+                       #options = list(placeholder = 'Select the next gate')
                      )
             )
           )
@@ -4049,7 +4075,7 @@ server <- function(input, output, session) {
     })
   }
   
-  observeEvent(FlagsFACS$actualLevel, {
+  observeEvent(c(FlagsFACS$actualLevel,FlagsFACS$init), {
     currentInputId <- paste("FACScell", FlagsFACS$actualLevel, sep = "_")
     
     if (FlagsFACS$actualLevel == 0) {
@@ -4064,13 +4090,32 @@ server <- function(input, output, session) {
         }
       }
       
+      ## update the table for the barplot in which an expcondition is associated to each name
+      ExpConditionDF <- facsResult$ExpConditionDF <- data.frame(Name = unique(unlist(filtered_names)), ExpCondition = "")
+      
+      output$FACSexpcond_tab = renderDT({
+        DT::datatable( ExpConditionDF,
+                       selection = 'none',
+                       editable = list(target = "cell",
+                                       disable = list(columns = 0) ),
+                       rownames= FALSE,
+                       options = list(scrollX = TRUE,
+                                      searching = FALSE,
+                                      dom = 't' # Only display the table
+                       )
+        )
+      })
+      ######
+      
       data_for_table <- data.frame(
         Name = unlist(filtered_names),
         Start = unlist(filtered_cells),
         stringsAsFactors = FALSE
       )
-      FlagsFACS$data <- data_for_table  
       
+      facsResult$originalName <- unlist(filtered_names)
+      
+      FlagsFACS$data <- data_for_table  
       FlagsFACS$actualPath <- ""
       
       output$FACSmatrix <- renderDT({
@@ -4082,6 +4127,24 @@ server <- function(input, output, session) {
           )
         ))
       })
+      
+      data_for_name_update <- data.frame(
+        Name = unlist(filtered_names),
+        New_name = rep("-", length(filtered_names)),  # Colonna con trattini iniziali
+        stringsAsFactors = FALSE
+      )
+      
+      output$FACSnameUpdate <- renderDT({
+        datatable(data_for_name_update, options = list(
+          pageLength = 10,
+          autoWidth = TRUE,
+          columnDefs = list(
+            list(targets = 1, width = '50%'),  # Imposta la larghezza della prima colonna
+            list(targets = 2, width = '50%')
+          )
+        ), editable = list(target = 'cell', columns = 2))  # Permetti l'editing della seconda colonna
+      })
+      
     } else {
       selected_item <- input[[currentInputId]]
       path_components <- strsplit(FlagsFACS$actualPath, "/")[[1]]
@@ -4122,8 +4185,8 @@ server <- function(input, output, session) {
         datatable(FlagsFACS$data, options = list(autoWidth = TRUE))
       })
     }
-    loadDrop() 
-  }, ignoreInit = TRUE)
+    loadDrop()
+  })
   
   observe({
     FlagsFACS$actualPath
@@ -4140,7 +4203,7 @@ server <- function(input, output, session) {
                          choices = choices
     )
   })
-  
+
   escapeRegex <- function(string) {
     gsub("([\\\\^$.*+?()[{\\]|-])", "\\\\\\1", string)
   }
@@ -4157,7 +4220,7 @@ server <- function(input, output, session) {
     valid_names <- as.character(valid_names)
     
     if (length(valid_names) > 0) {
-      short_names <- sapply(strsplit(valid_names, "/", fixed = TRUE), function(x) tail(x, 1))
+      short_names <- unique(sapply(strsplit(valid_names, "/", fixed = TRUE), function(x) tail(x, 1)) )
     } else {
       short_names <- "no valid names found"
     }
@@ -4166,14 +4229,13 @@ server <- function(input, output, session) {
     nextDivId <- paste("div_FACScell", targetLevel, sep = "")
     
     if (length(short_names) == 0) {
-      updateSelectInput(session, nextInputId, choices = list("No choices available" = ""), selected = "")
+      updateSelectInput(session, inputId = nextInputId, choices = list("No choices available" = ""), selected = "")
     } else {
-      updateSelectInput(session, nextInputId, choices = setNames(short_names, short_names), selected = character(0))
+      updateSelectInput(session, inputId = nextInputId, choices = short_names, selected = character(0))
     }
     
     shinyjs::runjs(paste0('setTimeout(function() { $("#', nextDivId, '").css("display", "block"); }, 200);'))
   }
-  
   
   observe({
     if (is.null(facsResult$depthCount) || length(facsResult$depthCount) == 0) {
@@ -4274,7 +4336,167 @@ server <- function(input, output, session) {
       )
     })
     facsResult$dataFinal <- facsResult$data
+ 
   })
+  
+  observeEvent(input$FACSexpcond_tab_cell_edit, {
+    info <- input$FACSexpcond_tab_cell_edit
+    str(info)  # Debugging line to show what 'info' contains
+    info$col = 2
+    # Update the data in the reactive value
+    facsResult$ExpConditionDF <- editData(facsResult$ExpConditionDF, info)
+  })
+  
+  observe({
+    facsResult$ExpConditionDF -> ExpConditionDF
+    facsResult$dataFinal -> dataFinal
+    
+    isolate({
+      if(!is.null(dataFinal) && !is.null(ExpConditionDF)  ){
+        
+        output$FACSexpcond_tab = renderDT({
+          DT::datatable( ExpConditionDF,
+                         selection = 'none',
+                         editable = list(target = "cell",
+                                         disable = list(columns = 0) ),
+                         rownames= FALSE,
+                         options = list(scrollX = TRUE,
+                                        searching = FALSE,
+                                        dom = 't' # Only display the table
+                         )
+          )
+        })
+        
+        dataFinalExpCond = merge(dataFinal,ExpConditionDF) %>%
+          tidyr::gather(-Name,-ExpCondition, value = "Percetages", key = "Gate" ) %>%
+          mutate(Percetages = as.numeric(gsub(replacement = "",x = Percetages,pattern = "%")))
+        
+        pl = ggplot(dataFinalExpCond, aes(x =  ExpCondition , y =  Percetages, color = Name, fill = Name)) + 
+          geom_bar(stat = "identity", position = "dodge") +
+          facet_wrap(~Gate) + theme_bw() + labs(y = "Percetages %", x = "Experimetal condition")
+        
+        plot1 = lapply(unique(dataFinalExpCond$Gate),function(g){
+          ggplot(dataFinalExpCond %>% filter(Gate == g),
+                 aes(x =  ExpCondition , y =  Percetages, color = Name, fill = Name)) + 
+            geom_bar(stat = "identity", position = "dodge") +
+            facet_wrap(~Gate) +
+            theme_bw() +
+            labs(y = "Percetages %", x = "Experimetal condition")
+        })
+        
+        
+        # Dynamically generate plot output UI
+        output$FACSexpcond_plot <- renderUI({
+          plot_output_list_1 <- lapply(1:length(plot1), function(i) {
+            plotOutput(paste0("FACSplot_", i), width = "100%" )
+          })
+          do.call(tagList, list(plot_output_list_1))
+        })
+        
+        lapply(1:length(plot1), function(i) {
+          output[[paste0("FACSplot_", i)]] <- renderPlot({
+            plot1[[i]]
+          })
+        })
+        
+        facsResult$Barplot = pl
+      }
+    })
+  })
+  
+  observeEvent(input$FACSstatButton, {
+    facsResult$ExpConditionDF -> ExpConditionDF
+    facsResult$dataFinal -> dataFinal
+    isolate({
+      if(!is.null(dataFinal) && !is.null(ExpConditionDF)  ){
+        dataFinalExpCond = merge(dataFinal,ExpConditionDF) %>%
+          tidyr::gather(-Name,-ExpCondition, value = "Percetages", key = "Gate" ) %>%
+          mutate(Percetages = as.numeric(gsub(replacement = "",x = Percetages,pattern = "%")))
+        
+        ### Ttest
+        if(length(unique(dataFinalExpCond$ExpCondition) > 1)){
+          StatDF = do.call( rbind, 
+                            lapply(unique(dataFinalExpCond$Gate), function(gate){
+                              subdata = dataFinalExpCond %>% filter(Gate == gate) %>% select(ExpCondition,Percetages)
+                              testStat.function(subdata, var = gate)
+                            }) )
+        }
+      }
+      
+      })
+    
+    facsResult$StatDF = StatDF
+    output$FACSstat_tab = renderDT({
+      DT::datatable( StatDF,
+                     selection = 'none',
+                     rownames= FALSE,
+                     options = list(scrollX = TRUE,
+                                    searching = FALSE,
+                                    dom = 't' # Only display the table
+                     )
+      )
+    })
+    
+  })
+  
+  observeEvent(input$FACSnameUpdate_cell_edit, {
+    info <- input$FACSnameUpdate_cell_edit
+    
+    row <- info$row
+    col <- info$col
+    new_value <- info$value
+    
+    if (col == 2) {  
+      associated_name <- FlagsFACS$data[row, "Name"]
+      
+      index <- which(facsResult$name == associated_name)
+      
+      if (length(index) > 0) {
+        if (new_value == "") {
+          original_name <- as.character(facsResult$originalName[row])
+          for (i in seq_along(facsResult$name)) {
+            name_parts <- strsplit(as.character(facsResult$name[i]), "/", fixed = TRUE)[[1]]
+            if (name_parts[1] == associated_name) {
+              name_parts[1] <- original_name
+              facsResult$name[i] <- paste(name_parts, collapse = "/")
+            }
+          }
+        } else {
+          for (i in seq_along(facsResult$name)) {
+            if (startsWith(as.character(facsResult$name[i]), as.character(associated_name))) {
+              suffix <- substr(facsResult$name[i], nchar(associated_name) + 1, nchar(facsResult$name[i]))
+              facsResult$name[i] <- paste0(new_value, suffix)
+            }
+          }
+        }
+        
+      }
+    }
+  })
+  
+  observeEvent(facsResult$name, {
+    valid_indices <- facsResult$depthCount == FlagsFACS$actualLevel
+    filtered_names <- facsResult$name
+    
+    Names <- unique(sapply(filtered_names, function(name) strsplit(name, "/")[[1]][1]))
+  
+    FlagsFACS$data$Name = Names
+    proxy <- dataTableProxy('FACSmatrix')
+    replaceData(proxy, FlagsFACS$data, resetPaging = FALSE)
+    
+    if(!is.null(facsResult$dataFinal)){
+      facsResult$dataFinal$Name <- Names
+      proxy <- dataTableProxy('FACSresult')
+      replaceData(proxy, facsResult$dataFinal, resetPaging = FALSE)
+    }
+    
+    if(!is.null(facsResult$ExpConditionDF)){
+      facsResult$ExpConditionDF$Name <- Names
+      #proxy <- dataTableProxy('FACSexpcond_tab')
+      #replaceData(proxy, facsResult$ExpConditionDF, resetPaging = FALSE)
+    }
+    
+  }, ignoreInit = TRUE)
   
   output$downloadFACSanalysis <- downloadHandler(
     filename = function() {
@@ -4461,7 +4683,8 @@ server <- function(input, output, session) {
                                                      FlagELISA = F,
                                                      FlagCYTOTOX = F,
                                                      FlagENDOC = F,
-                                                     FlagBCA = F)
+                                                     FlagBCA = F,
+                                                     FlagFACS = F)
   UploadDataAnalysisModule = reactiveValues(FlagALL = F,
                                             FlagUpdate = F,
                                             FlagWB = F,
@@ -4469,7 +4692,8 @@ server <- function(input, output, session) {
                                             FlagELISA = F,
                                             FlagCYTOTOX = F,
                                             FlagENDOC = F,
-                                            FlagBCA = F)
+                                            FlagBCA = F,
+                                            FlagFACS = F)
   
   # general upload in the app
   observeEvent(input$loadAnalysis_Button,{
@@ -4490,7 +4714,8 @@ server <- function(input, output, session) {
                all(messNames %in% names(pcrResult)) ||
                all(messNames %in% names(cytotoxResult)) ||
                all(messNames %in% names(endocResult)) ||
-               all(messNames %in% names(bcaResult)) ) ) {
+               all(messNames %in% names(bcaResult)) ||
+           all(messNames %in% names(facsResult)) ) ) {
         showAlert("Error", "The file must be RDs saved throught the Data Analysis module.", "error", 5000)
         return()
       }
@@ -4519,6 +4744,9 @@ server <- function(input, output, session) {
       }else if( all(messNames %in% names(ifResult)) ){
         DataAnalysisModule$ifResult <- mess
         UploadDataAnalysisModule$FlagIF = T
+      }else if( all(messNames %in% names(facsResult)) ){
+        DataAnalysisModule$facsResult <- mess
+        UploadDataAnalysisModule$FlagFACS = T
       }
       
       UploadDataAnalysisModule$FlagUpdate = T
@@ -4589,7 +4817,15 @@ server <- function(input, output, session) {
                   FlagsExp = FlagsIF)
         
       }
-      
+      else if(UploadDataAnalysisModule$FlagFACS || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "FACS",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = facsResult, 
+                  FlagsExp = FlagsFACS)
+        
+      }
       UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
     }
     
