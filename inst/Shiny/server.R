@@ -1099,18 +1099,16 @@ server <- function(input, output, session) {
     Initdata = NULL,
     selectIFcolumns = NULL,
     data = NULL,
-    IFnorm = NULL,
-    BaselineExp = NULL,
-    plotPCR = NULL,
-    NewIF = NULL)
-  ifResult0 = list(
+    StatData = NULL,
+    FinalData = NULL
+    )
+  ifResult0 = reactiveValues(
     Initdata = NULL,
     selectIFcolumns = NULL,
     data = NULL,
-    IFnorm = NULL,
-    BaselineExp = NULL,
-    plotPCR = NULL,
-    NewIF = NULL)
+    StatData = NULL,
+    FinalData = NULL
+  )
   
   # save everytime there is a change in the results
   IFresultListen <- reactive({
@@ -1180,63 +1178,110 @@ server <- function(input, output, session) {
                       selected = "")
     
     showAlert("Success", "The IF excel has been uploaded with success", "success", 2000)
-    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "tablesIF")
   }
   
   observeEvent(input$IF_expcond,{
-    if( !is.null(ifResult$Initdata) ){
-      selectIFcolumns = input$IF_expcond
-      selectIFcolumns = selectIFcolumns[selectIFcolumns!= ""]
+    tryCatch({
+      if( !is.null(ifResult$Initdata) ){
+        selectIFcolumns = input$IF_expcond
+        selectIFcolumns = selectIFcolumns[selectIFcolumns!= ""]
+        
+        IFdata = ifResult$Initdata
+        colNames = colnames(IFdata)
+        colNames[ colNames == selectIFcolumns] = "ExpCond"
+        colnames(IFdata) = colNames
+        
+        IFdataCalc = IFdata %>%
+          group_by(ExpCond) %>%
+          mutate(nRow = 1:n()) %>%
+          ungroup() %>%
+          tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars") %>%
+          group_by(ExpCond,nRow) %>%
+          mutate(Tot = sum(Values), Perc =  Values/Tot*100)
+        
+        IFinalData = IFdataCalc  %>%
+          tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                              values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
+        
+        statisticData = IFdataCalc %>% 
+          group_by(ExpCond,Vars) %>%
+          summarise(MeanValues = mean(Values),
+                    sdValues = sd(Values),
+                    MeanPerc = mean(Perc),
+                    sdPerc = sd(Perc),
+                    MeanTot = mean(Tot),
+                    sdTot = sd(Tot)) %>%
+          tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                              values_from = c(MeanValues, sdValues,MeanPerc,sdPerc)) %>% ungroup()
+        
+        ifResult$StatData = statisticData
+        ifResult$FinalData = IFinalData
+        
+        updateSelectInput("IF_TTestvariable",session = session, choices = unique(IFdataCalc$Vars))
+        
+        output$IFtable = renderDT({
+          DT::datatable( IFinalData,
+                         selection = 'none',
+                         # editable = list(target = "cell",
+                         #                 disable = list(columns = 0:2) ),
+                         rownames= FALSE,
+                         options = list(scrollX = TRUE,
+                                        searching = FALSE,
+                                        dom = 't' # Only display the table
+                         )
+          )
+        })
+        
+        output$IFtable_stat = renderDT({
+          DT::datatable(statisticData,
+                        selection = 'none',
+                        # editable = list(target = "cell",
+                        #                 disable = list(columns = 0:2) ),
+                        rownames= FALSE,
+                        options = list(scrollX = TRUE,
+                                       searching = FALSE,
+                                       dom = 't' # Only display the table
+                        )
+          )
+        })
+      }
+    }, error = function(e) {
+      showAlert("Error",paste("An error occurred:", e$message), "error", 2000)
+    })
+  })
+  
+  observeEvent(input$IF_TTestvariable,{
+    ifResult$FinalData -> IFinalData
+    input$IF_TTestvariable -> varSel
+    
+    if(varSel != "" && !is.null(IFinalData)){
+      IFinalData[,c("ExpCond", paste0(varSel,"_Perc"))] -> SubData
+      colnames(SubData) = c("ExpCond", "Values")
       
-      IFdata = ifResult$Initdata
-      colNames = colnames(IFdata)
-      colNames[ colNames == selectIFcolumns] = "ExpCond"
-      colnames(IFdata) = colNames
+      SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values))
       
-      IFdataCalc = IFdata %>%
-        group_by(ExpCond) %>%
-        mutate(nRow = 1:n()) %>%
-        ungroup() %>%
-        tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars") %>%
-        group_by(ExpCond,nRow) %>%
-        mutate(Tot = sum(Values), Perc =  Values/Tot)
+      combo = expand.grid(SubDataStat$ExpCond,SubDataStat$ExpCond)
+      combo = combo[combo$Var1 != combo$Var2, ]
+      resTTest = do.call(rbind,
+                         lapply(1:dim(combo)[1],function(x){
+                           sn = combo[x,]
+                           ttest = t.test(SubData %>% filter(ExpCond == sn$Var1) %>% select(Values),
+                                          SubData %>% filter(ExpCond == sn$Var2) %>% select(Values)) 
+                           data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
+                                      pValue = ttest$p.value,
+                                      conf.int = paste(ttest$conf.int,collapse = ";")
+                           )
+                         })
+      )
       
-       IFinalData = IFdataCalc  %>%
-         tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
-                             values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
-         
-      statisticData = IFdataCalc %>% 
-        group_by(ExpCond,Vars) %>%
-        summarise(MeanValues = mean(Values),
-                  sdValues = sd(Values),
-                  MeanPerc = mean(Perc),
-                  sdPerc = sd(Perc),
-                  MeanTot = mean(Tot),
-                  sdTot = sd(Tot)) %>%
-        tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
-                            values_from = c(MeanValues, sdValues,MeanPerc,sdPerc)) %>% ungroup()
-      
-      
-      updateSelectInput("IF_TTestvariable",session = session, choices = unique(IFdataCalc$Values))
-      
-      output$IFtable = renderDT({
-        DT::datatable( IFinalData,
-                       selection = 'none',
-                       # editable = list(target = "cell",
-                       #                 disable = list(columns = 0:2) ),
-                       rownames= FALSE,
-                       options = list(scrollX = TRUE,
-                                      searching = FALSE,
-                                      dom = 't' # Only display the table
-                       )
-        )
-      })
-      
-      output$IFtable_stat = renderDT({
-        DT::datatable(statisticData,
+      resTTest$Vars = varSel
+        
+      output$IFsummariseMean = renderDT({
+        DT::datatable(SubDataStat,
                       selection = 'none',
-                      # editable = list(target = "cell",
-                      #                 disable = list(columns = 0:2) ),
                       rownames= FALSE,
                       options = list(scrollX = TRUE,
                                      searching = FALSE,
@@ -1244,14 +1289,25 @@ server <- function(input, output, session) {
                       )
         )
       })
+      
+      output$IFtable_ttest = renderDT({
+        DT::datatable(resTTest,
+                      selection = 'none',
+                      rownames= FALSE,
+                      options = list(scrollX = TRUE,
+                                     searching = FALSE,
+                                     dom = 't' # Only display the table
+                      )
+        )
+      })
+      
+      ifResult$SubStatData = SubDataStat
+      ifResult$TTestData = resTTest
+      
     }
     
   })
   
-observeEvent(input$IF_TTestvariable,{
-  
-})
-
   
   observe({
     DataAnalysisModule$ifResult = reactiveValuesToList(ifResult)
@@ -4460,6 +4516,9 @@ observeEvent(input$IF_TTestvariable,{
       }else if(all(messNames %in% names(cytotoxResult)) ){
         DataAnalysisModule$cytotoxResult <- mess
         UploadDataAnalysisModule$FlagCYTOTOX = T
+      }else if( all(messNames %in% names(ifResult)) ){
+        DataAnalysisModule$ifResult <- mess
+        UploadDataAnalysisModule$FlagIF = T
       }
       
       UploadDataAnalysisModule$FlagUpdate = T
@@ -4513,13 +4572,21 @@ observeEvent(input$IF_TTestvariable,{
         
       }
       else if(UploadDataAnalysisModule$FlagCYTOTOX || UploadDataAnalysisModule$FlagALL){
-        
         UploadRDs(Flag = "CYTOTX",
                   session = session,
                   output = output,
                   DataAnalysisModule = DataAnalysisModule,
                   Result = cytotoxResult, 
                   FlagsExp = FlagsCYTOTOX)
+        
+      }
+      else if(UploadDataAnalysisModule$FlagIF || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "IF",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = ifResult, 
+                  FlagsExp = FlagsIF)
         
       }
       

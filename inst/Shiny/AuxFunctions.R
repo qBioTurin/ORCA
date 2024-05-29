@@ -163,7 +163,7 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       } else if(tolower(tools::file_ext(filename)) != "tif" && tolower(tools::file_ext(filename)) != "tiff") {
         return(list(message = "Please, upload a file with a .tif extension.", call = ""))
       } 
-      else {loadImage(filename)}
+      else {LoadImage(filename)}
     },
     "RDs" = {
       if(is.null(filename) || !file.exists(filename)) {
