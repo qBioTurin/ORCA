@@ -1304,7 +1304,7 @@ server <- function(input, output, session) {
         )
       })
       
-      ifResult$SubStatData = SubDataStat
+      ifResult$SubStatData = SubData
       ifResult$TTestData = resTTest
       ifResult$resplot = resplot
     }
@@ -3901,7 +3901,15 @@ server <- function(input, output, session) {
   
   
   #### CITOXICITY analysis ####
-  
+  cytotoxResult  = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    CYTOTOXcell_EXP = NULL,
+    CYTOTOXcell_REP = NULL,
+    CYTOTOXcell_SN = NULL,
+    MapBaseline = NULL)
   ### End CITOXICITY analysis ####
   
   #### FACS analysis ####
@@ -4529,6 +4537,8 @@ server <- function(input, output, session) {
                                        ELISA = list(),
                                        ENDOC = list(),
                                        CYTOTOX = list(),
+                                       IF = list(),
+                                       FACS = list(),
                                        Flag = F)
   
   DataStatisticresultListen <- reactive({
@@ -4572,31 +4582,29 @@ server <- function(input, output, session) {
     datapaths <- input$loadStatAnalysis_file$datapath
     for(dpath in 1:length(datapaths)){
       mess <- readRDS(datapaths[dpath])
+      names(mess) -> namesRes
+      if("Flags"%in% namesRes) namesRes = namesRes[ namesRes != "Flags"]
       
-      if(!(all(names(mess) %in% names(DataAnalysisModule)) ||
-           all(names(mess) %in% names(elisaResult)) ||
-           all(names(mess) %in% names(wbquantResult)) || 
-           all(names(mess) %in% names(pcrResult)) ||
-           all(names(mess) %in% names(cytotoxResult)) ||
-           all(names(mess) %in% names(endocResult)))){
+      if(all(namesRes %in% names(wbquantResult)) || all(namesRes %in% names(DataAnalysisModule))){
+        DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
+      } else if(all(namesRes %in% names(pcrResult)) || all(namesRes %in% names(DataAnalysisModule))){
+        DataStatisticModule$PCR[[dpath]]  <- mess
+      } else if(all(namesRes %in% names(endocResult)) || all(namesRes %in% names(DataAnalysisModule))){
+        DataStatisticModule$ENDOC[[dpath]]  <- mess
+      } else if(all(namesRes %in% names(elisaResult)) || all(namesRes %in% names(DataAnalysisModule))){
+        DataStatisticModule$ELISA[[dpath]]  <- mess
+      } else if(all(namesRes %in% names(cytotoxResult)) || all(namesRes %in% names(DataAnalysisModule))){
+        DataStatisticModule$CYTOTOX[[dpath]]  <- mess
+      } else if(all(namesRes %in% names(ifResult)) || all(namesRes %in% names(DataAnalysisModule))){
+        DataStatisticModule$IF[[dpath]]  <- mess
+      } else if(all(namesRes %in% names(facsResult)) || all(namesRes %in% names(DataAnalysisModule))){
+        DataStatisticModule$FACS[[dpath]]  <- mess
+      }else{
         showAlert("Error", paste(mess[["message"]],"\n The file must be RDs saved through the Data Analysis module."), "error", 5000)
         manageSpinner(FALSE)
         return()
       }
-      
       DataStatisticModule$Flag <- TRUE
-      
-      if(all(names(mess) %in% names(wbquantResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-        DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
-      } else if(all(names(mess) %in% names(pcrResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-        DataAnalysisModule$PCR[[dpath]]  <- mess
-      } else if(all(names(mess) %in% names(endocResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-        DataAnalysisModule$ENDOC[[dpath]]  <- mess
-      } else if(all(names(mess) %in% names(elisaResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-        DataAnalysisModule$ELISA[[dpath]]  <- mess
-      } else if(all(names(mess) %in% names(cytotoxResult)) || all(names(mess) %in% names(DataAnalysisModule))){
-        DataAnalysisModule$CYTOTOX[[dpath]]  <- mess
-      }
     }
     manageSpinner(FALSE)
     showAlert("Success", "The RDs files have been uploaded with success", "success", 2000)
@@ -4606,10 +4614,10 @@ server <- function(input, output, session) {
   StatisticalAnalysisResults <- reactive({
     if (!is.null(input$StatAnalysis) && input$StatAnalysis != "") {
       results <- DataStatisticModule[[input$StatAnalysis]]
-      do.call(rbind, results) -> results
       
       switch(input$StatAnalysis, 
              "WB" =  {
+               do.call(rbind, results) -> results
                res <- results %>%
                  select(DataSet, SampleName, AdjRelDens) %>%
                  mutate(SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
@@ -4622,18 +4630,20 @@ server <- function(input, output, session) {
                  group_by(SampleName) %>%
                  summarise(Mean = mean(AdjRelDens), Sd = sd(AdjRelDens), .groups = 'drop')
                
-               combo = expand.grid(stats$SampleName,stats$SampleName)
-               combo = combo[combo$Var1 != combo$Var2, ]
-               resTTest = do.call(rbind,
-                                  lapply(1:dim(combo)[1],function(x){
-                                    sn = combo[x,]
-                                    ttest = t.test(stats[stats$SampleName == sn$Var1, -1],stats[stats$SampleName == sn$Var2, -1]) 
-                                    data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
-                                               pValue = ttest$p.value,
-                                               conf.int = paste(ttest$conf.int,collapse = ";")
-                                    )
-                                  })
-               )
+               resTTest = testStat.function(points[,c("SampleName","AdjRelDens")])
+               
+               # combo = expand.grid(stats$SampleName,stats$SampleName)
+               # combo = combo[combo$Var1 != combo$Var2, ]
+               # resTTest = do.call(rbind,
+               #                    lapply(1:dim(combo)[1],function(x){
+               #                      sn = combo[x,]
+               #                      ttest = t.test(stats[stats$SampleName == sn$Var1, -1],stats[stats$SampleName == sn$Var2, -1]) 
+               #                      data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
+               #                                 pValue = ttest$p.value,
+               #                                 conf.int = paste(ttest$conf.int,collapse = ";")
+               #                      )
+               #                    })
+               # )
                
                resplot <- ggplot(stats, aes(x = SampleName, y = Mean)) + 
                  geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
@@ -4644,6 +4654,34 @@ server <- function(input, output, session) {
                  labs(color = "Sample Name")
                
                list(Table = stats, TableTest = resTTest, Plot = resplot)
+             },
+             "IF" = {
+               resultsNew = do.call(rbind,
+                                    lapply(1:length(results),
+                                                  function(l){
+                                                    d = results[[l]]$SubStatData
+                                                    d$File = l
+                                                    d
+                                                  } 
+                                                  ) 
+                                    )
+               
+               stats = resultsNew %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values))
+               
+               resTTest = testStat.function(resultsNew[,c("ExpCond", "Values")])
+               
+               resplot <- ggplot(stats, aes(x = ExpCond, y = Mean)) + 
+                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+                 geom_point(data = resultsNew, aes(x = ExpCond, y = Values, color = as.factor(File)),
+                            position = position_jitter(width = 0.2), size = 3) +
+                 theme_bw()+
+                 labs(color = "File")
+               
+               list(Table = stats, TableTest = resTTest, Plot = resplot)
+             },
+             "FACS" = {
+               
              }
       )
     } else {
@@ -4835,15 +4873,6 @@ server <- function(input, output, session) {
   
   #----------------------------------------------------------------------------------
   # OTHER ANALYSIS TO DO
-  cytotoxResult  = reactiveValues(
-    Initdata= NULL,
-    data = NULL,
-    TablePlot = NULL,
-    dataFinal = NULL,
-    CYTOTOXcell_EXP = NULL,
-    CYTOTOXcell_REP = NULL,
-    CYTOTOXcell_SN = NULL,
-    MapBaseline = NULL)
   
   # DOWNLOAD REPORT E RDS
   output$downloadReport <- downloadHandler(
@@ -4923,10 +4952,16 @@ server <- function(input, output, session) {
         !is.null(cytotoxResult$CYTOTOXcell_EXP) || !is.null(cytotoxResult$CYTOTOXcell_REP) ||
         !is.null(cytotoxResult$CYTOTOXcell_SN) || !is.null(cytotoxResult$MapBaseline))
       return (FALSE)
-    if (!is.null(endocResult$Initdata) || !is.null(cytotoxResult$data) ||
-        !is.null(endocResult$TablePlot) || !is.null(cytotoxResult$dataFinal) ||
-        !is.null(endocResult$ENDOCcell_TIME) || !is.null(cytotoxResult$ENDOCcell_SN) ||
-        !is.null(endocResult$MapBaseline) || !is.null(cytotoxResult$MapBlank))
+    if (!is.null(endocResult$Initdata) || !is.null(endocResult$data) ||
+        !is.null(endocResult$TablePlot) || !is.null(endocResult$dataFinal) ||
+        !is.null(endocResult$ENDOCcell_TIME) || !is.null(endocResult$ENDOCcell_SN) ||
+        !is.null(endocResult$MapBaseline) || !is.null(endocResult$MapBlank))
+      return (FALSE)
+    if (!is.null(ifResult$Initdata) || !is.null(ifResult$data) ||
+        !is.null(ifResult$dataFinal))
+      return (FALSE)
+    if (!is.null(facsResult$Initdata) || !is.null(facsResult$data) ||
+        !is.null(facsResult$dataFinal))
       return (FALSE)
     
     return (TRUE)

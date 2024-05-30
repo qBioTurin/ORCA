@@ -147,6 +147,22 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            flags$allLevel <- NULL
            flags$actualPath <- NULL
          },
+         "IF" = {
+           for(l in names(result))
+             result[[l]] = NULL
+           for(l in names(flags))
+             flags[[l]] = NULL
+           
+          updateSelectInput(
+            inputId = "IF_TTestvariable",
+            choices = "",selected = ""
+          )
+          output$IFtable_stat <- renderDT({data.frame()})
+          output$IFtable <- renderDT({data.frame()})
+          output$IFsummariseMean <- renderDT({data.frame()})
+          output$IFsummarise_plot <- renderPlot({}) 
+           
+         },
          error = function(cond) {
            showAlert("Error", "an error occured", "error", 5000)
          }
@@ -1317,6 +1333,20 @@ UploadRDs = function(Flag, session, output,
     
     # change pannel
     updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
+    
+  }
+  else if(Flag == "IF"){
+    
+    for(nameList in names(DataAnalysisModule$ifResult)) 
+      Result[[nameList]] <- DataAnalysisModule$ifResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$ifResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$ifResult$Flags[[nameList]]
+    
+    
+    # change pannel
+    
+    updateTabsetPanel(session, "SideTabs", selected = "tablesIF")
     
   }
 }
