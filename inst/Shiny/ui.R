@@ -112,8 +112,8 @@ ui <- dashboardPage(
                          tabName = 'integ',
                          icon = icon('file'),
                          menuSubItem("Omics Data", tabName = "Omics_tab"),
-                         menuSubItem("WB, RT-qPCR, ENDOC ", tabName = "WbPcrElisa_tab"),
-                         menuSubItem("IF, and other data ", tabName = "otherData_tab")
+                         menuSubItem("Data analysed", tabName = "DataIntegration_tab")
+                         #menuSubItem("IF, and other data ", tabName = "otherData_tab")
                 ),
                 menuItem('Dataverse', tabName = 'Dataverse_tab', icon = icon('eye')),
                 menuItem('Load analysis', tabName = 'LoadAnalysis', icon = icon('upload'))
@@ -223,8 +223,8 @@ ui <- dashboardPage(
       ## END model integration: Omics
       ## BEGIN model integration: WB PCR ENDOC ####
       tabItem(
-        tabName = "WbPcrElisa_tab",
-        h2("Data harmonization as initial marking into the Petri Net model "),
+        tabName = "DataIntegration_tab",
+        h2("Data integration as initial marking into the Petri Net model"),
         fluidRow(
           box(
             width = 12,
@@ -260,118 +260,116 @@ ui <- dashboardPage(
                               icon = shiny::icon("upload"),
                               inputId = "LoadIntG_Button" )
               )
-            ),
-            fluidRow(
-              column(
-                width = 10,
-                offset = 1,
-                verbatimTextOutput("LoadingError_IntG")
-              )
             )
           ),
           box(
             width = 12,
             collapsible = T,
             collapsed = T,
-            title = "WB analysis",
-            pickerInput(
-              width = "50%",
-              inputId = "Selectprot_wb",
-              multiple = F,
-              label = "Select the molecule from the omics dataset:",
-              choices = "",
-              options = list( maxItems = 1, `live-search` = TRUE),
-              choicesOpt = list(`style` = "btn-info",
-                                `liveSearchPlaceholder`="Search" )
-            ),
-            DTOutput("Tab_IntG_wb")
-          ),
-          box(
-            width = 12,
-            collapsible = T,
-            collapsed = T,
-            title = "RT-qPCR analysis",
-            selectizeInput(
-              width = "50%",
-              inputId = "SelectGene",
-              multiple = F,
-              options = list(maxItems = 1),
-              label = "Select the gene of interest:",
-              choices = ""
-            ),
-            uiOutput("tables_IntG_pcr")
-          ),
-          box(
-            width = 12,
-            collapsible = T,
-            collapsed = T,
-            title = "Endocytosis assay",
-            tableOutput("Tab_IntG_endoc")
+            title = "Load Data Analysed",
+            selectizeInput("IntegrAnalysis",
+                           label = "Select the analysis:",
+                           choices = ""),
+            uiOutput("tables_IntG")
           )
+          #   pickerInput(
+          #     width = "50%",
+          #     inputId = "Selectprot_wb",
+          #     multiple = F,
+          #     label = "Select the molecule from the omics dataset:",
+          #     choices = "",
+          #     options = list( maxItems = 1, `live-search` = TRUE),
+          #     choicesOpt = list(`style` = "btn-info",
+          #                       `liveSearchPlaceholder`="Search" )
+          #   ),
+          #   DTOutput("Tab_IntG_wb")
+          # )
+          # box(
+          #   width = 12,
+          #   collapsible = T,
+          #   collapsed = T,
+          #   title = "RT-qPCR analysis",
+          #   selectizeInput(
+          #     width = "50%",
+          #     inputId = "SelectGene",
+          #     multiple = F,
+          #     options = list(maxItems = 1),
+          #     label = "Select the gene of interest:",
+          #     choices = ""
+          #   ),
+          #   uiOutput("tables_IntG_pcr")
+          # ),
+          # box(
+          #   width = 12,
+          #   collapsible = T,
+          #   collapsed = T,
+          #   title = "Endocytosis assay",
+          #   tableOutput("Tab_IntG_endoc")
+          # )
         )
       ),
       ## END model integration: WB PCR ENDOC
       ## BEGIN model integration: IF..etc  #######
-      tabItem( tabName = "otherData_tab",
-               h2("Other expertiments"),
-               h4("It is possible to upload an excel file with at least (i) one character column \n
-                  identifying the experiments ID, and (ii) one numeric's from which it is possible \n
-                  calculate the average that will be rescaled with the omics value. "),
-               
-               box(
-                 width = 12,
-                 fluidRow(
-                   column(
-                     8,
-                     fileInput(
-                       inputId = "OtherImport",
-                       label = "",
-                       placeholder = "Select an excel file",
-                       width = "100%", 
-                       multiple = TRUE
-                     )
-                   ),
-                   column(
-                     1,
-                     actionButton(
-                       label = "Load",style = "margin-top: 20px;",
-                       icon = shiny::icon("upload"),
-                       inputId = "LoadOther_Button" 
-                     )
-                   )
-                 ),
-                 fluidRow(
-                   column(
-                     width = 10,
-                     offset = 1,
-                     verbatimTextOutput("LoadingError_Other")
-                   )
-                 )
-               ),
-               fluidRow(  
-                 column(
-                   width = 10,
-                   offset = 1,
-                   selectizeInput(
-                     width = "50%",
-                     inputId = "Selectprot_other",
-                     multiple = F,
-                     options = list(maxItems = 1),
-                     label = "Select the molecule from the omics dataset:",
-                     choices = ""
-                   )
-                 ),
-                 box(
-                   width = 12,
-                   title = "Data",
-                   collapsible = T,
-                   DTOutput("Other_table",width = "80%")
-                 ),
-                 fluidRow(
-                   DTOutput("Other_tableMean",width = "80%")
-                 )
-               )
-      ),
+      # tabItem( tabName = "otherData_tab",
+      #          h2("Other expertiments"),
+      #          h4("It is possible to upload an excel file with at least (i) one character column \n
+      #             identifying the experiments ID, and (ii) one numeric's from which it is possible \n
+      #             calculate the average that will be rescaled with the omics value. "),
+      #          
+      #          box(
+      #            width = 12,
+      #            fluidRow(
+      #              column(
+      #                8,
+      #                fileInput(
+      #                  inputId = "OtherImport",
+      #                  label = "",
+      #                  placeholder = "Select an excel file",
+      #                  width = "100%", 
+      #                  multiple = TRUE
+      #                )
+      #              ),
+      #              column(
+      #                1,
+      #                actionButton(
+      #                  label = "Load",style = "margin-top: 20px;",
+      #                  icon = shiny::icon("upload"),
+      #                  inputId = "LoadOther_Button" 
+      #                )
+      #              )
+      #            ),
+      #            fluidRow(
+      #              column(
+      #                width = 10,
+      #                offset = 1,
+      #                verbatimTextOutput("LoadingError_Other")
+      #              )
+      #            )
+      #          ),
+      #          fluidRow(  
+      #            column(
+      #              width = 10,
+      #              offset = 1,
+      #              selectizeInput(
+      #                width = "50%",
+      #                inputId = "Selectprot_other",
+      #                multiple = F,
+      #                options = list(maxItems = 1),
+      #                label = "Select the molecule from the omics dataset:",
+      #                choices = ""
+      #              )
+      #            ),
+      #            box(
+      #              width = 12,
+      #              title = "Data",
+      #              collapsible = T,
+      #              DTOutput("Other_table",width = "80%")
+      #            ),
+      #            fluidRow(
+      #              DTOutput("Other_tableMean",width = "80%")
+      #            )
+      #          )
+      # ),
       ## END model integration:  
       ######### END MODEL INTEGRATION
       

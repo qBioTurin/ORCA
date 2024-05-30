@@ -22,14 +22,24 @@ server <- function(input, output, session) {
                                        ifResult = NULL,
                                        facsResult = NULL)
   
-  DataIntegrationModule <- reactiveValues(dataLoaded = NULL,
-                                          data = NULL,
-                                          wbTabs = NULL, 
-                                          pcrTabs = NULL,
-                                          cytotoxTabs= NULL,
-                                          endocTabs=NULL,
-                                          otherTabs = NULL,
-                                          otherTabsMean = NULL)
+  DataStatisticModule = reactiveValues(WB = list(),
+                                       PCR = list(),
+                                       ELISA = list(),
+                                       ENDOC = list(),
+                                       CYTOTOX = list(),
+                                       IF = list(),
+                                       FACS = list(),
+                                       Flag = F)
+  
+  DataIntegrationModule <- reactiveValues(WB = list(),
+                                          PCR = list(),
+                                          ELISA = list(),
+                                          ENDOC = list(),
+                                          CYTOTOX = list(),
+                                          IF = list(),
+                                          FACS = list(),
+                                          Stat = list(),
+                                          Flag = F)
   
   MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity", "FACS","BCA","IF") 
   names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult", "facsResult","bcaResult","ifResult") 
@@ -37,7 +47,11 @@ server <- function(input, output, session) {
   #### DATA INTEGRATION ####
   ### Omics ####
   
-  Omics = reactiveValues(Default = NULL, User = NULL, Data = NULL, SelectedRows = list(Default = NULL, User = NULL), FinalSelectedRow = NULL)
+  Omics = reactiveValues(DefaultInit = NULL,
+                         Default = NULL,
+                         UserInit = NULL,
+                         User = NULL,
+                         Data = NULL, SelectedRows = list(Default = NULL, User = NULL), FinalSelectedRow = NULL)
   
   # default
   protfile = system.file("Data/Proteomic","pmic13104Simplified.xlsx", package = "ORCA")
@@ -46,7 +60,7 @@ server <- function(input, output, session) {
     protfile = "~/../home/data/Examples/Proteomic/pmic13104Simplified.xlsx"
   }
   Default = readxl::read_excel(protfile)
-  Omics$Default = Default
+  Omics$DefaultInit = Omics$Default = Default
   Omics$Data = Default %>%
     dplyr::select(`Protein name`,iBAQ) %>%
     rename(Value = iBAQ, Name = `Protein name`)
@@ -92,7 +106,7 @@ server <- function(input, output, session) {
       
       updateSelectInput(inputId = "RescalingColms_User",
                         choices = colmns ) 
-      Omics$User = mess
+      Omics$UserInit = Omics$User = mess
       "The excel file has been uploaded  with success"
     })
   })
@@ -187,19 +201,19 @@ server <- function(input, output, session) {
   )
   
   # here, only one row can be selected
-  observeEvent(input$SelectedOmicsUser_table_rows_selected,{
+  observe({
+    SelectedOmicsUser_table_rows_selected = input$SelectedOmicsUser_table_rows_selected
+    User = Omics$SelectedRows$User
     proxy <- dataTableProxy('SelectedOmicsDefault_table')
     selectRows(proxy, NULL)
-    Omics$FinalSelectedRow <-  Omics$SelectedRows$User[input$SelectedOmicsUser_table_rows_selected, , drop = FALSE]
+    Omics$FinalSelectedRow <-  User[SelectedOmicsUser_table_rows_selected, , drop = FALSE]
   })
-  observeEvent(input$SelectedOmicsDefault_table_rows_selected,{
+  observe({
+    SelectedOmicsDefault_table_rows_selected = input$SelectedOmicsDefault_table_rows_selected
+    Default = Omics$SelectedRows$Default
     proxy <- dataTableProxy('SelectedOmicsUser_table')
     selectRows(proxy, NULL)
-    Omics$FinalSelectedRow <-  Omics$SelectedRows$Default[input$SelectedOmicsDefault_table_rows_selected, , drop = FALSE]  
-  })
-  
-  observe({
-    print(Omics$FinalSelectedRow)
+    Omics$FinalSelectedRow <-  Default[SelectedOmicsDefault_table_rows_selected, , drop = FALSE]  
   })
   
   # rescaling
@@ -210,8 +224,8 @@ server <- function(input, output, session) {
       return()
     }
     
-    if(!is.null(Omics$Default)){
-      Omics$Default$iBAQ = Omics$Default$iBAQ/input$InputDefault_rescaling
+    if(!is.null(Omics$DefaultInit)){
+      Omics$Default$iBAQ = Omics$DefaultInit$iBAQ/input$InputDefault_rescaling
     }
   })
   
@@ -226,8 +240,8 @@ server <- function(input, output, session) {
       }
       
       colms = input$RescalingColms_User
-      if(!is.null(Omics$User)){
-        Omics$User[,colms] = Omics$User[,colms]/input$InputUser_rescaling
+      if(!is.null(Omics$UserInit)){
+        Omics$User[,colms] = Omics$UserInit[,colms]/input$InputUser_rescaling
       }
     }
   })
@@ -238,157 +252,87 @@ server <- function(input, output, session) {
   ### integration ####
   
   observeEvent(input$LoadIntG_Button,{
-    output$LoadingError_IntG <- renderText({
-      validate(
-        need(!is.null(input$IntGImport) && all(file.exists(input$IntGImport$datapath)) ,
-             "Please select one or more RDs files!!" )
-      )
-      
-      mess = readfile(
-        filename = input$IntGImport$datapath,
-        type = "RDsMulti",
-        namesAll = namesAll
-      )
-      
-      validate(
-        need(!setequal(names(mess),c("message","call")) ,
-             mess[["message"]]
-        )
-      )
-      
-      DataIntegrationModule$dataLoaded = mess
-      
-      "The RDs files are uploaded with success"
-    })
-  })
-  
-  observeEvent(DataIntegrationModule$dataLoaded,{
+    manageSpinner(TRUE)
     
-    data = list(
-      wbResult = NULL,
-      wbquantResult = NULL,
-      endocResult = NULL,
-      pcrResult = NULL
+    result <- readfile(
+      filename = input$IntGImport$datapath, 
+      type = "RDsMulti",
+      isFileUploaded = !is.null(input$LoadIntG_Button)
     )
-    DataIntegrationModule$dataLoaded -> mess
     
-    if(!is.null(mess)){
+    if (!is.null(result$error)) {
+      showAlert("Error", result$error, "error", 5000)
+      manageSpinner(FALSE)
+      return()
+    }
+    
+    datapaths <- input$IntGImport$datapath
+    
+    updateMultiValues(datapaths,DataIntegrationModule)
+    
+    manageSpinner(FALSE)
+    showAlert("Success", "The RDs files have been uploaded with success", "success", 2000)
+  })
+  
+  DataIntegrationresultListen <- reactive({
+    reactiveValuesToList(DataIntegrationModule)
+  })
+  
+  observeEvent(DataIntegrationresultListen(),{
+    if(DataIntegrationModule$Flag){
+      AnalysisNames = names(DataIntegrationModule)[names(DataIntegrationModule) != "Flag"]
+      Analysis = rep(F,length(AnalysisNames) )
+      names(Analysis) = AnalysisNames
+      for(j in AnalysisNames)
+        Analysis[j] = all(sapply(DataIntegrationModule[[j]], is.null))
       
-      for( x in 1:length(mess))
-      {
-        if(all(names(mess[[x]]) %in% names(DataAnalysisModule)) )
-          data = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(wbResult)) )
-          data$wbResult = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(wbquantResult)) )
-          data$wbquantResult = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(pcrResult)) )
-          data$pcrResult = mess[[x]]
-        else if( all(names(mess[[x]]) %in% names(endocResult)))
-          data$endocResult = mess[[x]]
-      }
+      AnalysisNames = AnalysisNames[!Analysis]
       
-      DataIntegrationModule$data = data
-      ## starting updating the boxes
-      prot = Omics$Data
-      # removing all the null analysis
-      data = data[!sapply(data, is.null)]
+      updateSelectizeInput(inputId = "IntegrAnalysis",
+                           choices = c("",AnalysisNames),
+                           selected = "")
       
-      namesAnalysis = names(data)
-      
-      for(n in namesAnalysis){
-        subdata = data[[n]]
-        print(n)
-        if(n == "pcrResult"){
-          pcrTabs = subdata$CompPCR 
-          updateSelectizeInput(inputId = "SelectGene",
-                               choices = unique(pcrTabs$Gene),
-                               selected = unique(pcrTabs$Gene)[1])
-          
-          DataIntegrationModule$pcrTabs = pcrTabs
-        }else if(n == "wbquantResult"){
-          wbTabs = subdata$RelDensitiy %>%
-            dplyr::select(ExpName,Lane,RelDens) %>%
-            group_by(ExpName,Lane) %>%
-            
-            ungroup()
-          
-          # wbTabs1 = wbTabs %>% dplyr::select(-Mean) %>%
-          #   tidyr::spread(Dataset, RelDens)
-          # wbTabs2 = wbTabs %>% dplyr::select(-RelDens,-Dataset) %>%
-          #   distinct()
-          
-          DataIntegrationModule$wbTabs = wbTabs #merge(wbTabs1,wbTabs2)
-          updatePickerInput(inputId = "Selectprot_wb",
-                            choices = c("",unique(prot$Name)),
-                            selected = "",session = session)
-          
-        }else if(n == "endocResult"){
-          
-        }
-      }
-      
+      DataIntegrationModule$Flag = F
     }
   })
   
-  observeEvent(input$SelectGene,{
-    if(!is.null(DataIntegrationModule$pcrTabs) && length(input$SelectGene)>0 && input$SelectGene!=""){
-      pcrTabs = DataIntegrationModule$pcrTabs
-      SelectedGene = input$SelectGene
-      output$tables_IntG_pcr <- renderUI({fluidRow(pcrTab.generation(pcrTabs,SelectedGene)) })
-      prot = Omics$Data
-      SelInname = paste0("selinp_",SelectedGene)
-      updateSelectizeInput(inputId = SelInname,
-                           choices = unique(prot$Name),
-                           server =T)
+  IntegAnalysisResults <- reactive({
+    Omics$FinalSelectedRow
+    
+    if (!is.null(input$IntegrAnalysis) && input$IntegrAnalysis != "") {
+      results <- DataIntegrationModule[[input$IntegrAnalysis]]
       
-      local({
-        output[[paste0("tab_",SelectedGene)]] <- renderDT({
-          pcrTabs %>% filter(Gene == SelectedGene) %>%
-            group_by(Sample,Norm) %>%
-            dplyr::summarize(Qnorm=Qnorm,
-                             Mean = mean(Qnorm),
-                             Sd = sd(Qnorm),
-                             Norm.Prot = ifelse(length(input[[SelInname]]) > 0,
-                                                Mean*prot[prot$Name == input[[SelInname]],"Value"],
-                                                Mean)
-            ) %>%
-            ungroup() %>%
-            #tidyr::spread(Dataset,Qnorm) %>%
-            arrange(Norm)
-        })
-      })
+      if(length(Omics$FinalSelectedRow$iBAQ) == 0){
+        showAlert("Error", "An Omics value has to be selected", "error", 5000)
+        return()
+      }
+      
+      switch(input$IntegrAnalysis, 
+             "Stat" = {
+               results = do.call(rbind, results)
+               finalTable = results %>% mutate(
+                 OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
+                 MeanScaled = OmicsValue*Mean/100 # I have to divide 100 because Mean is in %
+               )%>% select(-sd) 
+               
+               list(Table = finalTable)
+             },
+             "WB" =  {
+               
+             },
+             "IF" = {
+               
+             },
+             "FACS" = {
+               
+             }
+      )
+    } else {
+      NULL
     }
   })
   
-  output$Tab_IntG_wb <- renderDT({
-    DataIntegrationModule$wbTabs
-  },
-  filter = 'top',
-  server = FALSE,
-  options = list(lengthChange = FALSE,
-                 autoWidth = TRUE),
-  rownames= FALSE
-  )
-  observeEvent(list(input$Selectprot_wb,Omics$Data),{
-    if(!is.null(DataIntegrationModule$wbTabs)){
-      wbTabs = DataIntegrationModule$wbTabs
-      prot = Omics$Data
-      if(!is.null(input$Selectprot_wb) && length(input$Selectprot_wb)>0 &&input$Selectprot_wb!= "" ){
-        as.numeric(prot[prot$Name == input$Selectprot_wb,"Value"]) -> pr
-        wbTabs = wbTabs %>% dplyr::mutate(`Rel.Prot.` = RelDens * pr )
-        wbTabs[paste(input$Selectprot_wb)] = pr
-      }
-      else
-        wbTabs = wbTabs[,ifelse("Rel.Prot." %in% colnames(wbTabs),
-                                colnames(wbTabs)[!"Rel.Prot." %in% colnames(wbTabs)],
-                                colnames(wbTabs) )]
-    }
-    else{
-      wbTabs = NULL
-    }
-    DataIntegrationModule$wbTabs <- wbTabs 
-  })
+  output$tables_IntG = renderTable({IntegAnalysisResults()$Table})
   #### end integration ###
   
   ### Other integration ####
@@ -1192,7 +1136,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$IF_expcond,{
     tryCatch({
-      if( !is.null(ifResult$Initdata) ){
+      if( !is.null(ifResult$Initdata) && input$IF_expcond != ""){
         selectIFcolumns = input$IF_expcond
         selectIFcolumns = selectIFcolumns[selectIFcolumns!= ""]
         
@@ -1255,6 +1199,14 @@ server <- function(input, output, session) {
           )
         })
       }
+      else{
+        
+        updateSelectInput("IF_TTestvariable",session = session, choices = "",selected = "")
+        
+        output$IFtable = renderDT({ NULL })
+        
+        output$IFtable_stat = renderDT({ NULL })
+      }
     }, error = function(e) {
       showAlert("Error",paste("An error occurred:", e$message), "error", 2000)
     })
@@ -1307,6 +1259,9 @@ server <- function(input, output, session) {
       ifResult$SubStatData = SubData
       ifResult$TTestData = resTTest
       ifResult$resplot = resplot
+    }else{
+      output$IFsummarise_plot = renderPlot({NULL})
+      output$IFsummariseMean = renderDT({ NULL })
     }
     
   })
@@ -4530,15 +4485,7 @@ server <- function(input, output, session) {
   ### End FACS analysis ####
   
   ### Start Statistic  ####
-  DataStatisticModule = reactiveValues(WB = list(),
-                                       PCR = list(),
-                                       ELISA = list(),
-                                       ENDOC = list(),
-                                       CYTOTOX = list(),
-                                       IF = list(),
-                                       FACS = list(),
-                                       Flag = F)
-  
+
   DataStatisticresultListen <- reactive({
     reactiveValuesToList(DataStatisticModule)
   })

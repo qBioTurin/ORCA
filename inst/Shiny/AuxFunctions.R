@@ -1,3 +1,34 @@
+updateMultiValues = function(datapaths,result){
+  for(dpath in 1:length(datapaths)){
+    mess <- readRDS(datapaths[dpath])
+    names(mess) -> namesRes
+    if("Flags"%in% namesRes) namesRes = namesRes[ namesRes != "Flags"]
+    
+    if(all(namesRes %in% c("Table","TableTest", "Plot"))){
+      result$Stat[[dpath]] <- mess$Table %>% mutate(DataSet = dpath)
+    } else if(all(namesRes %in% names(wbquantResult)) || all(namesRes %in% names(DataAnalysisModule))){
+      result$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
+    } else if(all(namesRes %in% names(pcrResult)) || all(namesRes %in% names(DataAnalysisModule))){
+      result$PCR[[dpath]]  <- mess
+    } else if(all(namesRes %in% names(endocResult)) || all(namesRes %in% names(DataAnalysisModule))){
+      result$ENDOC[[dpath]]  <- mess
+    } else if(all(namesRes %in% names(elisaResult)) || all(namesRes %in% names(DataAnalysisModule))){
+      result$ELISA[[dpath]]  <- mess
+    } else if(all(namesRes %in% names(cytotoxResult)) || all(namesRes %in% names(DataAnalysisModule))){
+      result$CYTOTOX[[dpath]]  <- mess
+    } else if(all(namesRes %in% names(ifResult)) || all(namesRes %in% names(DataAnalysisModule))){
+      result$IF[[dpath]]  <- mess
+    } else if(all(namesRes %in% names(facsResult)) || all(namesRes %in% names(DataAnalysisModule))){
+      result$FACS[[dpath]]  <- mess
+    }else{
+      showAlert("Error", paste(mess[["message"]],"\n The file must be RDs saved through the Data Analysis module."), "error", 5000)
+      manageSpinner(FALSE)
+      return()
+    }
+    result$Flag <- TRUE
+  }
+}
+
 # function to invoke to send shiny error or success messages
 showAlert <- function(title, text, type = "info", time) {
   shinyalert(title = title, text = text, type = type, timer = time)
