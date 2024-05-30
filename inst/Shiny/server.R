@@ -1931,7 +1931,6 @@ server <- function(input, output, session) {
   )
   FlagsWBquant = reactiveValues(BothUploaded = F)
   
-  
   observeEvent(input$DataverseUpload_Button,{
     
     if(input$selectAnalysis_DV != ""){
@@ -1996,43 +1995,40 @@ server <- function(input, output, session) {
   )
   
   observeEvent(input$actionB_loadingNormWB, {
+    manageSpinner(TRUE)
+    names(wbResult) -> namesAll
+
     mess = readfile(
       filename = input$NormWBImport$datapath,
       type = "RDs",
-      namesAll = namesAll
+      namesAll = c(namesAll, "Flags")
     )
     
-    if(is.list(mess) && !is.null(mess$message)) {
+    if( setequal(names(mess),c("message","call")) ) {
       showAlert("Error", mess[["message"]], "error", 5000)
-      return() 
+      return(mess[["message"]]) 
     }
-    
-    validate(
-      need(!setequal(names(mess),c("message","call")) ,
-           mess[["message"]])
-    )
     
     choices = paste0(mess$AUCdf$SampleName, " with ", mess$AUCdf$Truncation)
     wbquantResult$NormWBanalysis = mess
+    manageSpinner(FALSE)
+    
     showAlert("Success", "The RDS has been uploaded with success", "success", 2000)
   })
   
   observeEvent(input$actionB_loadingWB,{
+    names(wbResult) -> namesAll
+
     mess = readfile(
       filename = input$WBImport$datapath,
       type = "RDs",
-      namesAll = namesAll
+      namesAll = c(namesAll, "Flags")
     )
     
-    if(is.list(mess) && !is.null(mess$message)) {
+    if( setequal(names(mess),c("message","call")) ) {
       showAlert("Error", mess[["message"]], "error", 5000)
-      return() 
+      return(mess[["message"]]) 
     }
-    
-    validate(
-      need(!setequal(names(mess),c("message","call")) ,
-           mess[["message"]])
-    )
     
     wbquantResult$WBanalysis = mess
     wbquantResult$WBanalysis_filtered = NULL
