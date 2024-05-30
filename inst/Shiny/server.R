@@ -2017,6 +2017,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$actionB_loadingWB,{
+    manageSpinner(TRUE)
     names(wbResult) -> namesAll
 
     mess = readfile(
@@ -2032,6 +2033,7 @@ server <- function(input, output, session) {
     
     wbquantResult$WBanalysis = mess
     wbquantResult$WBanalysis_filtered = NULL
+    manageSpinner(FALSE)
     showAlert("Success", "The RDS has been uploaded with success", "success", 2000)
   })
   
