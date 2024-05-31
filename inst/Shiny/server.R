@@ -435,7 +435,7 @@ server <- function(input, output, session) {
   
   
   ### END DATA INTEGRATION ####
-  
+
   #### DATA ANALYSIS ####
   
   #### BCA analysis ####
@@ -1616,7 +1616,6 @@ server <- function(input, output, session) {
     output$DataPlot <- renderPlot({wbResult$Plots})
   })
   
-  
   observeEvent(c(input$actionButton_TruncV,input$actionButton_TruncH),{
     
     if( !is.null(wbResult$PanelsValue))
@@ -1632,20 +1631,23 @@ server <- function(input, output, session) {
         pl<-wbResult$Plots
       }
       
-      maxPanelsValue=max(wbResult$PanelsValue$Values)
+      maxPanelsValue = max(wbResult$PanelsValue$Values) 
       wbResult$AUCdf -> AUCdf
-      AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
+      #AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
       
       lastTrunc = AUCdf %>% 
         group_by(SampleName) %>%
         filter(SampleName == IDlane, row_number()==n() ) %>%
-        ungroup() %>%
-        dplyr::select(Truncation) 
+        ungroup() 
       
-      if(length(lastTrunc$Truncation) > 0 & lastTrunc$Truncation != "-")
-        AUCdf.new$Truncation <- lastTrunc$Truncation
+      # if(length(lastTrunc$Truncation) > 0 & lastTrunc$Truncation != "-")
+      #   AUCdf.new$Truncation <- lastTrunc$Truncation
+      # else
+      #   
+      #   
+      # AUCdf.new$SampleName <- IDlane
       
-      AUCdf.new$SampleName <- IDlane
+      AUCdf.new = lastTrunc
       
       if(Flags$CutTab=="V")
       {
@@ -1669,10 +1671,10 @@ server <- function(input, output, session) {
         AUCdf.new$Truncation <- paste(AUCdf.new$Truncation ,";\n Y = ", TruncY)
         
         updateSliderInput(session,"truncH",
-                          min = min(PanelsValue$Values[PanelsValue$ID == IDlane]),
-                          max = max(PanelsValue$Values[PanelsValue$ID == IDlane]),
-                          value = c(min(PanelsValue$Values[PanelsValue$ID == IDlane]),
-                                    max(PanelsValue$Values[PanelsValue$ID == IDlane]) ) )
+                          min = round(min(PanelsValue$Values[PanelsValue$ID == IDlane]),digits = 3),
+                          max = round(max(PanelsValue$Values[PanelsValue$ID == IDlane]),digits = 3),
+                          value = round(min(PanelsValue$Values[PanelsValue$ID == IDlane],digits = 3) ) )
+
       }
       
       pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
@@ -1771,95 +1773,6 @@ server <- function(input, output, session) {
     }  
   })
   
-  observeEvent(c(input$actionButton_TruncV,input$actionButton_TruncH),{
-    
-    if( !is.null(wbResult$PanelsValue))
-    {
-      Flags$IDlane -> IDlane
-      if(!is.null(wbResult$TruncatedPanelsValue ))
-      {
-        pl <- wbResult$TruncatedPlots    
-        wbResult$TruncatedPanelsValue -> PanelsValue
-      }
-      else{
-        wbResult$PanelsValue -> PanelsValue
-        pl<-wbResult$Plots
-      }
-      
-      maxPanelsValue=max(wbResult$PanelsValue$Values)
-      wbResult$AUCdf -> AUCdf
-      AUCdf.new <- AUCdf[length(AUCdf$Truncation),]
-      #AUCdf.new$ExpName = "-"
-      lastTrunc = AUCdf %>% 
-        group_by(SampleName) %>%
-        filter(SampleName == IDlane, row_number()==n() ) %>%
-        ungroup() %>%
-        dplyr::select(Truncation) 
-      
-      if(length(lastTrunc$Truncation) > 0 & lastTrunc$Truncation != "-")
-        AUCdf.new$Truncation <- lastTrunc$Truncation
-      
-      AUCdf.new$SampleName <- IDlane
-      
-      if(Flags$CutTab=="V")
-      {
-        MinTrunc<-input$truncV[1]
-        MaxTrunc<-input$truncV[2]
-        AUCdf.new$Truncation <- paste(AUCdf.new$Truncation ,";\n X = [", MinTrunc," ; ", MaxTrunc ,"]",collapse = "")
-        PanelsValue<- PanelsValue[!((PanelsValue$Y < MinTrunc | PanelsValue$Y > MaxTrunc) & PanelsValue$ID == IDlane),]
-        PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] -min(PanelsValue$Values[PanelsValue$ID == IDlane]) 
-        # pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-        #   geom_line() + theme_bw() +
-        #   facet_wrap(~ID)
-        updateSliderInput(session,"truncV",
-                          min = min(PanelsValue$Y[PanelsValue$ID == IDlane]),
-                          max = max(PanelsValue$Y[PanelsValue$ID == IDlane]),
-                          value = c(min(PanelsValue$Y[PanelsValue$ID == IDlane]),
-                                    max(PanelsValue$Y[PanelsValue$ID == IDlane]) ) )
-      }
-      else if(Flags$CutTab=="H")
-      {
-        TruncY<-input$truncH[1]
-        PanelsValue <- PanelsValue[!(PanelsValue$Values<TruncY & PanelsValue$ID == IDlane),]
-        PanelsValue$Values[PanelsValue$ID == IDlane] <- PanelsValue$Values[PanelsValue$ID == IDlane] - TruncY
-        AUCdf.new$Truncation <- paste(AUCdf.new$Truncation ,";\n Y = ", TruncY)
-        # pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-        #   geom_line() + 
-        #   theme_bw() +
-        #   facet_wrap(~ID)+ 
-        #   lims(y=c(minPanelsValue,maxPanelsValue))
-        
-        updateSliderInput(session,"truncH",
-                          min = min(PanelsValue$Values[PanelsValue$ID == IDlane]),
-                          max = max(PanelsValue$Values[PanelsValue$ID == IDlane]),
-                          value = c(min(PanelsValue$Values[PanelsValue$ID == IDlane]),
-                                    max(PanelsValue$Values[PanelsValue$ID == IDlane]) ) )
-      }
-      
-      pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-        geom_line() + 
-        theme_bw() +
-        facet_wrap(~ID)+ 
-        lims(y=c(0,maxPanelsValue))
-      
-      wbResult$TruncatedPanelsValue <- PanelsValue
-      wbResult$TruncatedPlots <- pl
-      output$DataPlot <- renderPlot({pl})
-      AUCdf<-AUCfunction(AUCdf.new=AUCdf.new,wbResult$AUCdf,PanelsValue,SName = IDlane)
-      
-      output$AUC <- renderDT({
-        AUCdf  %>% 
-          dplyr::select(SampleName,Truncation, AUC) 
-      },
-      selection = 'none', 
-      rownames= FALSE
-      # editable = list(target = "cell", 
-      #                 disable = list(columns = 1:4))
-      )
-      wbResult$AUCdf <- AUCdf
-    }
-  })
-  
   ## next buttons
   observeEvent(input$NextWBQuantif,{
     if(!is.null(wbResult$AUCdf))
@@ -1875,63 +1788,16 @@ server <- function(input, output, session) {
                                  WBanalysis = NULL,
                                  WBanalysis_filtered = NULL,
                                  RelDensitiy = NULL,
-                                 AdjRelDensitiy = NULL
+                                 AdjRelDensity = NULL
   )
   wbquantResult0 = list(NormWBanalysis = NULL,
                         NormWBanalysis_filtered = NULL,
                         WBanalysis = NULL,
                         WBanalysis_filtered = NULL,
                         RelDensitiy = NULL,
-                        AdjRelDensitiy = NULL
+                        AdjRelDensity = NULL
   )
   FlagsWBquant = reactiveValues(BothUploaded = F)
-  
-  observeEvent(input$DataverseUpload_Button,{
-    
-    if(input$selectAnalysis_DV != ""){
-      
-      if(input$Title_DV == "" && input$Author_DV == "" && input$Description_DV == "" &&
-         input$AuthorAff_DV== "" && input$ContactN_DV == "" && input$ContactEmail_DV == "")
-        output$LoadingError_DATAVERSE = showAlert("Error", "Error: missing information", "error", 5000)
-      else{
-        # creation of a temporary folder
-        tempfolder = paste0(tempdir(check = T),"/ORCA")
-        system(paste0("mkdir ",tempfolder))
-        system(paste0("mkdir ",tempfolder,"/dataset"))
-        # create the metadata
-        result <- rjson::fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
-        result$dataset_title = input$Title_DV
-        result$dataset_description = paste0(input$Description_DV,"\n This dataset has been obtained using the ORCA application, specifically the module: ", input$selectAnalysis_DV)
-        result$author_name = input$Author_DV
-        result$author_affiliation= input$AuthorAff_DV
-        result$dataset_contact_name = input$ContactN_DV
-        result$dataset_contact_email = input$ContactEmail_DV
-        # result$subject = as.vector(result$subject)
-        write(rjson::toJSON(result), file=paste0(tempfolder,"/metadata.json") )
-        
-        # move the file in the temporary folder
-        
-        saveExcel(filename = paste0(tempfolder,"/dataset/",
-                                    gsub(pattern = " ", 
-                                         x = input$selectAnalysis_DV,
-                                         replacement = ""),".xlsx"),
-                  ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
-                  analysis = input$selectAnalysis_DV )
-        
-        saveRDS(DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
-                file = paste0(tempfolder,"/dataset/ORCA_",
-                              gsub(pattern = " ", 
-                                   x = input$selectAnalysis_DV,
-                                   replacement = ""),".RDs"))
-        # docker run
-        ORCA::docker.run(params = paste0("--volume ", tempfolder,
-                                         ":/Results/ -d qbioturin/orca-upload-dataverse python3 main.py /Results/metadata.json /Results/dataset") 
-        )
-        
-      }
-      
-    }
-  })
   
   observeEvent(input$NextWBQuantif,{
     if(!is.null(wbResult$AUCdf))
@@ -1946,7 +1812,7 @@ server <- function(input, output, session) {
                                  WBanalysis = NULL,
                                  WBanalysis_filtered = NULL,
                                  RelDensitiy = NULL,
-                                 AdjRelDensitiy = NULL
+                                 AdjRelDensity = NULL
   )
   
   observeEvent(input$actionB_loadingNormWB, {
@@ -2052,7 +1918,8 @@ server <- function(input, output, session) {
       if(length(indexesWB) > 0){
         wbquantResult$NormWBanalysis_filtered = AUCdf[indexesWB,]
         
-        choices = paste0( AUCdf[indexesWB,]$SampleName, "; truncated ", AUCdf[indexesWB,]$Truncation)
+        #choices = paste0( AUCdf[indexesWB,]$SampleName, "; truncated ", AUCdf[indexesWB,]$Truncation)
+        choices = AUCdf[indexesWB,]$SampleName
         selected = input$IdLaneNorm_RelDens
         updateSelectInput("IdLaneNorm_RelDens",
                           session = session,
@@ -2064,38 +1931,68 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(list(FlagsWBquant$BothUploaded, input$IdLaneNorm_RelDens,input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
-    table =  wbResult0$AUCdf 
+  observe({
+    FlagsWBquant$BothUploaded
+    input$AUC_WB_rows_selected
+    input$AUC_WBnorm_rows_selected
     
-    if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered)){
+    input$IdLaneNorm_RelDens -> IdLaneNorm_RelDens
+    isolate({
+      table =  data.frame(SampleName = "-",
+                         Truncation = "-", 
+                         Truncation_Norm = "-",
+                         AUC = "-", 
+                         RelDens = "-",
+                         AUC_Norm = "-",
+                         RelDens_Norm = "-")
+    tableAdjRel = data.frame(SampleName = "-",
+                       AdjRelDensity = "-")
+    barPlotAdjRelDens = ggplot()
+    if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered) &&
+       IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected"){
       IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
-      IdLaneNorm_RelDens = strsplit(IdLaneNorm_RelDens,
-                                    split = "; truncated ")[[1]]
+      # IdLaneNorm_RelDens = strsplit(IdLaneNorm_RelDens,
+      #                               split = "; truncated ")[[1]]
       
-      tbWBnorm = wbquantResult$NormWBanalysis_filtered %>%
-        filter(SampleName ==IdLaneNorm_RelDens[1],
-               Truncation == IdLaneNorm_RelDens[2]) %>%
+      tbWBnormDen = wbquantResult$NormWBanalysis_filtered %>%
+        filter(SampleName ==IdLaneNorm_RelDens[1]) %>%
+        pull(AUC)
+      
+      tbWBnorm = wbquantResult$NormWBanalysis_filtered %>% 
         rename(AUC_Norm = AUC,
-               Truncation_Norm = Truncation,
-               SampleName_Norm = SampleName)
+               Truncation_Norm = Truncation) %>%
+        mutate(RelDens_Norm = AUC_Norm/tbWBnormDen)
       
-      tbWB = wbquantResult$WBanalysis_filtered
+      tbWBDen = wbquantResult$WBanalysis_filtered %>%
+        filter(SampleName ==IdLaneNorm_RelDens[1]) %>% 
+        pull(AUC)
+        
+      tbWB = wbquantResult$WBanalysis_filtered %>%
+        mutate(RelDens = AUC/tbWBDen)
       
-      if(!is.null(tbWBnorm) & !is.null(tbWB) & dim(tbWBnorm)[1]==1 ){
-        if(!all(table(tbWB$SampleName)==1) ){
-          output$LoadingErrorWB <- renderText({"No rows with equal sample name are allowed"})
+      
+      if(!is.null(tbWBnorm) & !is.null(tbWB) ){
+        if(!all(table(tbWB$SampleName)==1) && !all(table(tbWBnorm$SampleName)==1) ){
+          showAlert("Error",  "Only one sample name per panel is allowed", "error", 5000)
+          return()
         }
         else{ 
-          table = tbWB
-          table$AUC_Norm = tbWBnorm$AUC_Norm
-          table$RelDens = table$AUC/table$AUC_Norm
-          table = table %>%
-            dplyr::select(SampleName, Truncation, AUC, AUC_Norm, RelDens) 
+          table = merge(tbWB,tbWBnorm,all =T) %>%
+            dplyr::select(SampleName, Truncation, AUC, RelDens, AUC_Norm, RelDens_Norm) 
+          tableAdjRel = table %>% na.omit() %>% mutate(AdjRelDensity = RelDens/RelDens_Norm) %>% select(SampleName,AdjRelDensity)
+          barPlotAdjRelDens = tableAdjRel  %>%
+                    ggplot() +
+                    geom_bar(aes(x = SampleName,
+                                 y = AdjRelDensity,
+                                 fill = SampleName ),
+                             stat = "identity" ) +
+                    theme_bw()
         }
       }
     }
     
     wbquantResult$RelDensitiy = table
+    wbquantResult$AdjRelDensity = tableAdjRel
     
     output$AUC_RelDens <- renderDT(
       table,
@@ -2105,66 +2002,77 @@ server <- function(input, output, session) {
       rownames= FALSE
     )
     
+    output$AUC_AdjRelDens <- renderDT(
+      tableAdjRel ,
+      server = FALSE,
+      options = list(lengthChange = FALSE, autoWidth = TRUE),
+      rownames= FALSE
+    )
+    output$plot_AdjRelDens <- renderPlot({
+      barPlotAdjRelDens
+    })
+    
+    })
   })
   
-  observeEvent(list(FlagsWBquant$BothUploaded, input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
-    table = data.frame(SampleName = "-",
-                       Truncation = "-", 
-                       Truncation_Norm = "-",
-                       AUC = "-", 
-                       AUC_Norm = "-",
-                       AdjRelDens = "-")
-    
-    if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered)){
-      
-      tbWB = wbquantResult$WBanalysis_filtered
-      tbWBnorm = wbquantResult$NormWBanalysis_filtered
-      
-      if(!all(table(tbWBnorm$SampleName)==1) ){
-        output$LoadingErrorNormWB <- renderText({"No rows with equal sample name are allowed"})
-      }else if(!all(table(tbWB$SampleName)==1) ){
-        output$LoadingErrorWB <- renderText({"No rows with equal sample name are allowed"})
-      }
-      else{ # we admit only one SampleName
-        
-        tbWBnorm = tbWBnorm  %>%
-          rename(AUC_Norm = AUC,
-                 Truncation_Norm = Truncation)
-        
-        table = merge(tbWBnorm,tbWB, by = "SampleName" ,all = T )
-        
-        table$AdjRelDens = table$AUC/table$AUC_Norm
-        table = table %>% 
-          dplyr::select( SampleName, Truncation, Truncation_Norm, AUC, AUC_Norm, AdjRelDens) 
-        
-        wbquantResult$AdjRelDensitiy = table
-        output$AUC_AdjRelDens <- renderDT(
-          table ,
-          server = FALSE,
-          options = list(lengthChange = FALSE, autoWidth = TRUE),
-          rownames= FALSE
-        )
-        
-        if(dim(table)[1] > 1 ){
-          barPlotAdjRelDens = table %>% 
-            mutate(Normalizer = paste0("Sample: ",SampleName ),
-                   WB = paste0("Sample: ",SampleName))  %>%
-            ggplot() +
-            geom_bar(aes(x = SampleName,
-                         y = AdjRelDens,
-                         fill = Normalizer ),
-                     stat = "identity" ) +
-            #facet_grid(~WB)+
-            theme_bw()
-        }else{
-          barPlotAdjRelDens = ggplot()
-        }
-        output$plot_AdjRelDens <- renderPlot({
-          barPlotAdjRelDens
-        })
-      }
-    }
-  })
+  # observeEvent(list(FlagsWBquant$BothUploaded, input$AUC_WB_rows_selected,input$AUC_WBnorm_rows_selected),{
+  #   table = data.frame(SampleName = "-",
+  #                      Truncation = "-", 
+  #                      Truncation_Norm = "-",
+  #                      AUC = "-", 
+  #                      AUC_Norm = "-",
+  #                      AdjRelDens = "-")
+  #   
+  #   if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered)){
+  #     
+  #     tbWB = wbquantResult$WBanalysis_filtered
+  #     tbWBnorm = wbquantResult$NormWBanalysis_filtered
+  #     
+  #     if(!all(table(tbWBnorm$SampleName)==1) ){
+  #       output$LoadingErrorNormWB <- renderText({"No rows with equal sample name are allowed"})
+  #     }else if(!all(table(tbWB$SampleName)==1) ){
+  #       output$LoadingErrorWB <- renderText({"No rows with equal sample name are allowed"})
+  #     }
+  #     else{ # we admit only one SampleName
+  #       
+  #       tbWBnorm = tbWBnorm  %>%
+  #         rename(AUC_Norm = AUC,
+  #                Truncation_Norm = Truncation)
+  #       
+  #       table = merge(tbWBnorm,tbWB, by = "SampleName" ,all = T )
+  #       
+  #       table$AdjRelDens = table$AUC/table$AUC_Norm
+  #       table = table %>% 
+  #         dplyr::select( SampleName, Truncation, Truncation_Norm, AUC, AUC_Norm, AdjRelDens) 
+  #       
+  #       wbquantResult$AdjRelDensity = table
+  #       output$AUC_AdjRelDens <- renderDT(
+  #         table ,
+  #         server = FALSE,
+  #         options = list(lengthChange = FALSE, autoWidth = TRUE),
+  #         rownames= FALSE
+  #       )
+  #       
+  #       if(dim(table)[1] > 1 ){
+  #         barPlotAdjRelDens = table %>% 
+  #           mutate(Normalizer = paste0("Sample: ",SampleName ),
+  #                  WB = paste0("Sample: ",SampleName))  %>%
+  #           ggplot() +
+  #           geom_bar(aes(x = SampleName,
+  #                        y = AdjRelDens,
+  #                        fill = Normalizer ),
+  #                    stat = "identity" ) +
+  #           #facet_grid(~WB)+
+  #           theme_bw()
+  #       }else{
+  #         barPlotAdjRelDens = ggplot()
+  #       }
+  #       output$plot_AdjRelDens <- renderPlot({
+  #         barPlotAdjRelDens
+  #       })
+  #     }
+  #   }
+  # })
   
   output$downloadWBquantAnalysis <- downloadHandler(
     filename = function() {
@@ -2174,8 +2082,8 @@ server <- function(input, output, session) {
       manageSpinner(TRUE)
       
       tempDir <- tempdir()
-      tempRDSPath <- file.path(tempDir, paste0("Analysis-", Sys.Date(), ".rds"))
-      tempExcelPath <- file.path(tempDir, paste0("Analysis-", Sys.Date(), ".xlsx"))
+      tempRDSPath <- file.path(tempDir, paste0("QuantificAnalysis-", Sys.Date(), ".rds"))
+      tempExcelPath <- file.path(tempDir, paste0("QuantificAnalysis-", Sys.Date(), ".xlsx"))
       
       resultsRDS <- DataAnalysisModule$wbquantResult
       saveRDS(resultsRDS, tempRDSPath)
@@ -2394,12 +2302,12 @@ server <- function(input, output, session) {
       BaselinePCR = PCRstep3 %>% 
         filter(Sample == BaselineExp) %>%
         rename(BaselineMean=Mean, BaselineSd=Sd,BaselinedCt = dCt) %>%
-        dplyr::select(-Sample, -HousekGene, -HousekGeneMean, -HousekGeneSd)
+        dplyr::select(-Sample,  -HousekGeneMean, -HousekGeneSd)
       
-      PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time") )
+      PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time","HousekGene") )
       
       PCRstep5 = PCRstep4 %>%
-        group_by(Sample,Gene,Time) %>%
+        group_by(Sample,Gene,Time,HousekGene) %>%
         dplyr::summarize(
           ddCt = dCt - BaselinedCt,
           Q = 2^{-ddCt},
@@ -2408,12 +2316,12 @@ server <- function(input, output, session) {
         ungroup()
       
       
-      NormPCR = PCRstep5 %>%
-        filter(Gene %in% PCRnorm ) %>%
-        rename(Norm = Gene,
-               NormQ = Q,
-               NormSd = Sd,
-               NormMean = Mean)
+      # NormPCR = PCRstep5 %>%
+      #   filter(Gene %in% PCRnorm ) %>%
+      #   rename(Norm = Gene,
+      #          NormQ = Q,
+      #          NormSd = Sd,
+      #          NormMean = Mean)
       
       # CompPCR = merge(OnePCR,NormPCR)
       # 
@@ -2444,20 +2352,21 @@ server <- function(input, output, session) {
       #   do.call(tagList, plot_output_list)
       # })
       
+      PCRstep5 = PCRstep5 %>% mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
       
-      plot1 = lapply(unique(PCRstep5$Gene),function(g){
-          ggplot(data = PCRstep5 %>% filter(Gene == g),
+      plot1 = lapply(unique(PCRstep5$GeneH),function(g){
+          ggplot(data = PCRstep5 %>% filter(GeneH == g),
                        aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
-          facet_wrap(~Gene, ncol = 1) +
+          facet_wrap(~GeneH, ncol = 1) +
           geom_jitter(width = 0.1, height = 0,size = 2)+
           theme_bw()+
           labs(x = "Time", y = "DDCT")
         })
       
-      plot2 = lapply(unique(PCRstep5$Gene),function(g){
-        ggplot(data = PCRstep5 %>% filter(Gene == g),
+      plot2 = lapply(unique(PCRstep5$GeneH),function(g){
+        ggplot(data = PCRstep5 %>% filter(GeneH == g),
                aes(x= as.factor(Time), y = Q, col = Sample)) + 
-          facet_wrap(~Gene, ncol = 1) +
+          facet_wrap(~GeneH, ncol = 1) +
           geom_jitter(width = 0.1, height = 0,size = 2)+
           theme_bw()+
           labs(x = "Time", y = "2^(-DDCT)")
@@ -2465,14 +2374,14 @@ server <- function(input, output, session) {
       
       plot1All = ggplot(data = PCRstep5,
                aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
-          facet_wrap(~Gene, ncol = 1) +
+          facet_wrap(~GeneH, ncol = 1) +
           geom_jitter(width = 0.1, height = 0,size = 2)+
           theme_bw()+
           labs(x = "Time", y = "DDCT")
       
       plot2All = ggplot(data = PCRstep5,
                aes(x= as.factor(Time), y = Q, col = Sample)) + 
-          facet_wrap(~Gene, ncol = 1) +
+          facet_wrap(~GeneH, ncol = 1) +
           geom_jitter(width = 0.1, height = 0,size = 2)+
           theme_bw()+
           labs(x = "Time", y = "2^(-DDCT)")
@@ -3863,6 +3772,15 @@ server <- function(input, output, session) {
     CYTOTOXcell_REP = NULL,
     CYTOTOXcell_SN = NULL,
     MapBaseline = NULL)
+  cytotoxResult0  = reactiveValues(
+    Initdata= NULL,
+    data = NULL,
+    TablePlot = NULL,
+    dataFinal = NULL,
+    CYTOTOXcell_EXP = NULL,
+    CYTOTOXcell_REP = NULL,
+    CYTOTOXcell_SN = NULL,
+    MapBaseline = NULL)
   ### End CITOXICITY analysis ####
   
   #### FACS analysis ####
@@ -4531,7 +4449,7 @@ server <- function(input, output, session) {
       if("Flags"%in% namesRes) namesRes = namesRes[ namesRes != "Flags"]
       
       if(all(namesRes %in% names(wbquantResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
+        DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensity %>% mutate(DataSet = dpath)
       } else if(all(namesRes %in% names(pcrResult)) || all(namesRes %in% names(DataAnalysisModule))){
         DataStatisticModule$PCR[[dpath]]  <- mess
       } else if(all(namesRes %in% names(endocResult)) || all(namesRes %in% names(DataAnalysisModule))){
@@ -4563,19 +4481,19 @@ server <- function(input, output, session) {
       switch(input$StatAnalysis, 
              "WB" =  {
                do.call(rbind, results) -> results
-               res <- results %>%
-                 select(DataSet, SampleName, AdjRelDens) %>%
+               points <- results %>%
+                 select(DataSet, SampleName, AdjRelDensity) %>%
                  mutate(SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
                         ColorSet = as.character(DataSet)) 
                
-               points <- res %>%
-                 mutate(SampleName = as.factor(SampleName))
+               # points <- res %>%
+               #   mutate(SampleName = as.factor(SampleName))
                
                stats <- points %>%
                  group_by(SampleName) %>%
-                 summarise(Mean = mean(AdjRelDens), Sd = sd(AdjRelDens), .groups = 'drop')
+                 summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
                
-               resTTest = testStat.function(points[,c("SampleName","AdjRelDens")])
+               resTTest = testStat.function(points %>% select(SampleName,AdjRelDensity) %>% as_tibble())
                
                # combo = expand.grid(stats$SampleName,stats$SampleName)
                # combo = combo[combo$Var1 != combo$Var2, ]
@@ -4592,13 +4510,13 @@ server <- function(input, output, session) {
                
                resplot <- ggplot(stats, aes(x = SampleName, y = Mean)) + 
                  geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-                 geom_errorbar(aes(ymin=Mean-Sd, ymax=Mean+Sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = points, aes(x = SampleName, y = AdjRelDens, color = ColorSet),
+                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+                 geom_point(data = points, aes(x = SampleName, y = AdjRelDensity, color = ColorSet),
                             position = position_jitter(width = 0.2), size = 3) +
                  theme_bw()+
                  labs(color = "Sample Name")
                
-               list(Table = stats, TableTest = resTTest, Plot = resplot)
+               list(Table = stats%>%rename(ExpCond=SampleName)%>% mutate(Mean = Mean*100), TableTest = resTTest, Plot = resplot)
              },
              "IF" = {
                resultsNew = do.call(rbind,
@@ -4611,7 +4529,10 @@ server <- function(input, output, session) {
                                                   ) 
                                     )
                
-               stats = resultsNew %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values))
+               stats = resultsNew %>%
+                 group_by(ExpCond) %>% 
+                 summarise(Mean = mean(Values), sd = sd(Values))
+            
                
                resTTest = testStat.function(resultsNew[,c("ExpCond", "Values")])
                
@@ -4624,6 +4545,32 @@ server <- function(input, output, session) {
                  labs(color = "File")
                
                list(Table = stats, TableTest = resTTest, Plot = resplot)
+             },
+             "PCR" = {
+               resultsNew = do.call(rbind,
+                                    lapply(1:length(results),
+                                           function(l){
+                                             d = results[[l]]$NewPCR
+                                             d$File = l
+                                             d
+                                           } 
+                                    ) 
+               )
+               
+               resultsNew = resultsNew %>%  mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
+               stats = resultsNew %>% group_by(GeneH) %>% summarise(Mean = mean(Q), sd = sd(Q))
+               
+               resTTest = testStat.function(resultsNew[,c("GeneH", "Q")])
+               
+               resplot <- ggplot(stats, aes(x = GeneH, y = Mean)) + 
+                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+                 geom_point(data = resultsNew, aes(x = GeneH, y = Q, color = as.factor(File)),
+                            position = position_jitter(width = 0.2), size = 3) +
+                 theme_bw()+
+                 labs(color = "File")
+               
+               list(Table = stats%>%rename(ExpCond=GeneH), TableTest = resTTest, Plot = resplot)
              },
              "FACS" = {
                
@@ -4658,10 +4605,101 @@ server <- function(input, output, session) {
   
   ### End Statistic ####
   
+  ### DATAVERSE ####
+  
+  observeEvent(input$APIkey,{
+    pathORCA <- system.file("Data", package = "ORCA")
+    
+    if(input$APIkey != "") # the last key used is saved
+      write(input$APIkey,file = paste0(pathORCA,"/.APIkey"))
+    
+  })
+  
+  DataAnalysisModule0 <- list(wbResult = wbResult0,
+                              wbquantResult = wbquantResult0,
+                              endocResult = endocResult0,
+                              elisaResult = elisaResult0,
+                              pcrResult = pcrResult0,
+                              cytotoxResult = cytotoxResult0)
+  
+  observe({
+    listDataAnalysisModule = reactiveValuesToList(DataAnalysisModule)
+    namesAnalysis = sapply(names(listDataAnalysisModule), function(x){
+      if(x == "wbquantResult"){
+        if(! identical(DataAnalysisModule[[x]]$NormWBanalysis,DataAnalysisModule0[[x]]$NormWBanalysis) )
+          return(x)
+        else
+          return("")
+      }
+      else if(!is.null(DataAnalysisModule[[x]]$Initdata) || !identical(DataAnalysisModule[[x]]$Initdata,DataAnalysisModule0[[x]]$Initdata) )
+        return(x)
+      else
+        return("")
+    })
+    namesAnalysis = namesAnalysis[namesAnalysis!= ""]
+    if(length(namesAnalysis)>0)
+      updateSelectizeInput(inputId = "selectAnalysis_DV",
+                           choices = MapAnalysisNames[namesAnalysis])
+  })
+  
+  observeEvent(input$DataverseUpload_Button,{
+    
+    if(input$selectAnalysis_DV != ""){
+      
+      if(input$Title_DV == "" && input$Author_DV == "" && input$Description_DV == "" &&
+         input$AuthorAff_DV== "" && input$ContactN_DV == "" && input$ContactEmail_DV == "")
+        output$LoadingError_DATAVERSE = renderText("Error: missing information")
+      else{
+        # creation of a temporary folder
+        tempfolder = paste0(tempdir(check = T),"/ORCA")
+        system(paste0("mkdir ",tempfolder))
+        system(paste0("mkdir ",tempfolder,"/dataset"))
+        # create the metadata
+        result <- rjson::fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
+        result$dataset_title = input$Title_DV
+        result$dataset_description = paste0(input$Description_DV,"\n This dataset has been obtained using the ORCA application, specifically the module: ", input$selectAnalysis_DV)
+        result$author_name = input$Author_DV
+        result$author_affiliation= input$AuthorAff_DV
+        result$dataset_contact_name = input$ContactN_DV
+        result$dataset_contact_email = input$ContactEmail_DV
+        # result$subject = as.vector(result$subject)
+        write(rjson::toJSON(result), file=paste0(tempfolder,"/metadata.json") )
+        
+        # move the file in the temporary folder
+        
+        saveExcel(filename = paste0(tempfolder,"/dataset/",
+                                    gsub(pattern = " ", 
+                                         x = input$selectAnalysis_DV,
+                                         replacement = ""),".xlsx"),
+                  ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
+                  analysis = input$selectAnalysis_DV )
+        
+        saveRDS(DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
+                file = paste0(tempfolder,"/dataset/ORCA_",
+                              gsub(pattern = " ", 
+                                   x = input$selectAnalysis_DV,
+                                   replacement = ""),".RDs"))
+        # docker run
+        ORCA::docker.run(params = paste0("--volume ", tempfolder,
+                                         ":/Results/ -d qbioturin/orca-upload-dataverse python3 main.py /Results/metadata.json /Results/dataset") 
+        )
+        
+      }
+      
+    }
+  })
+  
+  #initiate_sword_dataset()
+  #add_dataset_file()
+  #publish_dataset()
+  
+  #### End DATAVERSE
+  
   ### LOAD analysis ####
   UploadDataAnalysisModuleAllFalse  = reactiveValues(FlagALL = F,
                                                      FlagUpdate = F,
                                                      FlagWB = F,
+                                                     FlagWBquant = F,
                                                      FlagPCR = F,
                                                      FlagELISA = F,
                                                      FlagCYTOTOX = F,
@@ -4671,6 +4709,7 @@ server <- function(input, output, session) {
   UploadDataAnalysisModule = reactiveValues(FlagALL = F,
                                             FlagUpdate = F,
                                             FlagWB = F,
+                                            FlagWBquant = F,
                                             FlagPCR = F,
                                             FlagELISA = F,
                                             FlagCYTOTOX = F,
@@ -4693,7 +4732,8 @@ server <- function(input, output, session) {
       
       if(!(all(messNames %in% names(DataAnalysisModule)) ||
                all(messNames %in% names(elisaResult)) ||
-               all(messNames %in% names(wbResult)) || 
+               all(messNames %in% names(wbResult)) ||
+               all(messNames %in% names(wbquantResult)) ||
                all(messNames %in% names(pcrResult)) ||
                all(messNames %in% names(cytotoxResult)) ||
                all(messNames %in% names(endocResult)) ||
@@ -4712,6 +4752,9 @@ server <- function(input, output, session) {
       }else if( all(messNames %in% names(wbResult)) ){
         DataAnalysisModule$wbResult <- mess
         UploadDataAnalysisModule$FlagWB = T
+      }else if( all(messNames %in% names(wbquantResult)) ){
+        DataAnalysisModule$wbquantResult <- mess
+        UploadDataAnalysisModule$FlagWBquant = T
       }else if( all(messNames %in% names(pcrResult)) ){
         DataAnalysisModule$pcrResult <- mess
         UploadDataAnalysisModule$FlagPCR = T
@@ -4748,6 +4791,14 @@ server <- function(input, output, session) {
                   DataAnalysisModule = DataAnalysisModule,
                   Result = wbResult, 
                   FlagsExp = Flags,
+                  PanelStructures = PanelStructures)
+      } else if(UploadDataAnalysisModule$FlagWBquant || UploadDataAnalysisModule$FlagALL){
+        UploadRDs(Flag = "WBquant",
+                  session = session,
+                  output = output,
+                  DataAnalysisModule = DataAnalysisModule,
+                  Result = wbquantResult, 
+                  FlagsExp = FlagsWBquant,
                   PanelStructures = PanelStructures)
       } else if(UploadDataAnalysisModule$FlagBCA || UploadDataAnalysisModule$FlagALL){
         UploadRDs(Flag = "BCA",
@@ -4880,7 +4931,7 @@ server <- function(input, output, session) {
       return (FALSE)
     if (!is.null(wbquantResult$NormWBanalysis) || !is.null(wbquantResult$NormWBanalysis_filtered) ||
         !is.null(wbquantResult$WBanalysis) || !is.null(wbquantResult$WBanalysis_filtered) ||
-        !is.null(wbquantResult$AdjRelDensitiy))
+        !is.null(wbquantResult$AdjRelDensity))
       return (FALSE)
     if (!is.null(pcrResult$Initdata) || !is.null(pcrResult$selectPCRcolumns) ||
         !is.null(pcrResult$data) || !is.null(pcrResult$PCRnorm) || !is.null(pcrResult$NewPCR) ||
@@ -4914,4 +4965,3 @@ server <- function(input, output, session) {
   
   # END DOWNLOAD
 }
-

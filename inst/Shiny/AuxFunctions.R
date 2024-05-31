@@ -7,7 +7,7 @@ updateMultiValues = function(datapaths,result){
     if(all(namesRes %in% c("Table","TableTest", "Plot"))){
       result$Stat[[dpath]] <- mess$Table %>% mutate(DataSet = dpath)
     } else if(all(namesRes %in% names(wbquantResult)) || all(namesRes %in% names(DataAnalysisModule))){
-      result$WB[[dpath]] <- mess$AdjRelDensitiy %>% mutate(DataSet = dpath)
+      result$WB[[dpath]] <- mess$AdjRelDensity %>% mutate(DataSet = dpath)
     } else if(all(namesRes %in% names(pcrResult)) || all(namesRes %in% names(DataAnalysisModule))){
       result$PCR[[dpath]]  <- mess
     } else if(all(namesRes %in% names(endocResult)) || all(namesRes %in% names(DataAnalysisModule))){
@@ -137,12 +137,12 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
          },
          "BCA" = {
            FlagsBCA <- reactiveValues(cellCoo = NULL,
-                                        AllExp = "",
-                                        BASEselected = "",
-                                        STDCselected = "",
-                                        BLANCHEselected = "",
-                                        EXPselected = "",
-                                        EXPcol = NULL)
+                                      AllExp = "",
+                                      BASEselected = "",
+                                      STDCselected = "",
+                                      BLANCHEselected = "",
+                                      EXPselected = "",
+                                      EXPcol = NULL)
            
            result$Initdata <- NULL
            result$data <- NULL
@@ -184,14 +184,14 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            for(l in names(flags))
              flags[[l]] = NULL
            
-          updateSelectInput(
-            inputId = "IF_TTestvariable",
-            choices = "",selected = ""
-          )
-          output$IFtable_stat <- renderDT({data.frame()})
-          output$IFtable <- renderDT({data.frame()})
-          output$IFsummariseMean <- renderDT({data.frame()})
-          output$IFsummarise_plot <- renderPlot({}) 
+           updateSelectInput(
+             inputId = "IF_TTestvariable",
+             choices = "",selected = ""
+           )
+           output$IFtable_stat <- renderDT({data.frame()})
+           output$IFtable <- renderDT({data.frame()})
+           output$IFsummariseMean <- renderDT({data.frame()})
+           output$IFsummarise_plot <- renderPlot({}) 
            
          },
          error = function(cond) {
@@ -455,24 +455,22 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            addWorksheet(wb,"RelDensitiy")
            writeDataTable(wb, sheet = "RelDensitiy", ResultList[["RelDensitiy"]])
            
-           addWorksheet(wb,"AdjRelDensitiy")
-           writeDataTable(wb, sheet = "AdjRelDensitiy", ResultList[["AdjRelDensitiy"]])
+           addWorksheet(wb,"AdjRelDensity")
+           writeDataTable(wb, sheet = "AdjRelDensity", ResultList[["AdjRelDensity"]])
            
-           addWorksheet(wb,"Barplot AdjRelDensitiy")
-           if(!is.null( ResultList[["AdjRelDensitiy"]])){
+           addWorksheet(wb,"Barplot AdjRelDensity")
+           if(!is.null( ResultList[["AdjRelDensity"]])){
              print(
-               ResultList[["AdjRelDensitiy"]] %>% 
-                 mutate(Normalizer = paste0("Sample: ",SampleName ),
-                        WB = paste0("Sample: ",SampleName))  %>%
+               ResultList[["AdjRelDensity"]]   %>%
                  ggplot() +
                  geom_bar(aes(x = SampleName,
-                              y = AdjRelDens,
-                              fill = Normalizer ),
+                              y = AdjRelDensity,
+                              fill = SampleName ),
                           stat = "identity" ) +
                  theme_bw()
              )
            }
-           insertPlot(wb, sheet = "Barplot AdjRelDensitiy")
+           insertPlot(wb, sheet = "Barplot AdjRelDensity")
          }, 
          "RT-qPCR" = {
            wb <- createWorkbook("RTqPCR")
@@ -483,6 +481,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            addWorksheet(wb,"Norm PRC")
            writeDataTable(wb,ResultList[["NewPCR"]], sheet="Norm PRC")
            
+           print(ResultList[["plotPCR"]])
            insertPlot(wb = wb,  sheet="Norm PRC",
                       startCol=dim(ResultList[["NewPCR"]])[2]+ 2)
            
@@ -567,14 +566,14 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            ## Linear regression analysis
            if (!is.null(ResultList$Regression)) {
-           addWorksheet(wb,"standard curve")
-           standcurve = ResultList[["Tablestandcurve"]]
-           lmStancurve = ResultList[["Regression"]]$data
-           print(ResultList[["Regression"]]$plot)
-           
-           writeDataTable(wb,standcurve, sheet="standard curve")
-           insertPlot(wb = wb,  sheet="standard curve",
-                      startCol=dim(standcurve)[2]+ 2)
+             addWorksheet(wb,"standard curve")
+             standcurve = ResultList[["Tablestandcurve"]]
+             lmStancurve = ResultList[["Regression"]]$data
+             print(ResultList[["Regression"]]$plot)
+             
+             writeDataTable(wb,standcurve, sheet="standard curve")
+             insertPlot(wb = wb,  sheet="standard curve",
+                        startCol=dim(standcurve)[2]+ 2)
            }
            # Se esiste anche dataQuant e vuoi scriverlo su un altro foglio
            if (!is.null(ResultList$dataQuant) && is.data.frame(ResultList$dataQuant)) {
@@ -1009,8 +1008,19 @@ UploadRDs = function(Flag, session, output,
     updateTabsetPanel(session = session, "SideTabs",
                       selected = "grey")
     
-  }
-  else if(Flag == "PRCC"){
+  }else if(Flag == "WBquant"){
+    
+    for(nameList in names(DataAnalysisModule$wbquantResult)) 
+      Result[[nameList]] <- DataAnalysisModule$wbquantResult[[nameList]]
+    
+    for(nameList in names(DataAnalysisModule$wbquantResult$Flags)) 
+      FlagsExp[[nameList]] <- DataAnalysisModule$wbquantResult$Flags[[nameList]]
+    
+    # change pannel
+    updateTabsetPanel(session = session, "SideTabs",
+                      selected = "quantification")
+    
+  }else if(Flag == "PRCC"){
     
     for(nameList in names(DataAnalysisModule$pcrResult)) 
       Result[[nameList]] <- DataAnalysisModule$pcrResult[[nameList]]
@@ -1360,7 +1370,7 @@ UploadRDs = function(Flag, session, output,
     #   Barplot = NULL,
     #   StatDF = NULL
     # )
-
+    
     
     # change pannel
     updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
@@ -1393,12 +1403,54 @@ testStat.function = function(data, var = NULL){
                        sn = combo[x,]
                        ttest = t.test(data[data[,1] ==  sn$Var1 , 2] ,
                                       data[data[,1] ==  sn$Var2 , 2] ) 
-                       data.frame(Ttest = paste(sn$Var1, " vs ",sn$Var2), 
+                       data.frame(Test = "t-test",
+                                  Condition = paste(sn$Var1, " vs ",sn$Var2), 
                                   pValue = ttest$p.value,
                                   conf.int = paste(ttest$conf.int,collapse = ";")
                        )
                      })
   )
+  
+  if(length(vars)>2){
+    colnames(data) = c("SampleName","Value")
+    data$SampleName <- as.factor(data$SampleName)
+    # Perform ANOVA
+    anova_model <- aov(Value ~ SampleName, data = data)
+    summary(anova_model) ->a
+    print(a)
+    # Calculate group means and standard errors
+    group_stats <- data %>%
+      group_by(SampleName) %>%
+      summarize(
+        mean = mean(Value),
+        sd = sd(Value),
+        n = n()
+      )
+    
+    # Calculate standard error
+    group_stats <- group_stats %>%
+      mutate(se = sd / sqrt(n))
+    
+    # Calculate the critical value for 95% confidence interval
+    alpha <- 0.05
+    t_critical <- qt(1 - alpha/2, df = df.residual(anova_model))
+    
+    # Calculate confidence intervals
+    group_stats <- group_stats %>%
+      mutate(
+        ci_lower = mean - t_critical * se,
+        ci_upper = mean + t_critical * se
+      )
+    
+    # Display the ANOVA results
+    resTTest = rbind( 
+      data.frame(Test = "Anova",
+                 Condition = paste(anova_model$call)[2] , 
+                 pValue = a[[1]]$`Pr(>F)`[1],
+                 conf.int = paste("-",collapse = ";")),
+      resTTest)
+  }
+  
   if(!is.null(var))
     resTTest$Var = var
   

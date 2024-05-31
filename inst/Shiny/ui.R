@@ -99,7 +99,7 @@ ui <- dashboardPage(
                          menuItem('Cytotoxicity assay', tabName = 'cytotox',
                                   menuSubItem("Upload data", tabName = "uploadCYTOTOX"),
                                   menuSubItem("Quantification", tabName = "tablesCYTOTOX")),
-                         menuItem('IF analysis', tabName = 'if',
+                         menuItem('Immunofluorescence analysis', tabName = 'if',
                                   menuSubItem("Upload data", tabName = "uploadIF"),
                                   menuSubItem("Quantification", tabName = "tablesIF")),
                          menuItem('Flow Cytometry analysis', tabName = 'facs',
@@ -135,8 +135,10 @@ ui <- dashboardPage(
                          tags$li(h4(strong("Western Blot"), " (WB),")),
                          tags$li(h4(strong("Reverse Transcription-quantitative PCR"), " (RT-qPCR),")),
                          tags$li(h4(strong("Enzyme-Linked ImmunoSorbent Assay"), " (ELISA),")),
-                         tags$li(h4(strong("Endocytosis"), " and,")),
-                         tags$li(h4(strong("Cytotoxicity experiments"), "."))
+                         tags$li(h4(strong("Endocytosis"), ",")),
+                         tags$li(h4(strong("Cytotoxicity experiments"), ",")),
+                         tags$li(h4(strong("Immunofluorescence"), ", and")),
+                         tags$li(h4(strong("Flow Cytometry analysis"), "."))
                        )
                 )
               ),
@@ -463,7 +465,7 @@ ui <- dashboardPage(
                 box(width = 6,
                     tabsetPanel(id = "tabs",
                                 tabPanel("Vertical cut", value= "V",textOutput("V"),
-                                         sliderInput(inputId = "truncV", label = h4("Vertical truncation:"),
+                                         sliderInput(inputId = "truncV", label = h4("Vertical cutting:"),
                                                      min = 0, max = 0, value = c(0,0),step = 1
                                          ),
                                          actionButton( 
@@ -472,7 +474,7 @@ ui <- dashboardPage(
                                          )
                                 ),
                                 tabPanel("Horizontal cut", value= "H",textOutput("H"),
-                                         sliderInput(inputId = "truncH", label = h4("Horizontal truncation:"),
+                                         sliderInput(inputId = "truncH", label = h4("Horizontal cutting:"),
                                                      min = 0, max = 0, value = 0),
                                          actionButton( label = "Cut", inputId = "actionButton_TruncH",
                                                        icon = icon("cut") 
@@ -524,16 +526,6 @@ ui <- dashboardPage(
                               inputId = "actionB_loadingNormWB"
                             )
                      ),
-                     tags$style(type='text/css',
-                                "#actionB_loadingNormWB { width:100%; margin-top: 20px;}"
-                     ),
-                     fluidRow(
-                       column(
-                         width = 10,
-                         offset = 1,
-                         verbatimTextOutput("LoadingErrorNormWB")
-                       )
-                     ),
                      fluidRow(
                        column(
                          width = 10,
@@ -559,16 +551,6 @@ ui <- dashboardPage(
                                           width = "100%",
                                           inputId = "actionB_loadingWB"
                             )
-                     ),
-                     tags$style(type='text/css',
-                                "#actionB_loadingWB { width:100%; margin-top: 20px;}"
-                     ),
-                     fluidRow(
-                       column(
-                         width = 10,
-                         offset = 1,
-                         verbatimTextOutput("LoadingErrorWB")
-                       )
                      ),
                      fluidRow(
                        column(
@@ -1422,7 +1404,116 @@ ui <- dashboardPage(
                   )
                 )
               )
+      ),
+      ###### BEGIN DATAVERSE #####
+      tabItem(tabName = "Dataverse_tab",
+              h2("Dataverse"),
+              fluidRow(
+                box(width = 12,
+                    title = "Upload and Maintain",
+                    collapsible = T,
+                    h4(
+                      em(
+                        "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
+                        " for obtaining an account and setting up an API key."
+                      ) 
+                    ),
+                    fluidRow(
+                      column(
+                        width = 10,offset = 1,
+                        verbatimTextOutput("LoadingError_DATAVERSE")
+                      )
+                    ),
+                    fluidRow(
+                      column(width=6, 
+                             textInput("APIkey",
+                                       value = ifelse(system.file("Data",".APIkey", package = "ORCA") != "",
+                                                      read.table(paste0(system.file("Data", package = "ORCA"),
+                                                                        "/.APIkey"),
+                                                                 quote="\"",
+                                                                 comment.char=""),
+                                                      ""), 
+                                       label = "API key linked to a Dataverse installation account:")),
+                      column(2,
+                             selectizeInput("selectAnalysis_DV",
+                                            label = "Select the analysis:",
+                                            choices = "")
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             textInput("Title_DV",
+                                       label = "Title:",
+                                       value=""
+                             )
+                      ),
+                      column(4,
+                             textInput("Description_DV",
+                                       label = "Description:",
+                                       value=""
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             textInput("Author_DV",
+                                       label = "Author name:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             textInput("AuthorAff_DV",
+                                       label = "Author affiliation:",
+                                       value=""
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             textInput("ContactN_DV",
+                                       label = "Contact name:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             textInput("ContactEmail_DV",
+                                       label = "Contact email:",
+                                       value=""
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                      actionButton(
+                        label = "Upload",
+                        inputId = "DataverseUpload_Button" 
+                      )
+                      )
+                    )
+                )
+              ),
+              fluidRow(
+                box(width = 12,
+                    title = "Download Analysis",
+                    collapsible = T,
+                    fluidRow(
+                      column(3,
+                             textInput("DOIdownload",
+                                       label = "DOI:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             actionButton(
+                               label = "Download",
+                               inputId = "DataverseDownload_Button" 
+                             )
+                      )
+                    )
+                )
+              )
       )
+      ####### END DATAVERSE ####
     )
   )
 )
