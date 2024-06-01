@@ -552,6 +552,13 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              addWorksheet(wb, "Final data") 
              writeDataTable(wb, ResultList$dataFinal, sheet = "Final data")  
            }
+           if (!is.null(ResultList$Barplot) ) {
+             
+             print(ResultList$Barplot)
+             insertPlot(wb,  sheet = "Final data",
+                        startCol=dim(ResultList[["dataFinal"]] )[2]+ 2)  
+           }
+           
          },
          "BCA" = {
            wb <- createWorkbook("BCA")  

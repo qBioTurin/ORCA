@@ -23,7 +23,8 @@ isEmptyOrNoninformative <- function(df) {
 if (!is.null(ResultList$elisaResult[["TablePlot"]])) {
   cat("### ELISA\n\n")
   cat("#### Initial Data\n\n")
-  DT::datatable(ResultList$elisaResult[["TablePlot"]])
+  tb = kable(ResultList$elisaResult[["TablePlot"]])
+  print(tb)
 }
 ```
 
@@ -31,11 +32,11 @@ if (!is.null(ResultList$elisaResult[["TablePlot"]])) {
 if (!is.null(ResultList$elisaResult[["Regression"]]$data)) {
   cat("### Regression Analysis\n\n")
   cat("#### Table of Standard Curve\n\n")
-  DT::datatable(ResultList$elisaResult[["Tablestandcurve"]])
-  
+  tb = kable(ResultList$elisaResult[["Tablestandcurve"]])
+  print(tb)
   cat("#### Regression Data\n\n")
-  DT::datatable(ResultList$elisaResult[["Regression"]]$data)
-
+  tb = kable(ResultList$elisaResult[["Regression"]]$data)
+  print(tb)
   cat("#### Regression Plot\n\n")
   print(ResultList$elisaResult[["Regression"]]$plot)
 }
@@ -45,8 +46,8 @@ if (!is.null(ResultList$elisaResult[["Regression"]]$data)) {
 ```{r elisa-analysis, echo=FALSE, results='asis'}
 if (!is.null(ResultList$elisaResult[["dataFinal"]])) {
   cat("### Analysis\n\n")
-  DT::datatable(ResultList$elisaResult[["dataFinal"]])
-
+  tb = kable(ResultList$elisaResult[["dataFinal"]])
+  print(tb)
   # Plotting if dataFinal is not null
   print(ggplot(ResultList$elisaResult[["dataFinal"]],
                aes(x = Time, y = Quantification, fill = Experiment, group = Experiment)) +
@@ -61,8 +62,8 @@ if (!is.null(ResultList$elisaResult[["dataFinal"]])) {
 if (!is.null(ResultList$cytotoxResult[["TablePlot"]]) || !is.null(ResultList$cytotoxResult[["data"]])) {
   cat("## Cytotoxicity\n\n")
   cat("### Initial Data\n\n")
-  DT::datatable(ResultList$cytotoxResult[["TablePlot"]])
-
+  tb = kable(ResultList$cytotoxResult[["TablePlot"]])
+print(tb)
   if (!is.null(ResultList$cytotoxResult[["data"]])) {
     cat("### Analysis\n\n")
     print(ggplot(ResultList$cytotoxResult[["data"]],
@@ -82,11 +83,12 @@ if (!is.null(ResultList$cytotoxResult[["TablePlot"]]) || !is.null(ResultList$cyt
 if (!is.null(ResultList$endocResult[["TablePlot"]]) || !is.null(ResultList$endocResult[["dataFinal"]])) {
   cat("## Endocytosis\n\n")
   cat("### Initial Data\n\n")
-  DT::datatable(ResultList$endocResult[["TablePlot"]])
-
+  tb = kable(ResultList$endocResult[["TablePlot"]])
+print(tb)
   if (!is.null(ResultList$endocResult[["dataFinal"]])) {
     cat("### Analysis\n\n")
-    DT::datatable(ResultList$endocResult[["dataFinal"]])
+    tb = kable(ResultList$endocResult[["dataFinal"]])
+    print(tb)
   }
 }
 ```
@@ -96,11 +98,12 @@ if (!is.null(ResultList$endocResult[["TablePlot"]]) || !is.null(ResultList$endoc
 if (!is.null(ResultList$pcrResult[["Initdata"]]) || !is.null(ResultList$pcrResult[["NewPCR"]])) {
   cat("## RT-qPCR\n\n")
   cat("### Initial Data\n\n")
-  DT::datatable(ResultList$pcrResult[["Initdata"]])
-
+  tb = kable(ResultList$pcrResult[["Initdata"]])
+print(tb)
   cat("### Normalization on Housekeeping Genes\n\n")
   if (!is.null(ResultList$pcrResult[["NewPCR"]])) {
-    DT::datatable(ResultList$pcrResult[["NewPCR"]])
+    tb = kable(ResultList$pcrResult[["NewPCR"]])
+    print(tb)
     print(ResultList$pcrResult[["plotPRC"]])
   }
 }
@@ -143,26 +146,38 @@ if (!is.null(ResultList$wbResult[["Im"]])) {
 if ((!is.null(ResultList$wbquantResult[["NormWBanalysis_filtered"]]) && nrow(ResultList$wbquantResult[["NormWBanalysis_filtered"]]) > 0) ||
     (!is.null(ResultList$wbquantResult[["WBanalysis_filtered"]]) && nrow(ResultList$wbquantResult[["WBanalysis_filtered"]]) > 0) ||
     (!is.null(ResultList$wbquantResult[["RelDensitiy"]]) && nrow(ResultList$wbquantResult[["RelDensitiy"]]) > 0) ||
-    (!is.null(ResultList$wbquantResult[["AdjRelDensitiy"]]) && nrow(ResultList$wbquantResult[["AdjRelDensitiy"]]) > 0)) {
+    (!is.null(ResultList$wbquantResult[["AdjRelDensity"]]) && nrow(ResultList$wbquantResult[["AdjRelDensity"]]) > 0)) {
   cat("## WB Comparison\n\n")
   
   cat("### Normalizer WB\n\n")
   if (!is.null(ResultList$wbquantResult[["NormWBanalysis_filtered"]]) && nrow(ResultList$wbquantResult[["NormWBanalysis_filtered"]]) > 0) {
-    DT::datatable(ResultList$wbquantResult[["NormWBanalysis_filtered"]])
+    tb = kable(ResultList$wbquantResult[["NormWBanalysis_filtered"]])
+    print(tb)
   }
   
   cat("### WB Analysis\n\n")
   if (!is.null(ResultList$wbquantResult[["WBanalysis_filtered"]]) && nrow(ResultList$wbquantResult[["WBanalysis_filtered"]]) > 0) {
-    DT::datatable(ResultList$wbquantResult[["WBanalysis_filtered"]])
+    tb = kable(ResultList$wbquantResult[["WBanalysis_filtered"]])
+    print(tb)
   }
 
   cat("### Densities\n\n")
   if (!is.null(ResultList$wbquantResult[["RelDensitiy"]]) && nrow(ResultList$wbquantResult[["RelDensitiy"]]) > 0) {
-    DT::datatable(ResultList$wbquantResult[["RelDensitiy"]])
+    tb = kable(ResultList$wbquantResult[["RelDensitiy"]])
+    print(tb)
   }
   
-  if (!is.null(ResultList$wbquantResult[["AdjRelDensitiy"]]) && nrow(ResultList$wbquantResult[["AdjRelDensitiy"]]) > 0) {
-    DT::datatable(ResultList$wbquantResult[["AdjRelDensitiy"]])
+  if (!is.null(ResultList$wbquantResult[["AdjRelDensity"]]) && nrow(ResultList$wbquantResult[["AdjRelDensity"]]) > 0) {
+    tb = kable(ResultList$wbquantResult[["AdjRelDensity"]])
+    print(tb)
+    pl = ResultList$wbquantResult[["AdjRelDensity"]]   %>%
+                    ggplot() +
+                    geom_bar(aes(x = SampleName,
+                                 y = AdjRelDensity,
+                                 fill = SampleName ),
+                             stat = "identity" ) +
+                    theme_bw()
+    print(pl)
   }
 }
 

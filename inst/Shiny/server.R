@@ -4550,7 +4550,7 @@ server <- function(input, output, session) {
                resultsNew = do.call(rbind,
                                     lapply(1:length(results),
                                            function(l){
-                                             d = results[[l]]$NewPCR
+                                             d = results[[l]]$
                                              d$File = l
                                              d
                                            } 
@@ -4573,7 +4573,38 @@ server <- function(input, output, session) {
                list(Table = stats%>%rename(ExpCond=GeneH), TableTest = resTTest, Plot = resplot)
              },
              "FACS" = {
+               resultsNew = do.call(rbind,
+                                    lapply(1:length(results),
+                                           function(l){
+                                             d = results[[l]]$dataFinal
+                                             d = d %>% tidyr::gather(-Name, key = "Gate",value = "Perc")%>%
+                                               mutate(Perc = as.numeric(gsub(Perc,replacement = "",pattern = "%")))
+                                             d$File = l
+                                             d = merge(d,results[[l]]$ExpConditionDF)
+                                             d
+                                           } 
+                                    ) 
+               )
                
+               stats = resultsNew %>%
+                 group_by(ExpCondition,Gate) %>% 
+                 summarise(Mean = mean(Perc), sd = sd(Perc))
+               
+               resTTest = do.call(rbind,lapply(unique(resultsNew$Gate),function(g){
+                 results = resultsNew %>% filter(Gate == g)
+                 testStat.function(results[,c("ExpCondition", "Perc")])
+               }))
+               
+               resplot <- ggplot(stats, aes(x = ExpCondition, y = Mean)) + 
+                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+                 geom_point(data = resultsNew, aes(x = ExpCondition, y = Perc, color = as.factor(File)),
+                            position = position_jitter(width = 0.2), size = 3) +
+                 theme_bw()+
+                 labs(color = "File") %>%
+                 facet_wrap(~Gate)
+               
+               list(Table = stats, TableTest = resTTest, Plot = resplot)
              }
       )
     } else {
@@ -4883,8 +4914,14 @@ server <- function(input, output, session) {
       
       manageSpinner(TRUE)
       parmsList = list(ResultList = reactiveValuesToList(DataAnalysisModule))
-      rmarkdown::render("inst/shiny/report.Rmd",
-                        output_file = file, output_format = "html_document",
+      reportpath = system.file("Shiny","report.Rmd", package = "ORCA")
+      if(reportpath == ""){
+        # In this case it means that we are inside the docker
+        reportpath = "~/../home/Shiny/report.Rmd"
+      }
+      rmarkdown::render(reportpath,
+                        output_file = file,
+                        output_format = "html_document",
                         params = parmsList)
       manageSpinner(FALSE)
       showAlert("Success", "Download completed successfully", "success", 2000)
