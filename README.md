@@ -1,69 +1,74 @@
 # ORCA: Omni Reproducible Cell Analysis
 
-![](./inst/Shiny/www/images/ORCAlogo.png)
+<p align="center">
+  <img src="./inst/Shiny/www/images/ORCAlogo.png" alt="ORCA Logo" width="300">
+</p>
 
 **A cellular biologist’s toolbox for data analysis.**
 
-It provides an exhaustive platform where scientists can analyze raw:
-Western Blot (WB),
-Reverse Transcription-quantitative PCR (RT-qPCR),
-Enzyme-Linked ImmunoSorbent Assay (ELISA),
-Endocytosis and,
-Cytotoxicity experiments.
+ORCA provides an exhaustive platform where scientists can analyze raw data from:
 
-## Required installed packages
+- Western Blot (WB)
+- Reverse Transcription-quantitative PCR (RT-qPCR)
+- Enzyme-Linked ImmunoSorbent Assay (ELISA)
+- Endocytosis
+- Cytotoxicity
+- Immunofluorescence
+- Flow Cytometry analysis experiments
+
+## Required Installed Packages
 
 The following R packages must be installed:
 
-```
-install.packages(c( "rjson", "openxlsx", "patchwork", "ggplot2", "shinydashboard", "shinyWidgets", "shiny", "dashboardthemes", "dplyr","OpenImageR","knitr","zoo", "shinythemes","readxl","DT","shinyjs"))
+```r
+install.packages(c("rjson", "openxlsx", "patchwork", "ggplot2", "shinydashboard", 
+                   "shinyWidgets", "shiny", "dashboardthemes", "dplyr", "OpenImageR", 
+                   "knitr", "zoo", "shinythemes", "readxl", "DT", "shinyjs"))
 ```
 
-## How to install
+## How to Install
 
-To install it you can use  **devtools**:
+To install ORCA, you can use **devtools**:
 
-```
+```r
 install.packages("devtools")
-devtools::install_github("qBioTurin/ORCA", ref="main",dependencies=TRUE)
+devtools::install_github("qBioTurin/ORCA", ref="main", dependencies=TRUE)
 ```
 
-## How to run 
+## How to Run
 
 To run the Shiny application:
 
-```
+```r
 ORCA::ORCA.run()
 ```
 
-# Docker
+## Docker
 
-You need to have docker installed on your machine, for more info see this document:
-https://docs.docker.com/engine/installation/.
+You need to have Docker installed on your machine. For more information, see the [Docker installation guide](https://docs.docker.com/engine/installation/).
 
-To download all the docker images exploited by **ORCA** you can use:
+To download all the Docker images used by **ORCA**, you can use:
 
-```
+```r
 library(ORCA)
 downloadContainers()
 ```
 
-and the docker images are free available at the following [link](https://hub.docker.com/r/qbioturin/).
+The Docker images are freely available at the following [link](https://hub.docker.com/r/qbioturin/).
 
-## How to run the application with docker
+## How to Run the Application with Docker
 
-To run the ORCA application through its docker image, it is possible to use the R function:
+To run the ORCA application through its Docker image, use the following R function:
 
-```
+```r
 library(ORCA)
 docker.application.run()
 ```
 
+## Dataverse Communication
 
-## Dataverse communication
+The uploading of the analysis can be done using the *Dataverse* panel in the application. In this context, a Docker image can be utilized.
 
-The uploading of the analysis can be done by exploiting the panel in the application called *Dataverse*. In this context, an image docker c
-
-
-![](./inst/Shiny/www/images/Logo_QBio.png)
-
+<p align="center">
+  <img src="./inst/Shiny/www/images/Logo_QBio.png" alt="QBio Logo" width="200">
+</p>
