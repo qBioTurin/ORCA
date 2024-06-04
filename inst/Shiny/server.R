@@ -4636,7 +4636,7 @@ server <- function(input, output, session) {
   
   ### End Statistic ####
   
-  ### DATAVERSE ####
+  ### Start DATAVERSE ####
   
   observeEvent(input$APIkey,{
     pathORCA <- system.file("Data", package = "ORCA")
@@ -4651,18 +4651,23 @@ server <- function(input, output, session) {
                               endocResult = endocResult0,
                               elisaResult = elisaResult0,
                               pcrResult = pcrResult0,
-                              cytotoxResult = cytotoxResult0)
+                              cytotoxResult = cytotoxResult0,
+                              facsResult = facsResult0,
+                              bcaResult = bcaResult0,
+                              ifResult = ifResult0,
+                              facsResult = facsResult0)
   
   observe({
     listDataAnalysisModule = reactiveValuesToList(DataAnalysisModule)
     namesAnalysis = sapply(names(listDataAnalysisModule), function(x){
-      if(x == "wbquantResult"){
-        if(! identical(DataAnalysisModule[[x]]$NormWBanalysis,DataAnalysisModule0[[x]]$NormWBanalysis) )
-          return(x)
-        else
-          return("")
-      }
-      else if(!is.null(DataAnalysisModule[[x]]$Initdata) || !identical(DataAnalysisModule[[x]]$Initdata,DataAnalysisModule0[[x]]$Initdata) )
+      # if(x == "wbquantResult"){
+      #   if(! identical(DataAnalysisModule[[x]]$NormWBanalysis,DataAnalysisModule0[[x]]$NormWBanalysis) )
+      #     return(x)
+      #   else
+      #     return("")
+      # }
+      # else 
+      if(!identical(DataAnalysisModule[[x]],DataAnalysisModule0[[x]]) )
         return(x)
       else
         return("")
@@ -4686,24 +4691,28 @@ server <- function(input, output, session) {
         system(paste0("mkdir ",tempfolder))
         system(paste0("mkdir ",tempfolder,"/dataset"))
         # create the metadata
-        result <- rjson::fromJSON(file = system.file("docker","metadata.json", package = "ORCA") )
+        result <- rjson::fromJSON(file = system.file("Docker/Dataverse","metadata.json", package = "ORCA") )
         result$dataset_title = input$Title_DV
         result$dataset_description = paste0(input$Description_DV,"\n This dataset has been obtained using the ORCA application, specifically the module: ", input$selectAnalysis_DV)
         result$author_name = input$Author_DV
         result$author_affiliation= input$AuthorAff_DV
         result$dataset_contact_name = input$ContactN_DV
+        
+        # check of it is a correct email
         result$dataset_contact_email = input$ContactEmail_DV
+        
         # result$subject = as.vector(result$subject)
         write(rjson::toJSON(result), file=paste0(tempfolder,"/metadata.json") )
         
         # move the file in the temporary folder
+        filenameTMP = paste0(tempfolder,"/dataset/",
+                          gsub(pattern = " ", 
+                               x = input$selectAnalysis_DV,
+                               replacement = ""),".xlsx")
         
-        saveExcel(filename = paste0(tempfolder,"/dataset/",
-                                    gsub(pattern = " ", 
-                                         x = input$selectAnalysis_DV,
-                                         replacement = ""),".xlsx"),
-                  ResultList = DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
-                  analysis = input$selectAnalysis_DV )
+        saveExcel(filename = filenameTMP,
+                  ResultList= DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]],
+                  analysis = input$selectAnalysis_DV, PanelStructures)
         
         saveRDS(DataAnalysisModule[[ names(MapAnalysisNames[MapAnalysisNames == input$selectAnalysis_DV])]] ,
                 file = paste0(tempfolder,"/dataset/ORCA_",
@@ -4712,7 +4721,7 @@ server <- function(input, output, session) {
                                    replacement = ""),".RDs"))
         # docker run
         ORCA::docker.run(params = paste0("--volume ", tempfolder,
-                                         ":/Results/ -d qbioturin/orca-upload-dataverse python3 main.py /Results/metadata.json /Results/dataset") 
+                                         ":/Results/ -d qbioturin/dataversemanagement createDataset --dataverse root --json /Results/metadata.json --datafile_dir /Results/dataset") 
         )
         
       }
@@ -4724,7 +4733,7 @@ server <- function(input, output, session) {
   #add_dataset_file()
   #publish_dataset()
   
-  #### End DATAVERSE
+  #### End DATAVERSE ####
   
   ### LOAD analysis ####
   UploadDataAnalysisModuleAllFalse  = reactiveValues(FlagALL = F,
