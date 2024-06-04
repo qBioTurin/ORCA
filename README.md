@@ -1,7 +1,7 @@
 # ORCA: Omni Reproducible Cell Analysis
 
 <p align="center">
-  <img src="./inst/Shiny/www/images/ORCAlogo.png" alt="ORCA Logo" width="300">
+  <img src="./inst/Shiny/www/ORCAlogo.png" alt="ORCA Logo" width="300">
 </p>
 
 **A cellular biologist’s toolbox for data analysis.**
@@ -70,5 +70,8 @@ docker.application.run()
 The uploading of the analysis can be done using the *Dataverse* panel in the application. In this context, a Docker image can be utilized.
 
 <p align="center">
-  <img src="./inst/Shiny/www/images/Logo_QBio.png" alt="QBio Logo" width="200">
+  <a href="https://qbio.di.unito.it/">
+    <img src="./inst/Shiny/www/Logo_QBio.png" alt="QBio Logo" width="200">
+  </a>
 </p>
+
