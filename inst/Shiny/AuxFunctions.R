@@ -319,7 +319,34 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       
       return(x)
     },
-    
+    "ExcelMulti" = {
+      result <- list(data = list(), error = NULL)
+      filenames <- filename
+      
+      for(filename in filenames){
+        if(!isFileUploaded || !file.exists(filename)) {
+          return (list(message = "Please, select an Excel file", call = ""))
+        } else if(tolower(tools::file_ext(filename)) != "xls" && tolower(tools::file_ext(filename)) != "xlsx") {
+          return(list(message = "Please, upload a file with a .xls or .xlsx extension.", call = ""))
+        } 
+      }
+      
+      xmulti = tryCatch(
+        {
+          do.call(rbind, 
+                  lapply(filenames,function(filename){
+                    x = readxl::read_excel(filename, col_names = colname)
+                    x <- x %>% na.omit()
+                    colnames(x) = x[1,]
+                    x = x[-1,]
+                    return(x)
+                  }) 
+          )
+        }, 
+        error = function(e) list(message = "The matrix in the Excel files have different column names", call = "") )
+      
+      return(xmulti)
+    },
     {list(message = "Unsupported file type.", call = "")} #default switch case
     )
   }, 
@@ -419,18 +446,27 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                })
              }
            }
-           insertPlot(wb = wb, sheet = "WBimage and protein bands")
+           insertPlot(wb = wb, sheet = "WBimage and protein bands",
+                      fileType = "tiff",
+                      units = "in",
+                      dpi = 600)
            
            startRow <- 22
            writeDataTable(wb, PanelStructures$data, sheet = "WBimage and protein bands", startRow = startRow, startCol = 1)
            
            addWorksheet(wb, "Plot")
            print(ResultList[["Plots"]])
-           insertPlot(wb = wb, sheet="Plot")
+           insertPlot(wb = wb, sheet="Plot",
+                      fileType = "tiff",
+                      units = "in",
+                      dpi = 600, width = 10,height = 8)
            
            addWorksheet(wb, "Truncated Plot")
            print(ResultList[["TruncatedPlots"]])
-           insertPlot(wb = wb, sheet="Truncated Plot")
+           insertPlot(wb = wb, sheet="Truncated Plot",
+                      fileType = "tiff",
+                      units = "in",
+                      dpi = 600, width = 10,height = 8)
            
            addWorksheet(wb, "AUC")
            finaldata = ResultList[["AUCdf"]]
@@ -470,20 +506,63 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                  theme_bw()
              )
            }
-           insertPlot(wb, sheet = "Barplot AdjRelDensity")
+           insertPlot(wb, sheet = "Barplot AdjRelDensity",
+                      fileType = "tiff",
+                      units = "in",
+                      dpi = 600, width = 10,height = 8)
          }, 
          "RT-qPCR" = {
            wb <- createWorkbook("RTqPCR")
            
            addWorksheet(wb,"Table")
            writeDataTable(wb, sheet = "Table", ResultList[["Initdata"]])
+
            
-           addWorksheet(wb,"Norm PRC")
-           writeDataTable(wb,ResultList[["NewPCR"]], sheet="Norm PRC")
+           if(!is.null(ResultList$AllGenesFoldChangePlot)){
+             addWorksheet(wb,"AllGenes")
+             writeDataTable(wb,ResultList[["AllGenesFoldChangeTable"]], sheet="AllGenes")
+             
+             print(ResultList[["AllGenesFoldChangePlot"]])
+             insertPlot(wb = wb,  sheet="AllGenes",
+                        startCol=dim(ResultList[["AllGenesFoldChangeTable"]])[2]+ 2,
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600,width = 14,height = 6)
+             
+           }
+            
+           for(j in 1:length(names(ResultList[["plotPCR"]])) ){
+             i = names(ResultList[["plotPCR"]])[j]
+             
+             addWorksheet(wb,paste0("Gene ", j) )
+             writeDataTable(wb,ResultList[["plotPCR"]][[i]]$table, sheet=paste0("Gene ", j))
+             
+             print(ResultList[["plotPCR"]][[i]]$plot + labs(title = i))
+             insertPlot(wb = wb,  sheet=paste0("Gene ", j),
+                        startCol=dim(ResultList[["plotPCR"]][[i]]$table)[2]+ 2,
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600,width = 14,height = 6)
+             
+           }
            
-           print(ResultList[["plotPCR"]])
-           insertPlot(wb = wb,  sheet="Norm PRC",
-                      startCol=dim(ResultList[["NewPCR"]])[2]+ 2)
+           addWorksheet(wb,"Points Plot")
+           plotList = ResultList[["plotPCR"]]
+           df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% filter(DDCT == 0)
+           
+           print(
+             ggplot(df,aes(x = Gene, y = -DDCT)) +
+               geom_point() +
+               facet_wrap(~HousekGene, ncol = 1)+
+               theme_bw()+
+               labs(x="",y= "Log2(Q)", title = "")+
+               theme(axis.text.x=element_blank(), 
+                     axis.ticks.x=element_blank())
+           )
+           insertPlot(wb = wb,  sheet="Points Plot",
+                      fileType = "tiff",
+                      units = "in",
+                      dpi = 600)
            
          },
          "ENDOC" = {
@@ -522,7 +601,10 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            writeDataTable(wb,standcurve, sheet="standard curve")
            insertPlot(wb = wb,  sheet="standard curve",
-                      startCol=dim(standcurve)[2]+ 2)
+                      startCol=dim(standcurve)[2]+ 2,
+                      fileType = "tiff",
+                      units = "in",
+                      dpi = 600)
            
            ## Analysis
            addWorksheet(wb,"Analysis")
@@ -535,7 +617,10 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                    labs(x = "Time", col = "Experiments",
                         y = "Average quantifications obtained\n from the lm "))
            insertPlot(wb = wb,  sheet="Analysis",
-                      startCol=dim(ResultList[["dataFinal"]] )[2]+ 2)
+                      startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
+                      fileType = "tiff",
+                      units = "in",
+                      dpi = 600)
          },
          "FACS" = {
            wb <- createWorkbook("FACS")
@@ -556,7 +641,10 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              
              print(ResultList$Barplot)
              insertPlot(wb,  sheet = "Final data",
-                        startCol=dim(ResultList[["dataFinal"]] )[2]+ 2)  
+                        startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600,width = 8,height = 6)  
            }
            
          },
@@ -580,7 +668,10 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              
              writeDataTable(wb,standcurve, sheet="standard curve")
              insertPlot(wb = wb,  sheet="standard curve",
-                        startCol=dim(standcurve)[2]+ 2)
+                        startCol=dim(standcurve)[2]+ 2,
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600)
            }
            # Se esiste anche dataQuant e vuoi scriverlo su un altro foglio
            if (!is.null(ResultList$dataQuant) && is.data.frame(ResultList$dataQuant)) {
@@ -640,7 +731,10 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            if (!is.null(ResultList$resplot)) {
              addWorksheet(wb, "Bar plot") 
              print(ResultList$resplot)
-             insertPlot(wb = wb,  sheet="Bar plot")
+             insertPlot(wb = wb,  sheet="Bar plot",
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600,width = 8,height = 6)
              print("resplot scritto nel foglio Excel")
            } else {
              print("resplot non disponibile o non è un data.frame")
@@ -942,6 +1036,58 @@ updateTable <- function(position, analysis, info, data, result, flag) {
     }
   }
   return(paste("Updated values: ", new_value))
+}
+
+updateSelectizeUI <- function(maxDepth) {
+  rowContent <- fluidRow(
+    lapply(1:maxDepth, function(i) {
+      column(
+        2, offset = 1,
+        tags$div(style = "display: none;", id = paste("div_FACScell", i, sep = ""),
+                 selectizeInput(
+                   inputId = paste("FACScell", i, sep = "_"),
+                   label = paste("Gate", i),
+                   choices = c(),
+                   options = list(placeholder = 'Select the next gate', create = TRUE)
+                 )
+        )
+      )
+    })
+  )
+  return(rowContent)
+}
+
+escapeRegex <- function(string) {
+  gsub("([\\\\^$.*+?()[{\\]|-])", "\\\\\\1", string)
+}
+
+loadDrop <- function(facsResult, FlagsFACS, session) {
+  targetLevel <- FlagsFACS$actualLevel + 1
+  currentPath <- FlagsFACS$actualPath
+  
+  escapedPath <- escapeRegex(currentPath)
+  regex_path <- paste0(".*", escapedPath, "/[^/]+$")
+  valid_indices <- facsResult$depthCount == targetLevel & grepl(regex_path, facsResult$name)
+  
+  valid_names <- facsResult$name[valid_indices]
+  valid_names <- as.character(valid_names)
+  
+  if (length(valid_names) > 0) {
+    short_names <- sapply(strsplit(valid_names, "/", fixed = TRUE), function(x) tail(x, 1))
+  } else {
+    short_names <- "no valid names found"
+  }
+  
+  nextInputId <- paste("FACScell", targetLevel, sep = "_")
+  nextDivId <- paste("div_FACScell", targetLevel, sep = "")
+  
+  if (length(short_names) == 0) {
+    updateSelectInput(session, nextInputId, choices = list("No choices available" = ""), selected = "")
+  } else {
+    updateSelectInput(session, nextInputId, choices = setNames(short_names, short_names), selected = character(0))
+  }
+  
+  shinyjs::runjs(paste0('setTimeout(function() { $("#', nextDivId, '").css("display", "block"); }, 200);'))
 }
 
 UploadRDs = function(Flag, session, output,
