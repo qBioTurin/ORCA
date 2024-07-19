@@ -96,8 +96,9 @@ Consequently, the Adjusted Relative Density (*ADJ*) is calculated as follows:
  - $ADJn = RD_{GOI}[sample_n] / RD_{NG}[sample_n]$.
 
 We would like to inform you that there is a public record of the different versions of ORCA on GitHub. The relevant links are as follows:
-First version (as of June 3rd 2024): [ORCA branch v1.0](https://github.com/qBioTurin/ORCA/tree/v1.0)
-Current version: [ORCA branch main](https://github.com/qBioTurin/ORCA)
+
+  First version (as of June 3rd 2024): [ORCA branch v1.0](https://github.com/qBioTurin/ORCA/tree/v1.0),
+  Current version: [ORCA branch main](https://github.com/qBioTurin/ORCA)
 
 We thank you for your attention and wish you a smooth ORCA experience!
 
