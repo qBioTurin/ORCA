@@ -75,3 +75,23 @@ The uploading of the analysis can be done using the *Dataverse* panel in the app
   </a>
 </p>
 
+## NEWS
+
+Dear ORCA users,
+We are writing to notify of relevant changes to the Western Blot (WB) quantification formula in the new version of ORCA released on June 3rd 2024. 
+In the latest version of ORCA, the WB quantification formula has been updated to allow comparison between different WB experiments. Specifically,  the Relative Density (RD) for both the Gene Of Interest (GOI) and the Normaliser Gene (NG) is now calculated as follows: 
+RDbaseline = WBGOI[samplebaseline] / WBGOI[samplebaseline],
+RD2 = WBGOI[sample 2] / WBGOI[samplebaseline], …,
+RDn = WBGOI[sample n] / WBGOI[samplebaseline], 
+and similarly for the NG, allowing the RD of the first sample to be equal to 1. Consequently, the Adjusted Relative Density (ADJ) is calculated as follows: 
+ADJbaseline = RDGOI[samplebaseline] / RDNG[samplebaseline],
+ADJ2 = RDGOI[sample2] / RDNG[sample2], …,
+ADJn = RDGOI[samplen] / RDNG[samplen].
+
+We would like to inform you that there is a public record of the different versions of ORCA on GitHub. The relevant links are as follows:
+First version (as of June 3rd 2024): ORCA v1.0
+Current version: ORCA main
+
+We thank you for your attention and wish you a smooth ORCA experience!
+
+The Authors.
