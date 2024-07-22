@@ -69,11 +69,6 @@ docker.application.run()
 
 The uploading of the analysis can be done using the *Dataverse* panel in the application. In this context, a Docker image can be utilized.
 
-<p align="center">
-  <a href="https://qbio.di.unito.it/">
-    <img src="./inst/Shiny/www/Logo_QBio.png" alt="QBio Logo" width="200">
-  </a>
-</p>
 
 ## Diclaimer:
 ORCA developers have no liability for any use of ORCA functions, including without limitation, any loss of data, incorrect results, or any costs, liabilities, or damages that result from the use of ORCA. 
@@ -94,3 +89,38 @@ Tortarolo D., Pernice S. et al. "*OmniReprodubileCellAnalysis: a comprehensive t
 
 ```
 
+# NEWS
+
+Dear ORCA users,
+
+We are writing to notify of relevant changes to the Western Blot (WB) quantification formula in the new version of ORCA released on June 3rd 2024. 
+In the latest version of ORCA, the WB quantification formula has been updated to allow comparison between different WB experiments. Specifically,  the Relative Density (*RD*) for both the Gene Of Interest (*GOI*) and the Normaliser Gene (NG) is now calculated as follows: 
+
+ - $RD_{baseline} = WB_{GOI}[samplebaseline] / WB_{GOI}[samplebaseline]$, 
+ - $RD_2 =WB_{GOI}[sample_2] / WB_{GOI}[samplebaseline]$, 
+ -  …,
+ - $RD_n = WB_{GOI}[sample_n] / WB_{GOI}[samplebaseline]$, 
+
+ and similarly for the NG, allowing the RD of the first sample to be equal to 1. 
+
+Consequently, the Adjusted Relative Density (*ADJ*) is calculated as follows: 
+
+ - $ADJ_{baseline} = RD_{GOI}[samplebaseline] / RD_{NG}[samplebaseline]$,
+ - $ADJ2 = RD_{GOI}[sample_2] / RD_{NG}[sample_2]$,
+ - $…$, 
+ - $ADJn = RD_{GOI}[sample_n] / RD_{NG}[sample_n]$.
+
+We would like to inform you that there is a public record of the different versions of ORCA on GitHub. The relevant links are as follows:
+
+  First version (as of June 3rd 2024): [ORCA branch v1.0](https://github.com/qBioTurin/ORCA/tree/v1.0),
+  Current version: [ORCA branch main](https://github.com/qBioTurin/ORCA)
+
+We thank you for your attention and wish you a smooth ORCA experience!
+
+The Authors.
+
+<p align="center">
+  <a href="https://qbio.di.unito.it/">
+    <img src="./inst/Shiny/www/Logo_QBio.png" alt="QBio Logo" width="200">
+  </a>
+</p>
