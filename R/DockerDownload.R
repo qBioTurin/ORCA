@@ -16,7 +16,7 @@
 downloadContainers <- function(containers.file=NULL, tag = "latest"){
   if (is.null(containers.file))
   {
-    containers.file = paste(path.package(package="OCA"),"Containers/containersNames.txt",sep="/")
+    containers.file = system.file("Containers","containersNames.txt", package = "ORCA")
     containers <- read.table(containers.file,
                              header = TRUE,
                              row.names = 1)
@@ -27,13 +27,13 @@ downloadContainers <- function(containers.file=NULL, tag = "latest"){
   }
   
 
-    curr.tag <- gsub(pattern = "([[:alpha:]]+){1}(/ORCA){1}(-[[:alpha:]]+:){1}",
-                     replacement = "",
-                     x = containers$names)
-    curr.tag <- unique(curr.tag)
-    containers$names <- gsub(pattern = curr.tag,
-                             replacement = tag,
-                             x = containers$names)
+    # curr.tag <- gsub(pattern = "([[:alpha:]]+){1}(/ORCA){1}(-[[:alpha:]]+:){1}",
+    #                  replacement = "",
+    #                  x = containers$names)
+    # curr.tag <- unique(curr.tag)
+    # containers$names <- gsub(pattern = curr.tag,
+    #                          replacement = tag,
+    #                          x = containers$names)
   
   userid=system("id -u", intern = TRUE)
   username=system("id -un", intern = TRUE)

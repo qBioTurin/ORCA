@@ -514,23 +514,30 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
          "RT-qPCR" = {
            wb <- createWorkbook("RTqPCR")
            
-           addWorksheet(wb,"Table")
-           writeDataTable(wb, sheet = "Table", ResultList[["Initdata"]])
-
+           addWorksheet(wb,"Raw Data")
+           writeDataTable(wb, sheet = "Raw Data", ResultList[["Initdata"]])
+           
            
            if(!is.null(ResultList$AllGenesFoldChangePlot)){
-             addWorksheet(wb,"AllGenes")
-             writeDataTable(wb,ResultList[["AllGenesFoldChangeTable"]], sheet="AllGenes")
+             addWorksheet(wb,"Result All Genes")
+             InitRow = 1
+             for(Hk in 1:length(ResultList[["AllGenesFoldChangeTable"]])){
+               if(Hk > 1)
+                 InitRow = InitRow + dim(ResultList[["AllGenesFoldChangeTable"]][[Hk]])[1] + 1
+               
+               writeDataTable(wb,startRow = InitRow,
+                              ResultList[["AllGenesFoldChangeTable"]][[Hk]], sheet="Result All Genes")
+             }
              
              print(ResultList[["AllGenesFoldChangePlot"]])
-             insertPlot(wb = wb,  sheet="AllGenes",
-                        startCol=dim(ResultList[["AllGenesFoldChangeTable"]])[2]+ 2,
+             insertPlot(wb = wb,  sheet="Result All Genes",
+                        startCol=dim(ResultList[["AllGenesFoldChangeTable"]][[1]])[2]+ 4,
                         fileType = "tiff",
                         units = "in",
                         dpi = 600,width = 14,height = 6)
              
            }
-            
+           
            for(j in 1:length(names(ResultList[["plotPCR"]])) ){
              i = names(ResultList[["plotPCR"]])[j]
              
@@ -542,7 +549,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                         startCol=dim(ResultList[["plotPCR"]][[i]]$table)[2]+ 2,
                         fileType = "tiff",
                         units = "in",
-                        dpi = 600,width = 14,height = 6)
+                        dpi = 600,width = 20, height = 6)
              
            }
            
@@ -569,8 +576,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            wb <- createWorkbook("ENDOC")  
            
            if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
-             addWorksheet(wb, "TablePlot")  # Aggiunge un nuovo foglio al workbook
-             writeDataTable(wb, ResultList$Initdata, sheet = "TablePlot")  # Scrive i dati nel foglio
+             addWorksheet(wb, "Raw Data")  # Aggiunge un nuovo foglio al workbook
+             writeDataTable(wb, ResultList$Initdata, sheet = "Raw Data")  # Scrive i dati nel foglio
              print("Initdata scritto nel foglio Excel")
            } else {
              print("Errore: Initdata non disponibile o non è un data.frame")
@@ -590,8 +597,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            wb <- createWorkbook("ELISA")
            
            ## initial data
-           addWorksheet(wb,"TablePlot")
-           writeDataTable(wb, sheet = "TablePlot", ResultList[["TablePlot"]]$x$data)
+           addWorksheet(wb,"Raw Data")
+           writeDataTable(wb, sheet = "Raw Data", ResultList[["TablePlot"]]$x$data)
            
            ## Linear regression analysis
            addWorksheet(wb,"standard curve")
@@ -630,8 +637,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            print(ResultList$dataFinal)
            
            if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
-             addWorksheet(wb, "Init data") 
-             writeDataTable(wb, ResultList$Initdata, sheet = "Init data")  
+             addWorksheet(wb, "Raw Data") 
+             writeDataTable(wb, ResultList$Initdata, sheet = "Raw Data")  
            }
            if (!is.null(ResultList$dataFinal) && is.data.frame(ResultList$dataFinal)) {
              addWorksheet(wb, "Final data") 
@@ -652,8 +659,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            wb <- createWorkbook("BCA")  
            
            if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
-             addWorksheet(wb, "TablePlot")  # Aggiunge un nuovo foglio al workbook
-             writeDataTable(wb, ResultList$Initdata, sheet = "TablePlot")  # Scrive i dati nel foglio
+             addWorksheet(wb, "Raw Data")  # Aggiunge un nuovo foglio al workbook
+             writeDataTable(wb, ResultList$Initdata, sheet = "Raw Data")  # Scrive i dati nel foglio
              print("Initdata scritto nel foglio Excel")
            } else {
              print("Errore: Initdata non disponibile o non è un data.frame")
@@ -694,8 +701,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            wb <- createWorkbook("IF")  
            
            if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
-             addWorksheet(wb, "TablePlot")  # Aggiunge un nuovo foglio al workbook
-             writeDataTable(wb, ResultList$Initdata, sheet = "TablePlot")  # Scrive i dati nel foglio
+             addWorksheet(wb, "Raw Data")  # Aggiunge un nuovo foglio al workbook
+             writeDataTable(wb, ResultList$Initdata, sheet = "Raw Data")  # Scrive i dati nel foglio
              print("Initdata scritto nel foglio Excel")
            } else {
              print("Errore: Initdata non disponibile o non è un data.frame")

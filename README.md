@@ -75,3 +75,22 @@ The uploading of the analysis can be done using the *Dataverse* panel in the app
   </a>
 </p>
 
+## Diclaimer:
+ORCA developers have no liability for any use of ORCA functions, including without limitation, any loss of data, incorrect results, or any costs, liabilities, or damages that result from the use of ORCA. 
+
+## How to cite
+
+Tortarolo D., Pernice S. et al. "*OmniReprodubileCellAnalysis: a comprehensive toolbox for the analysis of cellular biology data.*" 2023 IEEE International Conference on Bioinformatics and Biomedicine (BIBM). IEEE, 2023.
+
+```
+@inproceedings{tortarolo2023ORCA,
+  title={OmniReprodubileCellAnalysis: a comprehensive toolbox for the analysis of cellular biology data},
+  author={Tortarolo, Dora and Pernice, Simone and Clapero, Fabiana and Valdembri, Donatella and Serini, Guido and Riccardo, Federica and Tarone, Lidia and Bena, Chiara Enrico and Bosia, Carla and Contaldo, Sandro Gepiro and others},
+  booktitle={2023 IEEE International Conference on Bioinformatics and Biomedicine (BIBM)},
+  pages={3748--3755},
+  year={2023},
+  organization={IEEE}
+}
+
+```
+

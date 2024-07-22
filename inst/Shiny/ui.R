@@ -704,9 +704,9 @@ ui <- dashboardPage(
               # ),
               fluidRow(
                 box(width= 12,
-                    title = "All genes",
+                    title = "All genes",collapsible = T,
                     column(
-                      width = 3,
+                      width = 6,
                       sliderInput(
                         inputId = "CutFoldChange_slider",
                         "Filter genes by :", min = 0, max=0, value = 0
@@ -719,7 +719,7 @@ ui <- dashboardPage(
                     ),
                     fluidRow(
                       column(width = 12,
-                             tableOutput("AllGenesTable")
+                             uiOutput("AllGenesTable")
                       )
                     )
                 )
@@ -745,6 +745,10 @@ ui <- dashboardPage(
                         choices = c(""), selected = ""
                       )
                     ),
+                    column(
+                      width = 3,
+                      radioButtons("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "point")
+                    ),
                     fluidRow(
                       column(width = 12,
                              plotOutput("SingleGenePlot")
@@ -756,10 +760,10 @@ ui <- dashboardPage(
                       )
                     ),
                     fluidRow(
-                      column(width = 8, offset = 2, 
+                      column(width = 3, offset = 7, 
                              actionButton(
                                inputId = "SavePCRplot",
-                               label = 'Save',
+                               label = 'Save the specific analysis',
                                align = "right",
                                icon = shiny::icon("save")
                              )

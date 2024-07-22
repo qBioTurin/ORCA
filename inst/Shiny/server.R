@@ -2306,37 +2306,6 @@ server <- function(input, output, session) {
       
       PCRstep5 = PCRstep5 %>% mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
       
-      # plot1 = lapply(unique(PCRstep5$GeneH),function(g){
-      #     ggplot(data = PCRstep5 %>% filter(GeneH == g),
-      #                  aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
-      #     facet_wrap(~GeneH, ncol = 1) +
-      #     geom_jitter(width = 0.1, height = 0,size = 2)+
-      #     theme_bw()+
-      #     labs(x = "Time", y = "DDCT")
-      #   })
-      # 
-      # plot2 = lapply(unique(PCRstep5$GeneH),function(g){
-      #   ggplot(data = PCRstep5 %>% filter(GeneH == g),
-      #          aes(x= as.factor(Time), y = Q, col = Sample)) + 
-      #     facet_wrap(~GeneH, ncol = 1) +
-      #     geom_jitter(width = 0.1, height = 0,size = 2)+
-      #     theme_bw()+
-      #     labs(x = "Time", y = "2^(-DDCT)")
-      # })
-      # 
-      # plot1All = ggplot(data = PCRstep5,
-      #          aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
-      #     facet_wrap(~GeneH, ncol = 1) +
-      #     geom_jitter(width = 0.1, height = 0,size = 2)+
-      #     theme_bw()+
-      #     labs(x = "Time", y = "DDCT")
-      # 
-      # plot2All = ggplot(data = PCRstep5,
-      #          aes(x= as.factor(Time), y = Q, col = Sample)) + 
-      #     facet_wrap(~GeneH, ncol = 1) +
-      #     geom_jitter(width = 0.1, height = 0,size = 2)+
-      #     theme_bw()+
-      #     labs(x = "Time", y = "2^(-DDCT)")
     }
   })
   # pcr plot
@@ -2367,26 +2336,52 @@ server <- function(input, output, session) {
       geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
       facet_wrap(~HousekGene, ncol = 1)+
       theme_bw()+
-      labs(x="",y= "Log2(Q)", title = "")+
+      labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
       scale_color_manual(values = c("Greater" = "#0072B2", "Smaller" = "#56B4E9")) +
       theme(axis.text.x=element_blank(), 
-            axis.ticks.x=element_blank()) 
-    
-    output$FoldchangeAllGenesPlot = renderPlot({  pl  })
+            axis.ticks.x=element_blank(),
+            legend.position = "bottom") 
     
     table  =  PCRstep5 %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
       filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
     
-    output$AllGenesTable = renderTable({ table })
-    
     pcrResult$AllGenesFoldChangePlot = pl
-    pcrResult$AllGenesFoldChangeTable = table
     
+    # Generate tables for each housekeeping gene
+    housekeeping_genes <- unique(PCRstep5$HousekGene)
+    tables <- lapply(housekeeping_genes, function(hg) {
+      PCRstep5 %>% 
+        filter(HousekGene == hg, -ddCt >= cut, !is.na(ddCt), Sample != pcrResult$BaselineExp) %>%
+        select(Gene, DDCT = ddCt, `2^(-DDCT)` = Q, everything(), -Cut)
+    })
+    names(tables) <- housekeeping_genes
+    
+    output$AllGenesTable <- renderUI({
+      lapply(housekeeping_genes, function(hg) {
+        div(
+          h3(paste("Table for Housekeeping Gene:", hg)),
+          tableOutput(paste0("PCR_GeneTable_", hg))
+        )
+      })
+    })
+    
+    lapply(housekeeping_genes, function(hg) {
+      output[[paste0("PCR_GeneTable_", hg)]] <- renderTable({
+        tables[[hg]]
+      })
+    })
+    
+    pcrResult$AllGenesFoldChangeTable = tables
+      
   })
+  
+  output$FoldchangeAllGenesPlot = renderPlot({   pcrResult$AllGenesFoldChangePlot  })
   
   observe({
     input$Gene_plot -> gene
     input$HousKgene_plot -> Hgene
+    plot_type <- req(input$PCR_plot_type)
+    
     isolate({
       if(Hgene != "" && gene != ""){
         
@@ -2394,20 +2389,40 @@ server <- function(input, output, session) {
           filter(HousekGene == Hgene, Gene == gene) %>%
           mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
         
-        plot1 = 
-          ggplot(data = PCRstep5,
-                 aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
-            facet_wrap(~GeneH, ncol = 1) +
-            geom_jitter(width = 0.1, height = 0,size = 2)+
-            theme_bw()+
+        if(length(unique(PCRstep5$Time)) >1 )
+        {
+          plot1 = 
+            ggplot(data = PCRstep5,
+                   aes(x= as.factor(Time), y = ddCt, col = Sample))+
             labs(x = "Time", y = "DDCT")
-        
-        plot2 = ggplot(data = PCRstep5 ,
-                 aes(x= as.factor(Time), y = Q, col = Sample)) + 
-            facet_wrap(~GeneH, ncol = 1) +
-            geom_jitter(width = 0.1, height = 0,size = 2)+
-            theme_bw()+
+          plot2 = ggplot(data = PCRstep5 ,
+                         aes(x= as.factor(Time), y = Q, col = Sample))+
             labs(x = "Time", y = "2^(-DDCT)")
+        }else{
+          plot1 = 
+            ggplot(data = PCRstep5,
+                   aes(x= as.factor(Sample), y = ddCt, col = Sample))+
+            labs(x = "Sample", y = "DDCT")
+          plot2 = ggplot(data = PCRstep5 ,
+                         aes(x= as.factor(Sample), y = Q, col = Sample))+
+            labs(x = "Sample", y = "2^(-DDCT)")
+        }
+        
+        if (plot_type == "point") {
+          plot1 <- plot1 + geom_jitter(width = 0.1, height = 0,size = 3)
+          plot2 <- plot2 + geom_jitter(width = 0.1, height = 0,size = 3)
+        } else if (plot_type == "bar") {
+          plot1 <- plot1 + geom_bar(aes(fill = Sample), stat = "identity", position = "dodge")
+          plot2 <- plot2 + geom_bar(aes(fill = Sample), stat = "identity", position = "dodge")
+        }
+        
+        plot1 = plot1  + 
+            facet_wrap(~GeneH, ncol = 1) +
+            theme_bw()
+        
+        plot2 = plot2 + 
+            facet_wrap(~GeneH, ncol = 1) +
+            theme_bw()
         
         output$SingleGenePlot = renderPlot({plot1|plot2})
         output$SingleGeneTable = renderTable({

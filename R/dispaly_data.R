@@ -11,7 +11,7 @@
 #' 
 #' @examples
 #'\dontrun{
-#' InteGreat.run()
+#' ORCA.run()
 #' }
 #' @export
 
