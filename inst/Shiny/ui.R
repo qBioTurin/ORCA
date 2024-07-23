@@ -15,7 +15,7 @@ library(DT)
 library(openxlsx)
 library(patchwork)
 library(stringr)
-
+library(randomcoloR)
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",

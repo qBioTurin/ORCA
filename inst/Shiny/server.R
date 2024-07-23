@@ -2130,8 +2130,8 @@ server <- function(input, output, session) {
   })
   
   FlagsPCR <- reactiveValues(norm=F, 
-                             baseline = F)
-  
+                             baseline = F,
+                             singleGeneInfo = NULL)
   
   observeEvent(input$LoadPCR_Button,{
     alert$alertContext <- "PCR-reset"
@@ -2424,10 +2424,12 @@ server <- function(input, output, session) {
             facet_wrap(~GeneH, ncol = 1) +
             theme_bw()
         
-        output$SingleGenePlot = renderPlot({plot1|plot2})
-        output$SingleGeneTable = renderTable({
-          PCRstep5 %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q)
-        })
+        
+        FlagsPCR$singleGeneInfo = list(Plot = plot1|plot2,
+                                       Table = PCRstep5 %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q))
+        
+        output$SingleGenePlot = renderPlot({FlagsPCR$singleGeneInfo$Plot})
+        output$SingleGeneTable = renderTable({FlagsPCR$singleGeneInfo$Table })
       }
     })
   })
@@ -2442,28 +2444,13 @@ server <- function(input, output, session) {
         
         if(is.null(plotList)) plotList = list()
         
-        PCRstep5 = pcrResult$NewPCR %>% 
-          filter(HousekGene == Hgene, Gene == gene) %>%
-          mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
-        
-        plot1 = 
-          ggplot(data = PCRstep5,
-                 aes(x= as.factor(Time), y = ddCt, col = Sample)) + 
-          facet_wrap(~GeneH, ncol = 1) +
-          geom_jitter(width = 0.1, height = 0,size = 2)+
-          theme_bw()+
-          labs(x = "Time", y = "DDCT")
-        
-        plot2 = ggplot(data = PCRstep5 ,
-                       aes(x= as.factor(Time), y = Q, col = Sample)) + 
-          facet_wrap(~GeneH, ncol = 1) +
-          geom_jitter(width = 0.1, height = 0,size = 2)+
-          theme_bw()+
-          labs(x = "Time", y = "2^(-DDCT)")
+        plot = FlagsPCR$singleGeneInfo$Plot
+        table = FlagsPCR$singleGeneInfo$Table
         
         if(is.null(plotList[[paste0(gene,"_H",Hgene)]])){
         
-          plotList[[paste0(gene,"_H",Hgene)]] = list(plot = ggplot(), table = NULL)
+          plotList[[paste0(gene,"_H",Hgene)]] = list(plot = ggplot(),
+                                                     table = NULL)
           
           PCRplotUI =  renderUI({
             plot_output_list <- lapply(names(plotList), function(i) {
@@ -2478,14 +2465,14 @@ server <- function(input, output, session) {
             })
             do.call(tagList, list(plot_output_list))
           })
+          
         }
         # Dynamically generate plot output UI
         output$PCRplot <- renderUI({PCRplotUI})
         output$PCRtables <- renderUI({PCRtableUI})
         
-        plotList[[paste0(gene,"_H",Hgene)]]$plot = plot1+plot2
-        plotList[[paste0(gene,"_H",Hgene)]]$table = PCRstep5 %>% 
-          rename(DDCT = ddCt, `2^(-DDCT)` = Q)
+        plotList[[paste0(gene,"_H",Hgene)]]$plot = plot
+        plotList[[paste0(gene,"_H",Hgene)]]$table = table
         
         output[[paste0("PCRplot_", gene,"_H",Hgene)]] <- renderPlot({
           plotList[[paste0(gene,"_H",Hgene)]]$plot
@@ -2503,7 +2490,7 @@ server <- function(input, output, session) {
             theme_bw()+
             labs(x="",y= "Log2(Q)", title = "")+
             theme(axis.text.x=element_blank(), 
-                  axis.ticks.x=element_blank())
+                  axis.ticks.x=element_blank() )
         })
         
       }
