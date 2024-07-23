@@ -904,71 +904,6 @@ server <- function(input, output, session) {
                   vjust = "inward", hjust = "inward" )+
         labs(x = "Concentrations", y = y) 
       
-      # }
-      # else if(input$regressionType == "Quadratic")
-      # {
-      #   #this is not implemented
-      #   standcurve$Concentrations2 = standcurve$Concentrations^2
-      #   modelStancurve = lm(Measures~Concentrations+Concentrations2, data = standcurve)
-      #   
-      #   infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-      #                       y = max(standcurve$Measures) + c(2,1.75),
-      #                       text = c( paste0("y = ", signif(modelStancurve$coef[[3]], 5), "x^2 + ",
-      #                                        signif(modelStancurve$coef[[2]], 5), "x + ",signif(modelStancurve$coef[[1]],5 )),
-      #                                 paste0("Adj R2 = ",signif(summary(modelStancurve)$adj.r.squared, 5))) )
-      #   
-      #   fun = paste0(modelStancurve$coef[[3]],"*x^2 + ",modelStancurve$coef[[2]],"*x + ",modelStancurve$coef[[1]] )
-      #   
-      #   regressionPlot =  regressionPlot  +
-      #     geom_point() +
-      #     stat_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1,col="red")+
-      #     geom_text(data= infoLM,
-      #               aes(x = x, y = y, label =text ),
-      #               vjust = "inward", hjust = "inward" )
-      # }
-      # else if(input$regressionType == "Hyperbola"){
-      #   
-      #   outNLreg = tryCatch(
-      #     {
-      #       modelStancurve<-nls(
-      #         Measures ~ a*Concentrations/(b+Concentrations), 
-      #         data = standcurve, #%>% group_by(Concentrations) %>% summarise(Measures = mean(Measures)),
-      #         start = list(a = 1,b = 1)
-      #       )
-      #     }, 
-      #     error = function(e){
-      #       return(e)
-      #     })
-      #   
-      #   if(!is.null(outNLreg$mess)){
-      #     modelStancurve = NULL
-      #     regressionPlot = ggplot()+ geom_text(data = data.frame(x = 1,y =1,text = paste0("Error: ",outNLreg$mess)),
-      #                                          aes(x,y,label = text),color = "red")
-      #   }else{
-      #     modelStancurve = outNLreg
-      #     coef = modelStancurve$m$getPars()
-      #     r2 = 1- sum(modelStancurve$m$resid()^2)/(sum(( mean(standcurve$Measures) - modelStancurve$m$predict() )^2))
-      #     
-      #     infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-      #                         y = max(standcurve$Measures) + c(2,1.75),
-      #                         text = c( paste0("y = ", signif(coef["a"], 5), "x / ( ",
-      #                                          signif(coef["b"], 5), " + x ) "),
-      #                                   paste0("R2 = ",signif(r2, 5))) )
-      #     
-      #     dfHyperbola = data.frame(x = seq(min(standcurve$Concentrations),max(standcurve$Concentrations),length.out = 20)) %>%
-      #       mutate(y = (coef["a"]*x/((coef["b"]+x)) ) )
-      #     
-      #     fun = paste0(coef["b"],"*x/(",coef["a"],"-x)")
-      #     
-      #     regressionPlot =  regressionPlot  +
-      #       geom_point() +
-      #       geom_line(data = dfHyperbola,aes(x = x,y = y),size = 1,col="red" )+
-      #       geom_text(data= infoLM,
-      #                 aes(x = x, y = y, label =text ),
-      #                 vjust = "inward", hjust = "inward" )
-      #   }
-      # }
-      
       bcaResult$Regression = list(data = modelStancurve, plot = regressionPlot, fun = function(x){ eval( parse(text = fun ) ) } )
       
     }else{
@@ -987,7 +922,7 @@ server <- function(input, output, session) {
         showAlert("Error", "The value must be numeric!", "error", 5000)
         return()
       }else{
-        bcamean[,paste0("Ug/",BCA_UGvalue)] =  bcamean$Ug/BCA_UGvalue
+        bcamean[,paste0("Ug/",BCA_UGvalue)] =  bcamean$UgBaseline/BCA_UGvalue
         
         bcaResult$dataFinal = bcamean
         
@@ -998,6 +933,29 @@ server <- function(input, output, session) {
       showAlert("Error", "The quantification step is missing!", "error", 5000)
       return()
     }
+  })
+  
+  observe({
+    req(input$BCA_UGvalue_init)
+    req(bcaResult$dataFinal) -> bcamean
+    as.numeric(input$BCA_UGvalue_init) -> BCA_UGvalue_init
+    
+    if(is.na(BCA_UGvalue_init)){
+      showAlert("Error", "The value must be numeric!", "error", 5000)
+      return()
+    }else{
+      bcamean[,"UgBaseline"] =  bcamean$Ug/BCA_UGvalue_init
+      
+      if(length(grep(x = names(bcamean),pattern = "Ug/" ,value = T)) >=1 ){
+        as.numeric(gsub(x = grep(x = names(bcamean),pattern = "Ug/" ,value = T), pattern = "Ug/",replacement = "" )) -> BCA_UGvalues
+        for(ug in BCA_UGvalues)
+          bcamean[,paste0("Ug/",ug)] = bcamean$UgBaseline/ug
+      }
+        
+      bcaResult$dataFinal = bcamean
+      output$BCAtablesUG = renderDT(bcamean)
+    }
+    
   })
   
   output$downloadBCAAnalysis <- downloadHandler(
@@ -2310,49 +2268,105 @@ server <- function(input, output, session) {
   })
   # pcr plot
   
-  observeEvent(pcrResult$NewPCR,{
+  observe({
     NewPCR = req(pcrResult$NewPCR)
+    input$PCR_cut_type -> PCR_cut_type
     
-    NewPCRFiltered = NewPCR %>% filter(!is.na(ddCt) | Sample == pcrResult$BaselineExp )
-    updateSelectizeInput(inputId = "HousKgene_plot", choices = c("",unique(NewPCR$HousekGene)),selected = "" )
-    updateSelectizeInput(inputId = "Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
-    
-    updateSliderInput(session = session, inputId = "CutFoldChange_slider",
-                      min = min(-NewPCRFiltered$ddCt,na.rm = T), max = max(-NewPCRFiltered$ddCt,na.rm = T), 
-                      value = min(-NewPCRFiltered$ddCt,na.rm = T))
+    isolate({
+      NewPCRFiltered = NewPCR %>% filter(!is.na(ddCt) | Sample == pcrResult$BaselineExp )
+      updateSelectizeInput(inputId = "HousKgene_plot", choices = c("",unique(NewPCR$HousekGene)),selected = "" )
+      updateSelectizeInput(inputId = "Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
+      
+      if(PCR_cut_type == "Both"){
+        updateSliderInput(session = session, inputId = "BothCutFoldChange_slider",
+                          min = min(-NewPCRFiltered$ddCt,na.rm = T), max = max(-NewPCRFiltered$ddCt,na.rm = T), 
+                          value = c(min(-NewPCRFiltered$ddCt,na.rm = T), max(-NewPCRFiltered$ddCt,na.rm = T) ) )
+      }else{
+        updateSliderInput(session = session, inputId = "CutFoldChange_slider",
+                          min = min(-NewPCRFiltered$ddCt,na.rm = T), max = max(-NewPCRFiltered$ddCt,na.rm = T), 
+                          value = min(-NewPCRFiltered$ddCt,na.rm = T))
+      }
+     
+    })
   })
   
   observe({
     NewPCR = req(pcrResult$NewPCR)
     cut = req(input$CutFoldChange_slider)
+    input$PCR_cut_type -> PCR_cut_type
     
-    PCRstep5 = NewPCR %>%
-      mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
-      filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
-      mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
-  
-    pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-      geom_point(aes(color = Cut), size = 3) +
-      geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
-      facet_wrap(~HousekGene, ncol = 1)+
-      theme_bw()+
-      labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
-      scale_color_manual(values = c("Greater" = "#0072B2", "Smaller" = "#56B4E9")) +
-      theme(axis.text.x=element_blank(), 
-            axis.ticks.x=element_blank(),
-            legend.position = "bottom") 
-    
-    table  =  PCRstep5 %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
-      filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
-    
+    if(PCR_cut_type == "Greater"){
+      PCRstep5 = NewPCR %>%
+        mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
+        filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
+        mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
+      
+      pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
+        geom_point(aes(color = Cut), size = 3) +
+        geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
+        facet_wrap(~HousekGene, ncol = 1)+
+        theme_bw()+
+        labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
+        scale_color_manual(values = c("Greater" = "#0072B2", "Smaller" = "#56B4E9")) +
+        theme(axis.text.x=element_blank(), 
+              axis.ticks.x=element_blank(),
+              legend.position = "bottom")
+      
+      table  =  PCRstep5 %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
+        filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
+    }else if(PCR_cut_type == "Smaller"){
+      PCRstep5 = NewPCR %>%
+        mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
+        filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
+        mutate(Cut = if_else(-ddCt <= cut,  "Smaller", "Greater"))
+      
+      pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
+        geom_point(aes(color = Cut), size = 3) +
+        geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
+        facet_wrap(~HousekGene, ncol = 1)+
+        theme_bw()+
+        labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
+        scale_color_manual(values = c( "Greater" = "#56B4E9", "Smaller" = "#0072B2")) +
+        theme(axis.text.x=element_blank(), 
+              axis.ticks.x=element_blank(),
+              legend.position = "bottom")
+      
+      table  =  PCRstep5 %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
+        filter(-DDCT <= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
+      
+    }else if(PCR_cut_type == "Both"){
+      cut = req(input$BothCutFoldChange_slider)
+      
+      PCRstep5 = NewPCR %>%
+        mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
+        filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
+        mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , "Outside interval", "Inside interval"))
+      
+      pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
+        geom_point(aes(color = Cut), size = 3) +
+        geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")+
+        geom_hline(yintercept = min(cut), color = "red", linetype = "dashed")+
+        facet_wrap(~HousekGene, ncol = 1)+
+        theme_bw()+
+        labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
+        scale_color_manual(values = c("Outside interval" = "#0072B2", "Inside interval" = "#56B4E9")) +
+        theme(axis.text.x=element_blank(), 
+              axis.ticks.x=element_blank(),
+              legend.position = "bottom")
+      
+      table  =  PCRstep5 %>% rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
+        filter( -DDCT >= max(cut) | -DDCT <= min(cut),
+                !is.na(DDCT), Sample != pcrResult$BaselineExp ) %>%
+        select(-Cut)
+    }
+ 
     pcrResult$AllGenesFoldChangePlot = pl
     
     # Generate tables for each housekeeping gene
     housekeeping_genes <- unique(PCRstep5$HousekGene)
     tables <- lapply(housekeeping_genes, function(hg) {
-      PCRstep5 %>% 
-        filter(HousekGene == hg, -ddCt >= cut, !is.na(ddCt), Sample != pcrResult$BaselineExp) %>%
-        select(Gene, DDCT = ddCt, `2^(-DDCT)` = Q, everything(), -Cut)
+      table %>% 
+        filter(HousekGene == hg)
     })
     names(tables) <- housekeeping_genes
     
