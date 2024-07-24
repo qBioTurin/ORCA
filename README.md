@@ -1,7 +1,7 @@
 # ORCA: Omni Reproducible Cell Analysis
 
 <p align="center">
-  <img src="./inst/Shiny/www/ORCAlogo.png" alt="ORCA Logo" width="300">
+  <img src="./inst/Shiny/www/ORCAlogo.png" alt="ORCA Logo" width="200">
 </p>
 
 **A cellular biologist’s toolbox for data analysis.**
@@ -15,6 +15,12 @@ ORCA provides an exhaustive platform where scientists can analyze raw data from:
 - Cytotoxicity
 - Immunofluorescence
 - Flow Cytometry analysis experiments
+
+<p align="center">
+  <a href="https://qbio.di.unito.it/">
+    <img src="./inst/Shiny/www/ORCAgoals.png" alt="ORCA goals" width="800">
+  </a>
+</p>
 
 ## Required Installed Packages
 
