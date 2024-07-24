@@ -29,4 +29,6 @@ Imports:
     stringr,
     DT,
     shinyWidgets,
-    shiny
+    shiny,
+    randomcoloR,
+    plotly

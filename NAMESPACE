@@ -11,6 +11,9 @@ import(jsonlite)
 import(knitr)
 import(openxlsx)
 import(patchwork)
+import(randomcoloR)
+import(plotly)
+
 import(shiny,except=runExample)
 import(shinyWidgets,except=alert)
 
