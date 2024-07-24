@@ -27,7 +27,7 @@ The following R packages must be installed:
 ```r
 install.packages(c("rjson", "openxlsx", "patchwork", "ggplot2", "shinydashboard", 
                    "shinyWidgets", "shiny", "dashboardthemes", "dplyr", "OpenImageR", 
-                   "knitr", "zoo", "shinythemes", "readxl", "DT", "shinyjs","randomcoloR"))
+                   "knitr", "zoo", "shinythemes", "readxl", "DT", "shinyjs","randomcoloR","plotly"))
 ```
 
 ## How to Install

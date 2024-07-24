@@ -2233,7 +2233,7 @@ server <- function(input, output, session) {
         filter(Gene %in% PCRnorm)%>%
         rename(HousekGene = Gene,HousekGeneMean=Mean, HousekGeneSd=Sd) 
       
-      PCRstep2 = merge(HousekGenePCR,NewPCR %>% filter(!Gene %in% PCRnorm),all.y = T,by=c("Sample","Time") )
+      PCRstep2 = merge(HousekGenePCR,NewPCR %>% filter(!Gene %in% PCRnorm), all.y = T,by=c("Sample","Time") )
       
       #PCRstep3 = merge(BaselinePCR,PCRstep2,all.y = T,by=c("Gene","Time") )
       
@@ -2302,7 +2302,7 @@ server <- function(input, output, session) {
         mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
       
       pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Cut), size = 3) +
+        geom_point(aes(color = Cut, text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene) ), size = 3) +
         geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
         facet_wrap(~HousekGene, ncol = 1)+
         theme_bw()+
@@ -2321,7 +2321,7 @@ server <- function(input, output, session) {
         mutate(Cut = if_else(-ddCt <= cut,  "Smaller", "Greater"))
       
       pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Cut), size = 3) +
+        geom_point(aes(color = Cut, text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
         geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
         facet_wrap(~HousekGene, ncol = 1)+
         theme_bw()+
@@ -2343,7 +2343,7 @@ server <- function(input, output, session) {
         mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , "Outside interval", "Inside interval"))
       
       pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Cut), size = 3) +
+        geom_point(aes(color = Cut, text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
         geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")+
         geom_hline(yintercept = min(cut), color = "red", linetype = "dashed")+
         facet_wrap(~HousekGene, ncol = 1)+
@@ -2389,7 +2389,7 @@ server <- function(input, output, session) {
       
   })
   
-  output$FoldchangeAllGenesPlot = renderPlot({   pcrResult$AllGenesFoldChangePlot  })
+  output$FoldchangeAllGenesPlot = plotly::renderPlotly({   plotly::ggplotly(pcrResult$AllGenesFoldChangePlot, tooltip = "text") })
   
   observe({
     input$Gene_plot -> gene

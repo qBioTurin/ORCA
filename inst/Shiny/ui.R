@@ -722,7 +722,7 @@ ui <- dashboardPage(
                       ),
                       fluidRow(
                         column(width = 12,
-                               plotOutput("FoldchangeAllGenesPlot")
+                               plotly::plotlyOutput("FoldchangeAllGenesPlot")
                         )
                       ),
                       fluidRow(
