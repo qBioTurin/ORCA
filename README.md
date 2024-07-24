@@ -17,9 +17,7 @@ ORCA provides an exhaustive platform where scientists can analyze raw data from:
 - Flow Cytometry analysis experiments
 
 <p align="center">
-  <a href="https://qbio.di.unito.it/">
     <img src="./inst/Shiny/www/ORCAgoals.png" alt="ORCA goals" width="800">
-  </a>
 </p>
 
 ## Required Installed Packages
