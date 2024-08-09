@@ -7,6 +7,13 @@ library(shinybusy)
 library(zoo)
 library(knitr)
 library(ggplot2)
+library(ggpubr)
+library(ggsignif)
+library(tibble)
+library(igraph)
+library(ggraph)
+library(tidyverse)
+library(tidyr)
 library(shinythemes)
 library(OpenImageR)
 library(dplyr)
@@ -15,7 +22,7 @@ library(DT)
 library(openxlsx)
 library(patchwork)
 library(stringr)
-library(randomcoloR)
+library(dplyr)
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
@@ -1560,54 +1567,74 @@ ui <- dashboardPage(
               ),
               #### END data analysis: IF ####
               
-              #### BEGIN statistical analysis ####
-              tabItem(tabName = "StatAnalysis_tab",
-                      h2("Statistical analysis"),
-                      fluidRow(
-                        box(width = 12,
-                            title = "Upload the analysis",
-                            fluidRow(
-                              column(
-                                9,
-                                fileInput(
-                                  inputId = "loadStatAnalysis_file",
-                                  label = "",
-                                  placeholder = "Select the RDs files storing ORCA analyses",
-                                  width = "80%", 
-                                  multiple = TRUE)
-                              ),
-                              column(
-                                2,
-                                actionButton( label = "Load",
-                                              style = "margin-top: 20px; width: 100%;",
-                                              icon = shiny::icon("upload"),
-                                              inputId = "loadStatAnalysis_file_Button" )
-                              )
-                            )
-                        )
+      #### BEGIN statistical analysis ####
+      tabItem(tabName = "StatAnalysis_tab",
+              h2("Statistical analysis"),
+              fluidRow(
+                box(width = 12,
+                    title = "Upload the analysis",
+                    fluidRow(
+                      column(
+                        9,
+                        fileInput(
+                          inputId = "loadStatAnalysis_file",
+                          label = "",
+                          placeholder = "Select the RDs files storing ORCA analyses",
+                          width = "80%", 
+                          multiple = TRUE)
                       ),
-                      box(
-                        width = 12,
-                        collapsible = T,
-                        collapsed = T,
-                        title = "Comparison analysis",
-                        selectizeInput("StatAnalysis",
-                                       label = "Select the analysis:",
-                                       choices = ""),
-                        fluidRow(
-                          column(10,
-                                 fluidRow(plotOutput("PlotStat")),
-                                 fluidRow(DTOutput("TabStat")),
-                                 fluidRow(DTOutput("TabTTest"))
-                          )
-                        ),
-                        fluidRow(
-                          column(12,
-                                 # New download button for statistical analysis
-                                 downloadButton("downloadStatisticalAnalysis", "Download Statistical Analysis")
-                          )
-                        )
+                      column(
+                        2,
+                        actionButton( label = "Load",
+                                      style = "margin-top: 20px; width: 100%;",
+                                      icon = shiny::icon("upload"),
+                                      inputId = "loadStatAnalysis_file_Button" )
                       )
+                    )
+                )
+              ),
+              fluidRow(
+                box(
+                  width = 12,
+                  collapsible = TRUE,
+                  collapsed = TRUE,
+                  title = "Statistical decision",
+                  fluidRow(
+                    column(9,
+                           style = "border-right: 1px solid #000000;",
+                           plotOutput("decision_tree_plot")
+                    ),
+                    column(3,
+                           tags$style(HTML("#analysis_output {font-size: 12px; font-style: italic; }")),
+                           htmlOutput("analysis_output")
+                    )
+                  )
+                )
+              ),
+              fluidRow(
+                box(
+                  width = 12,
+                  collapsible = T,
+                  collapsed = T,
+                  title = "Comparison analysis",
+                  selectizeInput("StatAnalysis",
+                                 label = "Select the analysis:",
+                                 choices = ""),
+                  fluidRow(
+                    column(10, offset = 1,
+                           fluidRow(plotOutput("PlotStat")),
+                           fluidRow(DTOutput("TabStat")),
+                           fluidRow(DTOutput("TabTTest"))
+                    ), 
+                  ),
+                  fluidRow(
+                    column(8,
+                           # New download button for statistical analysis
+                           downloadButton("downloadStatisticalAnalysis", "Download Statistical Analysis")
+                      )
+                    )
+                  )
+                )
               ),
               ###### BEGIN DATAVERSE #####
               tabItem(tabName = "Dataverse_tab",

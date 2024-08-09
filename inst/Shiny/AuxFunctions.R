@@ -1552,67 +1552,182 @@ UploadRDs = function(Flag, session, output,
   }
 }
 
-testStat.function = function(data, var = NULL){
-  vars = data[,1] %>% distinct() %>% pull() 
-  combo = combn( vars , 2 )
-  combo = data.frame(Var1 = combo[1,], Var2 = combo[2,])
+testStat.function <- function(data) {
+  steps <- ""
+  step_counter <- 1
+  resTTest <- NULL
+  resANOVA <- NULL
+  resPairwise <- NULL
+  path <- c("shapiro.test")
   
-  combo = combo[combo$Var1 != combo$Var2, ]
-  resTTest = do.call(rbind,
-                     lapply(1:dim(combo)[1],function(x){
-                       sn = combo[x,]
-                       ttest = t.test(data[data[,1] ==  sn$Var1 , 2] ,
-                                      data[data[,1] ==  sn$Var2 , 2] ) 
-                       data.frame(Test = "t-test",
-                                  Condition = paste(sn$Var1, " vs ",sn$Var2), 
-                                  pValue = ttest$p.value,
-                                  conf.int = paste(ttest$conf.int,collapse = ";")
-                       )
-                     })
-  )
+  data$Value <- as.numeric(gsub("^\\s+|\\s+$", "", as.character(data[[2]])))
   
-  if(length(vars)>2){
-    colnames(data) = c("SampleName","Value")
-    data$SampleName <- as.factor(data$SampleName)
-    # Perform ANOVA
-    anova_model <- aov(Value ~ SampleName, data = data)
-    summary(anova_model) ->a
-    print(a)
-    # Calculate group means and standard errors
-    group_stats <- data %>%
-      group_by(SampleName) %>%
-      summarize(
-        mean = mean(Value),
-        sd = sd(Value),
-        n = n()
+  shapiro_results <- data %>%
+    group_by(data[[1]]) %>%
+    filter(n() >= 3) %>%
+    summarize(
+      p.value = ifelse(
+        length(unique(Value)) > 1, 
+        shapiro.test(Value)$p.value, 
+        NA
+      ),
+      message = ifelse(
+        length(unique(Value)) > 1, 
+        "", 
+        "All values are identical or less than 3 samples"
       )
-    
-    # Calculate standard error
-    group_stats <- group_stats %>%
-      mutate(se = sd / sqrt(n))
-    
-    # Calculate the critical value for 95% confidence interval
-    alpha <- 0.05
-    t_critical <- qt(1 - alpha/2, df = df.residual(anova_model))
-    
-    # Calculate confidence intervals
-    group_stats <- group_stats %>%
-      mutate(
-        ci_lower = mean - t_critical * se,
-        ci_upper = mean + t_critical * se
-      )
-    
-    # Display the ANOVA results
-    resTTest = rbind( 
-      data.frame(Test = "Anova",
-                 Condition = paste(anova_model$call)[2] , 
-                 pValue = a[[1]]$`Pr(>F)`[1],
-                 conf.int = paste("-",collapse = ";")),
-      resTTest)
+    )
+  
+  steps <- c(steps, paste("Step", step_counter, ". Shapiro-Wilk test performed for each group:\n"))
+  step_counter <- step_counter + 1
+  for (i in 1:nrow(shapiro_results)) {
+    if (is.na(shapiro_results$p.value[i])) {
+      steps <- c(steps, paste("  Group", shapiro_results[[1]][i], ": p-value = NA (", shapiro_results$message[i], ")\n"))
+    } else {
+      steps <- c(steps, paste("  Group", shapiro_results[[1]][i], ": p-value =", shapiro_results$p.value[i], "\n"))
+    }
   }
   
-  if(!is.null(var))
-    resTTest$Var = var
+  group_counts <- data %>%
+    group_by(data[[1]]) %>%
+    summarize(count = n())
   
-  return(resTTest)
+  if (all(group_counts$count < 30) || all(shapiro_results$p.value > 0.05, na.rm = TRUE)) {
+    steps <- c(steps, paste("Step ", step_counter, ". the data is normalized", "\n"))
+    step_counter <- step_counter + 1 
+    path <- c(path, "groups check (normalized)")
+    
+    vars <- data[,1] %>% distinct() %>% pull() 
+    
+    if (length(vars) == 2) {
+      steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use t-test for analysis", "\n"))
+      step_counter <- step_counter + 1  
+      path <- c(path, "t.test")
+      combo <- combn(vars, 2)
+      combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])
+      
+      combo <- combo[combo$Var1 != combo$Var2, ]
+      resTTest <- do.call(rbind,
+                          lapply(1:dim(combo)[1], function(x){
+                            sn <- combo[x,]
+                            ttest <- t.test(data[data[,1] == sn$Var1, "Value"],
+                                            data[data[,1] == sn$Var2, "Value"]) 
+                            data.frame(Test = "t-test",
+                                       Condition = paste(sn$Var1, " vs ", sn$Var2), 
+                                       pValue = ttest$p.value,
+                                       conf.int = paste(ttest$conf.int, collapse = ";")
+                            )
+                          })
+      )
+    } else if(length(vars) > 2){
+      steps <- c(steps, paste("Step ", step_counter, ". groups are more than 2, I will use ANOVA for analysis", "\n"))
+      step_counter <- step_counter + 1  
+      path <- c(path, "ANOVA")
+      colnames(data) <- c("SampleName", "Value")
+      data$SampleName <- as.factor(data$SampleName)
+      
+      anova_model <- aov(Value ~ SampleName, data = data)
+      summary(anova_model) -> a
+      
+      resANOVA <- data.frame(Test = "Anova",
+                             Condition = paste(anova_model$call)[2], 
+                             pValue = a[[1]]$`Pr(>F)`[1],
+                             conf.int = paste("-", collapse = ";"))
+      
+      if (!is.null(resANOVA) && resANOVA$pValue < 0.05) {
+        steps <- c(steps, paste("Step ", step_counter, ". ANOVA p-value <", resANOVA$pValue, ", performing pairwise t-tests", "\n"))
+        step_counter <- step_counter + 1  
+        path <- c(path, "pairwise test\nANOVA")
+        
+        combo <- combn(vars, 2)
+        combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])
+        
+        combo <- combo[combo$Var1 != combo$Var2, ]
+        resPairwise <- do.call(rbind,
+                               lapply(1:dim(combo)[1], function(x){
+                                 sn <- combo[x,]
+                                 ttest <- t.test(data[data[,1] == sn$Var1, "Value"],
+                                                 data[data[,1] == sn$Var2, "Value"]) 
+                                 data.frame(Test = "t-test",
+                                            Condition = paste(sn$Var1, " vs ", sn$Var2), 
+                                            pValue = ttest$p.value,
+                                            conf.int = paste(ttest$conf.int, collapse = ";")
+                                 )
+                               })
+        )
+      } else {
+        steps <- c(steps, paste("Step ", step_counter, ". ANOVA p-value >=", resANOVA$pValue, ", no pairwise t-tests performed", "\n"))
+      }
+    }
+    
+    return(list(resTTest = resTTest, test = resANOVA, pairwise = resPairwise, steps = steps, path = path))
+  } else {
+    steps <- c(steps, paste("Step ", step_counter, ". the data is not normalized", "\n"))
+    step_counter <- step_counter + 1 
+    path <- c(path, "groups check (not normalized)")
+    
+    vars <- data[,1] %>% distinct() %>% pull()
+    
+    if (length(vars) == 2) {
+      steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use Wilcoxon test for analysis", "\n"))
+      step_counter <- step_counter + 1  
+      path <- c(path, "wilcoxon")
+      combo <- combn(vars, 2)
+      combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])
+      
+      combo <- combo[combo$Var1 != combo$Var2, ]
+      resTTest <- do.call(rbind,
+                          lapply(1:dim(combo)[1], function(x){
+                            sn <- combo[x,]
+                            wilcox_test <- wilcox.test(data[data[,1] == sn$Var1, "Value"],
+                                                       data[data[,1] == sn$Var2, "Value"]) 
+                            data.frame(Test = "Wilcoxon",
+                                       Condition = paste(sn$Var1, " vs ", sn$Var2), 
+                                       pValue = wilcox_test$p.value,
+                                       conf.int = paste(wilcox_test$conf.int, collapse = ";")
+                            )
+                          })
+      )
+    } else if(length(vars) > 2){
+      steps <- c(steps, paste("Step ", step_counter, ". groups are more than 2, I will use Kruskal-Wallis for analysis", "\n"))
+      step_counter <- step_counter + 1  
+      path <- c(path, "kruskal wallis")
+      colnames(data) <- c("SampleName", "Value")
+      data$SampleName <- as.factor(data$SampleName)
+      
+      kruskal_test <- kruskal.test(Value ~ SampleName, data = data)
+      
+      resKRUSKAL <- data.frame(Test = "Kruskal-Wallis",
+                               Condition = paste(kruskal_test$call)[2], 
+                               pValue = kruskal_test$p.value,
+                               conf.int = paste("-", collapse = ";"))
+      
+      if (!is.null(resKRUSKAL) && resKRUSKAL$pValue < 0.05) {
+        steps <- c(steps, paste("Step ", step_counter, ". Kruskal-Wallis p-value <", resKRUSKAL$pValue, ", performing pairwise Wilcoxon tests", "\n"))
+        step_counter <- step_counter + 1  
+        path <- c(path, "pairwise test\nKruskal")
+        
+        combo <- combn(vars, 2)
+        combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])
+        
+        combo <- combo[combo$Var1 != combo$Var2, ]
+        resPairwise <- do.call(rbind,
+                               lapply(1:dim(combo)[1], function(x){
+                                 sn <- combo[x,]
+                                 wilcox_test <- wilcox.test(data[data[,1] == sn$Var1, "Value"],
+                                                            data[data[,1] == sn$Var2, "Value"]) 
+                                 data.frame(Test = "Wilcoxon",
+                                            Condition = paste(sn$Var1, " vs ", sn$Var2), 
+                                            pValue = wilcox_test$p.value,
+                                            conf.int = paste(wilcox_test$conf.int, collapse = ";")
+                                 )
+                               })
+        )
+      } else {
+        steps <- c(steps, paste("Step ", step_counter, ". Kruskal-Wallis p-value >=", resKRUSKAL$pValue, ", no pairwise Wilcoxon tests performed", "\n"))
+      }
+    }
+    
+    return(list(resTTest = resTTest, test = resKRUSKAL, pairwise = resPairwise, steps = steps, path = path))
+  }
 }
