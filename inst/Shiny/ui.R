@@ -997,7 +997,7 @@ ui <- dashboardPage(
                                             label = "Sample name:",
                                             choices = "",
                                             options = list(create = TRUE)),
-                             selectizeInput("ELISAcell_EXP",label = "Experimental condition:",
+                             selectizeInput("ELISAcell_EXP",label = "Experimental condition or standard curve Concentrations:",
                                             choices = "",
                                             options = list(create = TRUE)),
                              fluidRow(
@@ -1006,10 +1006,10 @@ ui <- dashboardPage(
                                                      label = "Select standard curve:",
                                                      choices = NULL)
                                ),
-                               column(4,
-                                      checkboxGroupInput(inputId = "ELISA_baselines",
-                                                         "Select control:")
-                               ),
+                               # column(4,
+                               #        checkboxGroupInput(inputId = "ELISA_baselines",
+                               #                           "Select control:")
+                               # ),
                                # column(4,
                                #        checkboxGroupInput(inputId = "ELISA_blanks",
                                #                           "Select blank:")
@@ -1038,8 +1038,8 @@ ui <- dashboardPage(
                       )
                   ),
                   fluidRow(
-                    column(6, dataTableOutput("leftTableElisa")),
-                    column(6, dataTableOutput("rightTableElisa"))
+                    column(6, dataTableOutput("leftTableELISA")),
+                    column(6, dataTableOutput("rightTableELISA"))
                   ),
                   fluidRow(
                     column(width = 1,offset = 9,
@@ -1060,7 +1060,7 @@ ui <- dashboardPage(
                             title = "Regression of the standard curve:",
                             collapsible = TRUE,
                             fluidRow(column(4,
-                                            selectizeInput("regressionType",
+                                            selectizeInput("ELISAregressionType",
                                                            label="Select the regression model:",
                                                            choices = c("Linear","Hyperbola"))
                             ),
@@ -1079,12 +1079,12 @@ ui <- dashboardPage(
                               )
                             )
                         ),
-                        box(width= 12,
-                            title = "Select a baseline for the following experimental conditions",
-                            collapsible = TRUE,
-                            collapsed = T,
-                            uiOutput("ElisaBaselineSelection")
-                        ),
+                        # box(width= 12,
+                        #     title = "Select a baseline for the following experimental conditions",
+                        #     collapsible = TRUE,
+                        #     collapsed = T,
+                        #     uiOutput("ElisaBaselineSelection")
+                        # ),
                         box(width= 12,
                             title = "Quantification",
                             collapsible = TRUE,

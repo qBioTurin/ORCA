@@ -267,9 +267,10 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       if (allDouble) {
         xstr = which(sapply(x, function(col) !is.numeric(col)))
         if (length(xstr) > 0) {
-          for (i in which(sapply(x, is.numeric))) {
-            x[[i]] = as.double(x[[i]])
-          }
+          return(list(message = "Not numeric values are not allowed.", call = ""))
+          # for (i in which(sapply(x, is.numeric))) {
+          #   x[[i]] = as.double(x[[i]])
+          # }
         }
       }
       if (colors) {
@@ -305,6 +306,9 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
           fill_col = dplyr::filter(l, col == j)
           if (!all(fill_col$fill == "white")) {
             tb.SN[fill_col$row, j] = fill_col$SN
+            na.indexes = which(is.na(x[,j]))
+            if(any(na.indexes <= nrow(tb.SN)))
+              tb.SN[na.indexes[na.indexes <= nrow(tb.SN)], j] = ""
           }
         }
         
@@ -758,16 +762,22 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
          "Initialize" = {
            ExpDataTable = Result$Initdata
            
-           if(is.null(FlagsExp$EXPcol)){
-             ExpDataTable.colors = matrix("",nrow = nrow(ExpDataTable),ncol=ncol(ExpDataTable))
-           }else{
+           ExpDataTable.colors.null = matrix("",nrow = nrow(ExpDataTable),ncol=ncol(ExpDataTable))
+           
+           if(!is.null(FlagsExp$EXPcol)){
+             
              ExpDataTable.colors = Result[[grep(x=names(Result), pattern = "cell_COLOR", value = T)]]
              
              if(is.null(ExpDataTable.colors) ) {
-               ExpDataTable.colors = matrix("", nrow = nrow(ExpDataTable), ncol = ncol(ExpDataTable))
+               ExpDataTable.colors = ExpDataTable.colors.null
+               
              }else if( nrow(ExpDataTable.colors) != nrow(ExpDataTable) ||  ncol(ExpDataTable.colors) != ncol(ExpDataTable) ){
-               ExpDataTable.colors = ExpDataTable.colors[1:nrow(ExpDataTable),1:ncol(ExpDataTable)]
+               ExpDataTable.colors.null[1:min(nrow(ExpDataTable),nrow(ExpDataTable.colors)),1:min(ncol(ExpDataTable),ncol(ExpDataTable.colors))] = ExpDataTable.colors[1:min(nrow(ExpDataTable),nrow(ExpDataTable.colors)),1:min(ncol(ExpDataTable),ncol(ExpDataTable.colors))]
+               ExpDataTable.colors = ExpDataTable.colors.null
+               #ExpDataTable.colors = ExpDataTable.colors[1:nrow(ExpDataTable),1:ncol(ExpDataTable)]
              }
+           }else{
+             ExpDataTable.colors = ExpDataTable.colors.null
            }
            
            completeExpDataTable = cbind(ExpDataTable,ExpDataTable.colors)
@@ -808,7 +818,7 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
                          cols.color,
                          backgroundColor = styleEqual(names(EXPcol), EXPcol) )
            cell_COLOR <- ExpDataTable.colors
-           cell_TIME <- cell_EXP <- cell_REP <- matrix(
+           cell_TIME <- cell_EXP <- cell_REP<- cell_SN <- matrix(
              "",
              nrow = length(ExpDataTable$x$data[,1]),
              ncol = length(ExpDataTable$x$data[1,])
@@ -822,6 +832,8 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
              Result[[grep(x=names(Result),pattern = "cell_REP", value = T)]]<- cell_REP
            if(length(grep(x=names(Result),pattern = "cell_TIME", value = T))>0)
              Result[[grep(x=names(Result),pattern = "cell_TIME", value = T)]]<- cell_TIME
+           if(length(grep(x=names(Result),pattern = "cell_SN", value = T))>0)
+             Result[[grep(x=names(Result),pattern = "cell_SN", value = T)]]<- cell_SN
            
            Result$TablePlot = ExpDataTable
          }, "Update" =  {
