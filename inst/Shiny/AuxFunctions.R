@@ -264,15 +264,15 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       x = readxl::read_excel(filename, col_names = colname)
       x <- x[, !is.na(colnames(x))]
       
-      if (allDouble) {
-        xstr = which(sapply(x, function(col) !is.numeric(col)))
-        if (length(xstr) > 0) {
-          return(list(message = "Not numeric values are not allowed.", call = ""))
-          # for (i in which(sapply(x, is.numeric))) {
-          #   x[[i]] = as.double(x[[i]])
-          # }
-        }
-      }
+      # if (allDouble) {
+      #   xstr = which(sapply(x, function(col) !is.numeric(col)))
+      #   if (length(xstr) > 0) {
+      #     return(list(message = "Not numeric values are not allowed.", call = ""))
+      #     # for (i in which(sapply(x, is.numeric))) {
+      #     #   x[[i]] = as.double(x[[i]])
+      #     # }
+      #   }
+      # }
       if (colors) {
         wb = loadWorkbook(filename)
         sheetName = wb$sheet_names[1]
@@ -904,7 +904,7 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
   column_TIME <- paste0(analysis, "cell_TIME")  
   
   # Set variable names based on analysis type
-  if (analysis %in% c("ELISA","BCA","IF") ){
+  if (analysis %in% c("ELISA","BCA","IF", "CYTOTOX") ){
     value1 = "Sample Name"
     value2 = "Experimental condition"
     column_EXP <- paste0(analysis, "cell_SN") 
@@ -926,6 +926,8 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
       time_values <- apply(matching_indices, 1, function(idx) {
         if (analysis == "ELISA")
           val <- result$ELISAcell_EXP[idx["row"], idx["col"]]
+        else if (analysis == "CYTOTOX") 
+          val <- result$CYTOTOXcell_EXP[idx["row"], idx["col"]]
         else if (analysis == "IF")
           val <- result$IFcell_EXP[idx["row"], idx["col"]]
         else if (analysis == "BCA")
@@ -934,6 +936,13 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
         
         if (!is.na(val) && !is.null(val) && val != "") val else ""
       })
+      
+      if (analysis == "CYTOTOX") {
+        rep_values <- apply(matching_indices, 1, function(idx) {
+          val <- result$CYTOTOXcell_REP[idx["row"], idx["col"]]
+          if (!is.na(val) && !is.null(val) && val != "") val else ""
+        })
+      }
       
       time_output <- paste(unlist(time_values), collapse = " - ")
       
@@ -971,6 +980,95 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
   }
   return(do.call(rbind, formatted_data))
 }
+
+
+# get_formatted_data <- function(colors, color_names, result, singleValue, analysis) {
+#   if (length(colors) == 0) {
+#     return(data.frame(Color = character(), Values = character(), ExperimentalCondition = character(), ColorCode = character()))
+#   }
+#   formatted_data <- vector("list", length(colors))
+#   column_COLOR <- paste0(analysis, "cell_COLOR")
+#   column_TIME <- paste0(analysis, "cell_TIME")
+#   # Set variable names based on analysis type
+#   if (analysis == "ELISA" || analysis == "CYTOTOX") {
+#     value1 = "Sample Name"
+#     value2 = "Experimental condition"
+#     column_EXP <- paste0(analysis, "cell_SN")
+#   } else if (analysis == "ENDOC") {
+#     value1 = "Experimental condition"
+#     value2 = "Time"
+#     column_EXP <- paste0(analysis, "cell_EXP")
+#   }
+#   for (i in seq_along(colors)) {
+#     matching_indices <- which(result[[column_COLOR]] == color_names[i], arr.ind = TRUE)
+#     if (nrow(matching_indices) > 0) {
+#       selected_values <- apply(matching_indices, 1, function(idx) {
+#         result$Initdata[idx["row"], idx["col"]]
+#       })
+#       formatted_output <- paste(unlist(selected_values), collapse = " - ")
+#       time_values <- apply(matching_indices, 1, function(idx) {
+#         if (analysis == "ELISA") {
+#           val <- result$ELISAcell_EXP[idx["row"], idx["col"]]
+#         } else if (analysis == "CYTOTOX") {
+#           val <- result$CYTOTOXcell_EXP[idx["row"], idx["col"]]
+#         } else {
+#           val <- result$ENDOCcell_TIME[idx["row"], idx["col"]]
+#         }
+#         if (!is.na(val) && !is.null(val) && val != "") val else ""
+#       })
+#       if (analysis == "CYTOTOX") {
+#         rep_values <- apply(matching_indices, 1, function(idx) {
+#           val <- result$CYTOTOXcell_REP[idx["row"], idx["col"]]
+#           if (!is.na(val) && !is.null(val) && val != "") val else ""
+#         })
+#       }
+#       time_output <- paste(unlist(time_values), collapse = " - ")
+#       if (analysis == "CYTOTOX") rep_output <- paste(unlist(rep_values), collapse = " - ")
+#       exp_values <- apply(matching_indices, 1, function(idx) {
+#         result[[column_EXP]][idx["row"], idx["col"]]
+#       })
+#       if (length(unique(exp_values)) == 1) {
+#         exp_condition <- ifelse(exp_values[1] == "" || is.na(exp_values[1]), "-", exp_values[1])
+#       } else {
+#         exp_condition <- "No matching between values"
+#       }
+#       if (analysis != "CYTOTOX") {
+#         formatted_data[[i]] <- setNames(
+#           data.frame(
+#             ColorCode = color_names[i],
+#             Color = sprintf("<div style='background-color: %s; padding: 10px; margin-right:20px;'></div>", colors[i]),
+#             Values = formatted_output,
+#             exp_condition,
+#             time_output
+#           ),
+#           c("ColorCode", "Color", "Values", value1, value2)
+#         )
+#       } else
+#         formatted_data[[i]] <- setNames(
+#           data.frame(
+#             ColorCode = color_names[i],
+#             Color = sprintf("<div style='background-color: %s; padding: 10px; margin-right:20px;'></div>", colors[i]),
+#             Values = formatted_output,
+#             exp_condition,
+#             time_output,
+#             rep_output
+#           ),
+#           c("ColorCode", "Color", "Values", value1, value2, "ReplicateNumber")
+#         )
+#     } else {
+#       formatted_data[[i]] <- setNames(
+#         data.frame(
+#           ColorCode = color_names[i],
+#           Color = sprintf("<div style='background-color: %s; padding: 10px; margin-right:20px;'></div>", colors[i]),
+#           Values = "No matching indices found.",
+#           "-", "-"
+#         ),
+#         c("ColorCode", "Color", "Values", value1, value2)
+#       )
+#     }
+#   }
+#   return(do.call(rbind, formatted_data))
+# }
 
 updateTable <- function(position, analysis, info, data, result, flag) {
   req(info) 
