@@ -1179,7 +1179,7 @@ server <- function(input, output, session) {
       
       SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values))
       
-      resTTest = testStat.function(SubData, varSel)
+      resTTest = testStat.function(SubData)
         
       resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
         geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
@@ -1203,7 +1203,7 @@ server <- function(input, output, session) {
       })
       
       output$IFtable_ttest = renderDT({
-        DT::datatable(resTTest,
+        DT::datatable(resTTest$resTTest,
                       selection = 'none',
                       rownames= FALSE,
                       options = list(scrollX = TRUE,
