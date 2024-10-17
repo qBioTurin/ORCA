@@ -4,8 +4,8 @@
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "ORCA")
 
-source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
-#source("./inst/Shiny/AuxFunctions.R")
+#source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
+source("./inst/Shiny/AuxFunctions.R")
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
@@ -1188,7 +1188,10 @@ server <- function(input, output, session) {
                    position = position_jitter(width = 0.2), size = 3) +
         theme_bw()+
         labs(color = "Experimental Condition", y = "Percentages (%)" , x = "")
+        annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
+                 hjust = 1.1, vjust = 1.5, size = 5, color = "black")
       
+        
       output$IFsummarise_plot = renderPlot({resplot})
       
       output$IFsummariseMean = renderDT({
@@ -3828,44 +3831,40 @@ server <- function(input, output, session) {
   })
   
   observe({
-    color_codes <- FlagsCYTOTOX$EXPcol
-    color_names <- names(FlagsCYTOTOX$EXPcol)
+    if (!is.null(cytotoxResult$CYTOTOXcell_EXP)) {
+      color_codes <- FlagsCYTOTOX$EXPcol
+      color_names <- names(FlagsCYTOTOX$EXPcol)
+      
+      valid_colors <- color_codes != "white"
+      color_codes <- color_codes[valid_colors]
+      color_names <- color_names[valid_colors]
+      
+      mid_point <- ceiling(length(color_codes) / 2)
+      left_colors <- color_codes[1:length(color_codes)]
+      
+      left_formatted_data <- get_formatted_data(left_colors, color_names[1:length(color_codes)], cytotoxResult, cytotoxResult$CYTOTOXcell_EXP, "CYTOTOX")
+      
+      left_data_cytotox(left_formatted_data)
+    } 
     
-    valid_colors <- color_codes != "white"
-    color_codes <- color_codes[valid_colors]
-    color_names <- color_names[valid_colors]
-    
-    mid_point <- ceiling(length(color_codes) / 2)
-    left_colors <- color_codes[1:length(color_codes)]
-    right_colors <- color_codes[(mid_point+1):length(color_codes)]
-    
-    left_formatted_data <- get_formatted_data(left_colors, color_names[1:length(color_codes)], cytotoxResult, cytotoxResult$CYTOTOXcell_EXP, "CYTOTOX")
-    #right_formatted_data <- get_formatted_data(right_colors, color_names[(mid_point+1):length(color_codes)], cytotoxResult, cytotoxResult$CYTOTOXcell_EXP, "CYTOTOX")
-    
-    left_data_cytotox(left_formatted_data)
-    #right_data_cytotox(right_formatted_data)
-    
-    output$leftTableCytotox <- renderDataTable(
-      left_data_cytotox(), 
-      escape = FALSE, 
-      editable = list(target = "cell", disable = list(columns = 0:3)),
-      options = list(
-        dom = 't',
-        paging = FALSE,
-        info = FALSE,
-        searching = FALSE, 
-        columnDefs = list(
-          list(targets = 0, visible = FALSE),
-          list(targets = 1, visible = FALSE),
-          list(width = '10px', targets = 2),
-          list(width = '180px', targets = 3),
-          list(width = '150px', targets = 4),
-          list(width = '200px', targets = 5),
-          list(width = '200px', targets = 6),
-          list(className = 'dt-head-left dt-body-left', targets = 1)
-        )
+    output$leftTableCytotox <- renderDataTable({
+      data <- left_data_cytotox()
+      if (!is.null(data) && nrow(data) > 0) {
+        return(data)
+      }
+    }, escape = FALSE, options = list(
+      dom = 't',
+      paging = FALSE,
+      info = FALSE,
+      searching = FALSE,
+      columnDefs = list(
+        list(visible = FALSE, targets = 1),  
+        list(width = '5px', targets = 0),
+        list(width = '20px', targets = 2),
+        list(width = '400px', targets = 3),
+        list(width = '300px', targets = 4)
       )
-    )
+    ))
   })
   
   observeEvent(input$leftTableCytotox_cell_edit, {
