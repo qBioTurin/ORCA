@@ -4125,6 +4125,123 @@ server <- function(input, output, session) {
 
   ### End CITOXICITY analysis ####
   
+  #### RAW FACS analysis ####
+  rawfacsResult = reactiveValues(
+    Initdata= NULL
+  )
+  
+  rawfacsResult0 = reactiveValues(
+    Initdata= NULL
+  )
+  
+  rawFlagsFACS = reactiveValues(
+    firsflag= NULL
+  )
+  
+  rawFACSresultListen <- reactive({
+    reactiveValuesToList(rawfacsResult)
+  })
+  observeEvent(rawFACSresultListen(), {
+    DataAnalysisModule$rawfacsResult = reactiveValuesToList(rawfacsResult)
+    DataAnalysisModule$rawfacsResult$Flags = reactiveValuesToList(rawFlagsFACS)
+  })
+  
+  observeEvent(input$LoadRawFACS_Button,{
+    alert$alertContext <- "rawFACS-reset"
+    if(!is.null(rawfacsResult$name) ) {
+      shinyalert(
+        title = "Important message",
+        text = "Do you want to update the FACS data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadRawFileFACS()
+  })
+  
+  observeEvent(input$shinyalert, {
+    removeModal()
+    if (input$shinyalert && alert$alertContext == "rawFACS-reset") {  
+      resetPanel("rawFACS", flags = rawFlagsFACS, result = rawfacsResult)
+      
+      loadRawFileFACS()
+    }
+  })
+  
+  loadRawFileFACS <- function() {
+    alert$alertContext <- ""
+    
+    for(nameList in names(rawfacsResult0)) 
+      rawfacsResult[[nameList]] <- rawfacsResult0[[nameList]]
+    
+    mess = readfile(
+      filename = input$rawFACSImport$datapath,
+      colname = gsub(pattern = ".fcs$",replacement = "",x = input$rawFACSImport$name),
+      isFileUploaded = !is.null(input$rawFACSImport) && all(file.exists(input$rawFACSImport$datapath)),
+      type = "fcs"
+    )
+    
+    if (setequal(names(mess), c("message", "call"))) {
+      showAlert("Error", mess[["message"]], "error", 5000)
+    } else {
+      
+        rawfacsResult$Initdata <- data <- mess
+      
+        # data mangement
+        fileNames = sampleNames(data)
+        
+        medianTable = fsApply(data, each_col, median)
+        
+        channels =colnames(medianTable)
+        
+        updateSelectInput(session, "facs_xChannel", choices = channels, selected = channels[1])
+        updateSelectInput(session, "facs_yChannel", choices = channels, selected = channels[2])
+        
+        removeModal()
+        showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
+        
+        output$rawFACSmatrix = renderTable({
+          medianTable
+        })
+        updateTabsetPanel(session, "SideTabs", selected = "plotRawFACS")
+      }
+  }
+  
+  # Generate scatter plot when the plot button is clicked
+  observeEvent(input$facs_plotChannelButton, {
+    req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel)
+    
+    data = rawfacsResult$Initdata
+    
+    # Extract expression matrix
+    expr = do.call(rbind,
+                   lapply(sampleNames(data), function(name){ 
+      df = as.data.frame(exprs(data@frames[[name]])) 
+      df$Name = name
+      return(df)
+      })
+    )
+
+    channelx = input$facs_xChannel
+    channely = input$facs_yChannel
+    
+    # Create scatter plot using ggplot2
+    output$facs_ChannelscatterPlot <- renderPlot({
+      ggplot(expr, aes(x = !!sym(channelx),  y = !!sym(channely) )) +
+        geom_point(alpha = 0.5, color = "blue") +
+        labs(x = channelx, y = channely) +
+        theme_minimal()+facet_wrap(~Name)
+    })
+    
+    output$facs_autoPlot <- renderPlot({
+      ggcyto::autoplot(data, channelx,channely)
+    })
+    
+  })
+  
+  #### END RAW FACS analysis ####
+  
   #### FACS analysis ####
   facsResult = reactiveValues(
     Initdata= NULL,

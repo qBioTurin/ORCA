@@ -164,6 +164,7 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            flags$EXPselected <- ""
            flags$EXPcol <- NULL
          },
+         "rawFACS" = {},
          "FACS" = {
            result$Initdata <- NULL
            result$data <- NULL
@@ -350,6 +351,24 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
         error = function(e) list(message = "The matrix in the Excel files have different column names", call = "") )
       
       return(xmulti)
+    },
+    "fcs" = {
+      filenames <- filename
+      
+      for(filename in filenames){
+        if(is.null(filename) || !file.exists(filename)) {
+          return(list(message = "Please, select a fcs File!", call = ""))
+        }  else if(tolower(tools::file_ext(filename)) != "fcs") {
+          return(list(message = "Please, upload a file with a .fcs extension.", call = ""))
+        } 
+      }
+      
+      x = flowCore::read.flowSet(filenames,name.keyword = "$FIL",
+                             transformation = FALSE, truncate_max_range = FALSE)
+      flowCore::sampleNames(x) = colname
+      
+      return(x) 
+      
     },
     {list(message = "Unsupported file type.", call = "")} #default switch case
     )
