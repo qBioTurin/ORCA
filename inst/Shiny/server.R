@@ -882,7 +882,7 @@ server <- function(input, output, session) {
     if(length(unique(traces$ID)) == 1)
     {
       pl<-ggplot( )+
-        facet_wrap(~ Place, scales = "free")+
+        facet_wrap(~ Place, scales = "free",ncol = floor(length(places_to_keep)/2))+
         geom_line(data=traces,
                   aes(x=Time,y=Marking))+
         theme(axis.text=element_text(size=10),
@@ -902,7 +902,7 @@ server <- function(input, output, session) {
         ungroup()
       
       pl<-ggplot( )+
-        facet_wrap(~ Place,scales = "free")+
+        facet_wrap(~ Place,scales = "free",ncol = floor(length(places_to_keep)/2) )+
         geom_line(data=traces,
                   aes(x=Time,y=Marking,group = ID),alpha = .2,col = "grey")+
         geom_line(data=meanTrace,
@@ -917,13 +917,13 @@ server <- function(input, output, session) {
         labs(x="Time", y="Marking")
     }
   
-    if(!is.null(event_times))
+    if(!is.null(event_times)){
+      event_times_df = data.frame(Place = rep(places_to_keep,each = length(event_times)), event = rep(event_times,length(places_to_keep)) )
       pl = pl +
-        geom_vline( aes(xintercept = event_times,col="Discrete Events"),linetype = "dashed")
+        geom_vline( data = event_times_df, aes(xintercept = event,col="Discrete Events"),linetype = "dashed")
+    }
+    output$epimod_tracePlot <- renderPlot({  pl })
     
-    epimod_tracePlot <- renderPlot({
-      pl
-    })
   })
   #### END EPIMOD ####
   ### END DATA INTEGRATION ####
