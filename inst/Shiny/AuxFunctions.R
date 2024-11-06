@@ -1764,11 +1764,11 @@ testStat.function <- function(data) {
     summarize(count = n())
   
   if (all(group_counts$count < 30) || all(shapiro_results$p.value > 0.05, na.rm = TRUE)) {
-    steps <- c(steps, paste("Step ", step_counter, ". the data is normalized", "\n"))
+    steps <- c(steps, paste("Step ", step_counter, ". the data is normal", "\n"))
     step_counter <- step_counter + 1 
-    path <- c(path, "groups check (normalized)")
+    path <- c(path, "groups check (normal)")
     
-    vars <- data[,1] %>% distinct() %>% pull() 
+    vars <- unique(data[,1])
     
     if (length(vars) == 2) {
       steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use t-test for analysis", "\n"))
@@ -1808,7 +1808,7 @@ testStat.function <- function(data) {
       if (!is.null(resANOVA) && resANOVA$pValue < 0.05) {
         steps <- c(steps, paste("Step ", step_counter, ". ANOVA p-value <", resANOVA$pValue, ", performing pairwise t-tests", "\n"))
         step_counter <- step_counter + 1  
-        path <- c(path, "pairwise test\nANOVA")
+        path <- c(path, "pairwise test\nt.test")
         
         combo <- combn(vars, 2)
         combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])
@@ -1834,11 +1834,11 @@ testStat.function <- function(data) {
     return(list(BivTest = BivTest, MulvTest = resANOVA, pairwise = resPairwise, steps = steps, path = path))
     
   } else {
-    steps <- c(steps, paste("Step ", step_counter, ". the data is not normalized", "\n"))
+    steps <- c(steps, paste("Step ", step_counter, ". the data is not normal", "\n"))
     step_counter <- step_counter + 1 
-    path <- c(path, "groups check (not normalized)")
+    path <- c(path, "groups check (not normal)")
     
-    vars <- data[,1] %>% distinct() %>% pull()
+    vars <- unique(data[,1])
     
     if (length(vars) == 2) {
       steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use Wilcoxon test for analysis", "\n"))
@@ -1877,7 +1877,7 @@ testStat.function <- function(data) {
       if (!is.null(resKRUSKAL) && resKRUSKAL$pValue < 0.05) {
         steps <- c(steps, paste("Step ", step_counter, ". Kruskal-Wallis p-value <", resKRUSKAL$pValue, ", performing pairwise Wilcoxon tests", "\n"))
         step_counter <- step_counter + 1  
-        path <- c(path, "pairwise test\nKruskal")
+        path <- c(path, "pairwise test\nwilcoxon")
         
         combo <- combn(vars, 2)
         combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])

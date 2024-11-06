@@ -5507,7 +5507,7 @@ server <- function(input, output, session) {
                  geom_point(data = points, aes(x = SampleName, y = AdjRelDensity, color = ColorSet),
                             position = position_jitter(width = 0.2), size = 3) +
                  theme_bw() +
-                 labs(title = "Results", subtitle = main_test_txt, y = "AdjRelDensity", x = "SampleName", color = "Sample Name") +
+                 labs(title = "Results", subtitle = main_test_txt, y = "AdjRelDensity", x = "SampleName", color = "Experiments") +
                  annotate("text", x = Inf, y = Inf, label = "not showed: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
                           hjust = 1.1, vjust = 1.5, size = 5, color = "black")
              },
@@ -5533,12 +5533,8 @@ server <- function(input, output, session) {
                steps <- res$steps
                path <- res$path
                
+               main_test_txt <-  paste0("Test used is: ", path[length(path)])
                main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               main_test_txt <- if (is.null(PairwiseTest)) {
-                 signif(main_test_pvalue, digits = 3) %>% paste0("P value from main test = ", .)
-               } else {
-                 ""
-               }
                
                resplot <- ggplot(stats, aes(x = ExpCond, y = Mean)) + 
                  geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
@@ -5546,25 +5542,32 @@ server <- function(input, output, session) {
                  geom_point(data = resultsNew, aes(x = ExpCond, y = Values, color = as.factor(File)),
                             position = position_jitter(width = 0.2), size = 3) +
                  theme_bw()+
-                 labs(title = "Results", subtitle = main_test_txt, color = "File") +
+                 labs(title = "Results", subtitle = main_test_txt, color = "Experiments") +
                  annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
                           hjust = 1.1, vjust = 1.5, size = 5, color = "black")
+               
+               stats <- stats %>% rename(SampleName = ExpCond)
+               
              },
              "PCR" = {
                resultsNew <- do.call(rbind,
                                      lapply(1:length(results),
                                             function(l){
-                                              d = results[[l]]
+                                              d = results[[l]]$NewPCR
                                               d$File = l
                                               d
                                             } 
                                      ) 
                )
                
-               resultsNew <- resultsNew %>% mutate(GeneH = paste(Gene, ", Housekeeping: ", HousekGene))
-               stats <- resultsNew %>% group_by(GeneH) %>% summarise(Mean = mean(Q), sd = sd(Q))
+               resultsNew <- as.data.frame(resultsNew) %>%
+                 mutate(Q = as.numeric(Q), GeneH = paste(Gene, ", Housekeeping: ", HousekGene))
+               stats <- resultsNew %>%
+                 dplyr::group_by(GeneH) %>% 
+                 dplyr::summarise(Mean = mean((Q)), sd = sd(Q))
                
                res <- testStat.function(resultsNew[, c("GeneH", "Q")])
+               
                BivTest <- res$BivTest
                MulvTest <- res$test
                PairwiseTest <- res$pairwise
@@ -5587,6 +5590,8 @@ server <- function(input, output, session) {
                  labs(title = "Results", subtitle = main_test_txt, y = "Q", x = "GeneH", color = "File") +
                  annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
                           hjust = 1.1, vjust = 1.5, size = 5, color = "black")
+               
+               stats <- stats %>% rename(SampleName = GeneH)
              },
              "FACS" = {
                resultsNew <- do.call(rbind,
@@ -5633,8 +5638,14 @@ server <- function(input, output, session) {
                  facet_wrap(~ Gate) +
                  annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
                           hjust = 1.1, vjust = 1.5, size = 5, color = "black")
+               
+               stats <- stats %>% rename(SampleName = ExpCondition)
+               
              }
       )
+      
+      post_hoc_pairs = c()
+      annotations = c()
       
       if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && main_test_pvalue < 0.05) {
         PairwiseTest <- PairwiseTest %>%
@@ -5659,32 +5670,60 @@ server <- function(input, output, session) {
             "ns"
           }
         })
+
+      } 
+      else if(!is.null(BivTest)){
+        BivTest <- BivTest %>%
+          separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
+          mutate(group1 = trimws(group1), 
+                 group2 = trimws(group2),
+                 stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
         
-        y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
-        y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
+        all_combinations <- combn(unique(stats$SampleName), 2, simplify = FALSE)
         
-        if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
-          nspos = which(annotations != "ns")
-          if(length(nspos)>0)
-            resplot <- resplot + 
-              ggsignif::geom_signif(
-                comparisons = post_hoc_pairs[nspos],
-                y_position = y_pos[nspos],
-                annotations = annotations[nspos],
-                tip_length = 0.01,
-                textsize = 8 / 1.5,
-                vjust = 0.8
-              )
-        } else {
-          print("No valid post-hoc comparisons or annotations to plot.")
-        }
-      } else {
+        post_hoc_pairs <- lapply(all_combinations, function(pair) {
+          pair <- unlist(pair)
+          c(trimws(pair[1]), trimws(pair[2]))
+        })
+        annotations <- sapply(post_hoc_pairs, function(pair) {
+          idx <- which((BivTest$group1 == pair[1] & BivTest$group2 == pair[2]) |
+                         (BivTest$group1 == pair[2] & BivTest$group2 == pair[1]))
+          if (length(idx) > 0) {
+            as.character(BivTest$stars[idx])
+          } else {
+            "ns"
+          }
+        })
+        
+      }
+      else {
         print("No pairwise comparisons to plot.")
       }
       
-      output$decision_tree_plot <- renderPlot({
-        create_decision_tree(path)
-      })
+      
+      
+      if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
+        y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
+        y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
+        
+        nspos = which(annotations != "ns")
+        if(length(nspos)>0)
+          resplot <- resplot + 
+          ggsignif::geom_signif(
+            comparisons = post_hoc_pairs[nspos],
+            y_position = y_pos[nspos],
+            annotations = annotations[nspos],
+            tip_length = 0.01,
+            textsize = 8 / 1.5,
+            vjust = 0.8
+          )
+      } else {
+        print("No valid post-hoc comparisons or annotations to plot.")
+      }
+      
+      decision_tree = create_decision_tree(path)
+
+      output$decision_tree_plot <- renderPlot({ decision_tree })
       
       output$analysis_output <- renderUI({
         steps_formatted <- gsub("Step", "<br><br>Step", steps)
@@ -5692,11 +5731,9 @@ server <- function(input, output, session) {
         HTML(steps_formatted)
       })
       
-      
-      
-      return(list(Table = stats, TableTests = list(PairwiseTest = PairwiseTest, BivTest = BivTest, MulvTest = MulvTest), Plot = resplot))
+      return(list(Table = stats, TableTests = list(PairwiseTest = PairwiseTest, BivTest = BivTest, MulvTest = MulvTest), Plot = resplot, DecisionTree = decision_tree ))
     } else {
-      return(list(Table = NULL, TableTest = NULL, Plot = NULL))
+      return(list(Table = NULL, TableTest = NULL, Plot = NULL, DecisionTree = NULL))
     }
   })
   
@@ -5715,39 +5752,39 @@ server <- function(input, output, session) {
   })
   
   output$TabMulvTest <- renderDT({
-    StatisticalAnalysisResults()$TableTests$MulvTest
-  },
-  options = list(
-    searching = FALSE,
-    dom = 't' 
-  ))
+    datatable(StatisticalAnalysisResults()$TableTests$MulvTest, caption = "Multivariate test",
+              options = list(
+                searching = FALSE,
+                dom = 't' 
+              ))
+  })
   
   output$TabBivTest <- renderDT({
-    StatisticalAnalysisResults()$TableTests$BivTest
-  },
-  options = list(
-    searching = FALSE,
-    dom = 't' 
-  ))
+    datatable(StatisticalAnalysisResults()$TableTests$BivTest, caption = "Bivariate test",
+              options = list(
+                searching = FALSE,
+                dom = 't' 
+              ))
+  })
   
   output$PairwiseTest <- renderDT({
-    StatisticalAnalysisResults()$TableTests$PairwiseTest
-  },
-  options = list(
-    searching = FALSE,
-    dom = 't' 
-  ))
+    datatable(StatisticalAnalysisResults()$TableTests$PairwiseTest, caption = "Pairwise Tests",
+              options = list(
+      searching = FALSE,
+      dom = 't' 
+    ))
+  })
   
   create_decision_tree <- function(path) {
     data <- tibble(
       from = c("shapiro.test", "shapiro.test", 
-               "groups check (normalized)", "groups check (normalized)",
-               "groups check (not normalized)", "groups check (not normalized)",
+               "groups check (normal)", "groups check (normal)",
+               "groups check (not normal)", "groups check (not normal)",
                "ANOVA", "kruskal wallis"),
-      to = c("groups check (normalized)", "groups check (not normalized)", 
+      to = c("groups check (normal)", "groups check (not normal)", 
              "t.test", "ANOVA", 
              "wilcoxon", "kruskal wallis",
-             "pairwise test\nANOVA", "pairwise test\nKruskal"),
+             "pairwise test\nt.test", "pairwise test\nwilcoxon"),
       edge_label = c("data is normal", "data is not normal",
                      "number of groups = 2", "number of groups > 2",
                      "number of groups = 2", "number of groups > 2",
@@ -5760,7 +5797,9 @@ server <- function(input, output, session) {
       geom_edge_link(aes(label = edge_label), 
                      angle_calc = 'along', 
                      label_dodge = unit(5, 'mm'), 
-                     label_size = 3.5, 
+                     label_size = 3.5,
+                     start_cap = circle(8, 'mm'),  # Adjusts start of arrow outside the node
+                     end_cap = circle(8, 'mm'),
                      arrow = arrow(length = unit(4, 'mm'))) +
       geom_node_label(aes(label = name, fill = ifelse(name %in% path, "green", "grey")), 
                       size = 4, 

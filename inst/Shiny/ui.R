@@ -462,7 +462,7 @@ ui <- dashboardPage(
                     )
                     ),
                     fluidRow(
-                      verbatimTextOutput("EPIMODgenerationOutput")
+                      column(10,offset = 1,verbatimTextOutput("EPIMODgenerationOutput"))
                     )
                 )
               ),
@@ -506,14 +506,14 @@ ui <- dashboardPage(
                       column(4, fileInput("epimod_multiFileInput", "Files exploited in 'Parameters File' ", multiple = TRUE))
                     ),
                     fluidRow( 
-                      column(12,verbatimTextOutput("analysisOutput") )
+                      column(10,offset = 1,verbatimTextOutput("analysisOutput") )
                     )
                 )
               ),
       fluidRow(
         box(width = 12, title = "Visualisations", collapsible = T,
             fluidRow(
-              selectInput("epimod_placesPlot","Places dynamics to show:", choices = "" , multiple = TRUE)
+              column(10,offset = 1,selectInput("epimod_placesPlot","Places dynamics to show:", choices = "" , multiple = TRUE))
             ),
             fluidRow(
               plotOutput("epimod_tracePlot")
