@@ -11,7 +11,7 @@ function to lunch the ORCA shiny application.
 }
 \examples{
 \dontrun{
-InteGreat.run()
+ORCA.run()
 }
 }
 \author{

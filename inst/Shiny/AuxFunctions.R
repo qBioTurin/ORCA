@@ -328,7 +328,7 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       result <- list(data = list(), error = NULL)
       filenames <- filename
       
-      for(filename in filenames){
+       for(filename in filenames){
         if(!isFileUploaded || !file.exists(filename)) {
           return (list(message = "Please, select an Excel file", call = ""))
         } else if(tolower(tools::file_ext(filename)) != "xls" && tolower(tools::file_ext(filename)) != "xlsx") {
@@ -369,6 +369,48 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       
       return(x) 
       
+    },
+    "PNPRO" = {
+      xml_data <- read_xml(filename)
+      
+      # Extract places
+      places <- xml_find_all(xml_data, ".//place")
+      places_df <- data.frame(
+        id = xml_attr(places, "name"),
+        label = xml_attr(places, "name"),
+        x = as.numeric(xml_attr(places, "x")),
+        y = as.numeric(xml_attr(places, "y")),
+        size = 20, 
+        marking = xml_attr(places, "marking"),
+        shape = "circle",
+        color = list(background = "white", border = "black"),
+        stringsAsFactors = FALSE
+      )
+      
+      # Extract transitions
+      transitions <- xml_find_all(xml_data, ".//transition")
+      transitions_df <- data.frame(
+        id = xml_attr(transitions, "name"),
+        x = as.numeric(xml_attr(transitions, "x")),
+        y = as.numeric(xml_attr(transitions, "y")),
+        size = 10, 
+        rate = xml_attr(transitions, "delay"),
+        label = xml_attr(transitions, "name"),
+        shape = "box",  # Rectangle shape
+        color = list(background = "white", border = "black"),
+        stringsAsFactors = FALSE
+      )
+      
+      # Extract arcs (edges)
+      arcs <- xml_find_all(xml_data, ".//arc")
+      edges_df <- data.frame(
+        from = xml_attr(arcs, "head"),
+        to = xml_attr(arcs, "tail"),
+        arrows = "to",
+        stringsAsFactors = FALSE
+      )
+      
+      return(list(places = places_df, transitions = transitions_df, edges = edges_df, xml_data = xml_data))
     },
     {list(message = "Unsupported file type.", call = "")} #default switch case
     )
@@ -413,7 +455,7 @@ AUCfunction<-function(AUCdf,PanelsValue,bind=T,session = session,SName="1",AUCdf
     {
       AUCdf.new <- AUCdf
     }else{
-      AUCdf2 = AUCdf %>% filter(SampleName == SName)
+      AUCdf2 = AUCdf %>% dplyr::filter(SampleName == SName)
       
       if(length(AUCdf2[,1]) == 0){
         AUCdf.new = AUCdf2
@@ -578,7 +620,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            addWorksheet(wb,"Points Plot")
            plotList = ResultList[["plotPCR"]]
-           df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% filter(DDCT == 0)
+           df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(DDCT == 0)
            
            print(
              ggplot(df,aes(x = Gene, y = -DDCT)) +
@@ -1684,7 +1726,7 @@ UploadRDs = function(Flag, session, output,
 testStat.function <- function(data) {
   steps <- ""
   step_counter <- 1
-  resTTest <- NULL
+  BivTest <- NULL
   resANOVA <- NULL
   resPairwise <- NULL
   path <- c("shapiro.test")
@@ -1693,7 +1735,7 @@ testStat.function <- function(data) {
   
   shapiro_results <- data %>%
     group_by(data[[1]]) %>%
-    filter(n() >= 3) %>%
+    dplyr::filter(n() >= 3) %>%
     summarize(
       p.value = ifelse(
         length(unique(Value)) > 1, 
@@ -1736,7 +1778,7 @@ testStat.function <- function(data) {
       combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])
       
       combo <- combo[combo$Var1 != combo$Var2, ]
-      resTTest <- do.call(rbind,
+      BivTest <- do.call(rbind,
                           lapply(1:dim(combo)[1], function(x){
                             sn <- combo[x,]
                             ttest <- t.test(data[data[,1] == sn$Var1, "Value"],
@@ -1789,7 +1831,8 @@ testStat.function <- function(data) {
       }
     }
     
-    return(list(resTTest = resTTest, test = resANOVA, pairwise = resPairwise, steps = steps, path = path))
+    return(list(BivTest = BivTest, MulvTest = resANOVA, pairwise = resPairwise, steps = steps, path = path))
+    
   } else {
     steps <- c(steps, paste("Step ", step_counter, ". the data is not normalized", "\n"))
     step_counter <- step_counter + 1 
@@ -1805,7 +1848,7 @@ testStat.function <- function(data) {
       combo <- data.frame(Var1 = combo[1,], Var2 = combo[2,])
       
       combo <- combo[combo$Var1 != combo$Var2, ]
-      resTTest <- do.call(rbind,
+      BivTest <- do.call(rbind,
                           lapply(1:dim(combo)[1], function(x){
                             sn <- combo[x,]
                             wilcox_test <- wilcox.test(data[data[,1] == sn$Var1, "Value"],
@@ -1857,6 +1900,6 @@ testStat.function <- function(data) {
       }
     }
     
-    return(list(resTTest = resTTest, test = resKRUSKAL, pairwise = resPairwise, steps = steps, path = path))
+    return(list(BivTest = BivTest, MulvTest = resKRUSKAL, pairwise = resPairwise, steps = steps, path = path))
   }
 }

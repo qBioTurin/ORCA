@@ -24,6 +24,9 @@ library(patchwork)
 library(stringr)
 library(dplyr)
 library(flowCore)
+library(xml2)
+library(visNetwork)
+library(shinyFiles)  # Load shinyFiles package
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
@@ -123,8 +126,13 @@ ui <- dashboardPage(
                          tabName = 'integ',
                          icon = icon('file'),
                          menuSubItem("Omics Data", tabName = "Omics_tab"),
-                         menuSubItem("Data analysed", tabName = "DataIntegration_tab")
-                         #menuSubItem("IF, and other data ", tabName = "otherData_tab")
+                         menuSubItem("Data analysed", tabName = "DataIntegration_tab"),
+                         menuItem('GreatMod',
+                                  tabName = 'greatmod',
+                                  icon = icon('file'),
+                                  menuSubItem("GreatSPN", tabName = "greatspn_tab"),
+                                  menuSubItem("Epimod", tabName = "epimod_tab")
+                         )
                 ),
                 menuItem('Dataverse', tabName = 'Dataverse_tab', icon = icon('eye')),
                 menuItem('Load analysis', tabName = 'LoadAnalysis', icon = icon('upload'))
@@ -385,6 +393,136 @@ ui <- dashboardPage(
       # ),
       ## END model integration:  
       ######### END MODEL INTEGRATION
+      
+      
+      ## BEGIN model integration: GreatMOD ####
+      ## BEGIN greatspn ####
+      tabItem(tabName = "greatspn_tab",
+              h2("Load analysis"),
+              fluidRow(
+                box(width = 12,
+                    column(7,
+                           fileInput("loadAnalysis_PNPRO", "Upload .PNPRO File",width = "100%",  accept = ".PNPRO")
+                    ),
+                    column(1,
+                           actionButton(label = "Load",
+                                        style = "margin-top: 20px;  width: 100%;", 
+                                        icon = shiny::icon("upload"), 
+                                        inputId = "loadPNPRO_Button")
+                    ),
+                    column(2,
+                           downloadButton( label = "Download PNPRO", 
+                                           style = "margin-top: 20px;  width: 100%;",
+                                           outputId = "downloadPNPRO",
+                                           icon = icon("download") )
+                    ),
+                    column(2,
+                           actionButton("button_greatspn",style = "margin-top: 20px;  width: 100%;",label =  "Open GreatPSN")
+                    )
+                ),
+                tags$style(type='text/css', "#loadAnalysis_PNPRO { width:100%; margin-top: 20px;}")
+              ),
+              fluidRow(
+                column(6,
+                       box( width = 12, title = "Places",collapsible = T,
+                            DTOutput("placesTable")
+                       )
+                ),
+                column(6,
+                       box( width = 12, title = "Transitions",collapsible = T,
+                            DTOutput("transitionsTable")
+                       )
+                )
+              ),
+              fluidRow(
+                column(9,
+                       visNetworkOutput("petrinetPlot",height = "400px")
+                )
+              )
+      ),
+      ## END greatspn ####
+      ## BEGIN epimod ####
+      tabItem(tabName = "epimod_tab",
+              h4("Model Generation and Analysis"),
+              fluidRow(
+                box(width = 12,
+                    shinyDirButton("directory", "Set Working Directory", "Select the directory"),
+                    verbatimTextOutput("selectedDir")
+                )
+              ),
+              fluidRow(
+                box(width = 12,collapsible = T,title = "Model Generation",
+                    # Inputs for model generation function
+                    fluidRow(
+                      column(4,
+                           fileInput("transFileInput", "Upload Transitions File (.cpp)", accept = ".cpp")
+                    ),
+                    column(2,offset = 6,
+                           actionButton("generateModel", "Generate the model")
+                    )
+                    ),
+                    fluidRow(
+                      verbatimTextOutput("EPIMODgenerationOutput")
+                    )
+                )
+              ),
+              fluidRow(
+                box(width = 12, title = "Model Simulation", collapsible = T,
+                    fluidRow(
+                      column(2,numericInput("initialTime", "Initial Time (i_time)", value = 0)),
+                      column(2,numericInput("finalTime", "Final Time (f_time)", value = 1)),
+                      column(2,numericInput("stepTime", "Step Time (s_time)", value = 1)),
+                      column(2,offset = 4,
+                             # Button to run model analysis
+                             actionButton("runModelAnalysis", "Run Model Analysis")
+                      )
+                    ),
+                    fluidRow(
+                      column(2, selectInput("solverType", "Solver Type", choices = c("LSODA", "SSA")) ),
+                      # column(2, numericInput("nConfig", "Number of Configurations (n_config)", value = 1, min = 1)),
+                      # conditionalPanel(condition = "input.nConfig  > 1||input.solverType != 'LSODA'",
+                      #                  column(2, numericInput("parallelProcessors", "Parallel Processors", value = 1, min = 1 ) )
+                      # ),
+                      conditionalPanel(condition = "input.solverType != 'LSODA'",
+                                       column(2, numericInput("nRun", "Number of Runs (n_run)", value = 1, min = 1)),
+                                       column(2, numericInput("parallelProcessors", "Parallel Processors", value = 1, min = 1 ))
+                      )
+                    ),
+                    fluidRow(
+                      column(4,fileInput("parametersFileInput", "Parameters File (.csv)", accept = c(".csv"))),
+                      column(4,fileInput("functionsFileInput", "Functions File (.R)", accept = c(".R")))
+                    ),
+                    fluidRow(
+                      conditionalPanel(condition = "input.functionsFileInput != 'NULL'",
+                                       column(4,selectizeInput("epimod_event_function", "Function to use for simulating discrete event",choices ="" )),
+                                       column(4,textAreaInput("epimod_event_times", "Time points for simulating discrete events", 
+                                                              placeholder = "Enter values separated by commas (e.g.: 1, 2, 3)"))
+                      )
+                    ),
+                    fluidRow(
+                      column(4,
+                             textAreaInput("iniV", "Parametric Values (ini_v)", placeholder = "Enter values separated by commas (e.g.: 1, 2, 3)")
+                      ),
+                      column(4, fileInput("epimod_multiFileInput", "Files exploited in 'Parameters File' ", multiple = TRUE))
+                    ),
+                    fluidRow( 
+                      column(12,verbatimTextOutput("analysisOutput") )
+                    )
+                )
+              ),
+      fluidRow(
+        box(width = 12, title = "Visualisations", collapsible = T,
+            fluidRow(
+              selectInput("epimod_placesPlot","Places dynamics to show:", choices = "" , multiple = TRUE)
+            ),
+            fluidRow(
+              plotOutput("epimod_tracePlot")
+            )
+        )
+      )
+      ),
+      ## END epimod ####
+      ## END model integration: GreatMOD ####
       
       ###### BEGIN DATA ANALYSIS ####
       
@@ -1408,410 +1546,416 @@ ui <- dashboardPage(
                       3,
                       actionButton("facs_plotChannelButton", "Plot")
                     )
-              ),
-              fluidRow(
-                plotOutput("facs_ChannelscatterPlot"),
-                plotOutput("facs_autoPlot",height = "800px")
+                  ),
+                  fluidRow(
+                    plotOutput("facs_ChannelscatterPlot"),
+                    plotOutput("facs_autoPlot",height = "800px")
+                  )
               )
-      )
-    ),
-    tabItem(
-      tabName = "uploadFACS",
-      h2("Load Flow Cytometry data"),
-      fluidRow(
-        column(
-          9,
-          fileInput(
-            inputId = "FACSImport",
-            label = "",
-            placeholder = "Select an Excel file.",
-            width = "80%", 
-            multiple = TRUE
-          )
-        ),
-        column(2,
-               actionButton(
-                 label = "Load",
-                 style = "margin-top: 20px; width: 100%;",
-                 icon = shiny::icon("upload"),
-                 inputId = "LoadFACS_Button"
-               )
-        ),
-        tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
       ),
-    ),
-    tabItem(tabName = "tablesFACS",
-            h2("Hierarchical gating"),
-            box(width = 12,
-                fluidRow(
-                  tags$head(
-                    tags$style(HTML("
+      tabItem(
+        tabName = "uploadFACS",
+        h2("Load Flow Cytometry data"),
+        fluidRow(
+          column(
+            9,
+            fileInput(
+              inputId = "FACSImport",
+              label = "",
+              placeholder = "Select an Excel file.",
+              width = "80%", 
+              multiple = TRUE
+            )
+          ),
+          column(2,
+                 actionButton(
+                   label = "Load",
+                   style = "margin-top: 20px; width: 100%;",
+                   icon = shiny::icon("upload"),
+                   inputId = "LoadFACS_Button"
+                 )
+          ),
+          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+        ),
+      ),
+      tabItem(tabName = "tablesFACS",
+              h2("Hierarchical gating"),
+              box(width = 12,
+                  fluidRow(
+                    tags$head(
+                      tags$style(HTML("
                       #dynamicSelectize { 
                         margin-right: 40px;
                       }
                     "))
+                    ),
+                    uiOutput("dynamicSelectize")
                   ),
-                  uiOutput("dynamicSelectize")
-                ),
-                fluidRow(
-                  tags$head(
-                    tags$style(HTML("
+                  fluidRow(
+                    tags$head(
+                      tags$style(HTML("
                       #FACSmatrix { 
                         float: left;
                       }
                     "))
+                    ),
+                    column(12, 
+                           dataTableOutput("FACSmatrix")          
+                    )
                   ),
-                  column(12, 
-                         dataTableOutput("FACSmatrix")          
-                  )
-                ),
-                fluidRow(
-                  column(2, offset = 7,
-                         selectizeInput(inputId = "selectBaseGate",
-                                        label = div(class = "icon-container",
-                                                    h4("Parental gate:", icon("info-circle")),
-                                                    div(class = "icon-text", "Parental gate refers to the gate from which the percetages are calculated")
-                                        ),
-                                        choices = ""
-                         )
-                  ),
-                  column(2,
-                         actionButton(inputId = "SaveFACSanalysis",
-                                      label = 'Save',
-                                      style = "width: 100%; margin-top: 25px;",
-                                      align = "right",
-                                      icon = shiny::icon("forward"))
-                  )
-                )
-            ),
-            box(width = 12,collapsible = T,
-                fluidRow(
-                  style="width: 95%; margin-left: 30px;", 
-                  dataTableOutput("FACSresult")           
-                ),
-            ),
-            fluidRow(
-              box(
-                title = "FACS Name Update", 
-                solidHeader = TRUE, 
-                collapsible = TRUE, 
-                collapsed = TRUE, 
-                width = 12,
-                dataTableOutput("FACSnameUpdate")
-              )
-            ),
-            fluidRow(
-              box(
-                title = "FACS column name Update", 
-                solidHeader = TRUE, 
-                collapsible = TRUE, 
-                collapsed = TRUE, 
-                width = 12,
-                dataTableOutput("FACScolumnNameUpdate")
-              )
-            )
-    ),
-    tabItem(tabName = "statFACS",
-            h2("Statistics"),
-            box(width = 12,
-                fluidRow(
-                  style="width: 95%; margin-left: 30px;", 
-                  column(6,
-                         dataTableOutput("FACSexpcond_tab") 
-                  ),
-                  column(6,
-                         uiOutput("FACSexpcond_plot")
-                  )
-                ),
-                fluidRow(
-                  style="width: 95%; margin-left: 30px;", 
-                  column(6,
-                         actionButton(inputId = "FACSstatButton",
-                                      label = 'Calculate Statistic')
-                  )
-                ),
-                fluidRow(
-                  style="width: 95%; margin-left: 30px;", 
-                  dataTableOutput("FACSstat_tab")
-                )
-            ),
-            fluidRow(
-              column(width = 2,offset = 9,
-                     downloadButton( label = "Download Analysis & Excel", 
-                                     outputId = "downloadFACSanalysis",
-                                     icon = icon("download") 
-                     )
-              )
-            )
-    ),
-    #### END data analysis: FACS ####
-    
-    #### BEGIN data analysis: IF ####
-    tabItem(
-      tabName = "uploadIF",
-      h2("Load IF data"),
-      fluidRow(
-        column(9,
-               fileInput(
-                 inputId = "IFImport",
-                 label = "",
-                 placeholder = "Select an Excel file.",
-                 width = "80%", 
-                 multiple = TRUE
-               )
-        ),
-        column(2,
-               actionButton(
-                 label = "Load",
-                 style = "margin-top: 20px; width: 100%;",
-                 icon = shiny::icon("upload"),
-                 inputId = "LoadIF_Button"
-               )
-        ),
-        tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
-      )
-    ),
-    tabItem(tabName = "tablesIF",
-            h2("Quantification"),
-            fluidRow(
-              column(
-                width = 3,
-                selectInput(
-                  inputId = "IF_expcond",
-                  label = "Experimental condition:",
-                  choices = ""
-                )
-              )
-            ),
-            fluidRow(
-              box(width = 12,title = "Data informations",
                   fluidRow(
-                    column(
-                      width = 12,
-                      DTOutput("IFtable"),
-                      DTOutput("IFtable_stat")
+                    column(2, offset = 7,
+                           selectizeInput(inputId = "selectBaseGate",
+                                          label = div(class = "icon-container",
+                                                      h4("Parental gate:", icon("info-circle")),
+                                                      div(class = "icon-text", "Parental gate refers to the gate from which the percetages are calculated")
+                                          ),
+                                          choices = ""
+                           )
+                    ),
+                    column(2,
+                           actionButton(inputId = "SaveFACSanalysis",
+                                        label = 'Save',
+                                        style = "width: 100%; margin-top: 25px;",
+                                        align = "right",
+                                        icon = shiny::icon("forward"))
                     )
                   )
               ),
-              box(width = 12,title = "T-test",
+              box(width = 12,collapsible = T,
                   fluidRow(
-                    column(
-                      width = 6,
-                      selectInput(
-                        inputId = "IF_TTestvariable",
-                        label = "Ttest variable:",
-                        choices = ""
-                      )
-                    )
+                    style="width: 95%; margin-left: 30px;", 
+                    dataTableOutput("FACSresult")           
                   ),
+              ),
+              fluidRow(
+                box(
+                  title = "FACS Name Update", 
+                  solidHeader = TRUE, 
+                  collapsible = TRUE, 
+                  collapsed = TRUE, 
+                  width = 12,
+                  dataTableOutput("FACSnameUpdate")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "FACS column name Update", 
+                  solidHeader = TRUE, 
+                  collapsible = TRUE, 
+                  collapsed = TRUE, 
+                  width = 12,
+                  dataTableOutput("FACScolumnNameUpdate")
+                )
+              )
+      ),
+      tabItem(tabName = "statFACS",
+              h2("Statistics"),
+              box(width = 12,
                   fluidRow(
-                    column(
-                      width = 6,
-                      DTOutput("IFsummariseMean")
+                    style="width: 95%; margin-left: 30px;", 
+                    column(6,
+                           dataTableOutput("FACSexpcond_tab") 
                     ),
-                    column(
-                      width = 6,
-                      plotOutput("IFsummarise_plot")
+                    column(6,
+                           uiOutput("FACSexpcond_plot")
                     )
                   ),
                   fluidRow(
-                    column(
-                      width = 12,
-                      DTOutput("IFtable_ttest")
+                    style="width: 95%; margin-left: 30px;", 
+                    column(6,
+                           actionButton(inputId = "FACSstatButton",
+                                        label = 'Calculate Statistic')
                     )
+                  ),
+                  fluidRow(
+                    style="width: 95%; margin-left: 30px;", 
+                    dataTableOutput("FACSstat_tab")
                   )
               ),
               fluidRow(
                 column(width = 2,offset = 9,
                        downloadButton( label = "Download Analysis & Excel", 
-                                       outputId = "downloadIFAnalysis",
+                                       outputId = "downloadFACSanalysis",
                                        icon = icon("download") 
                        )
                 )
               )
-            )
-    ),
-    #### END data analysis: IF ####
-    
-    #### BEGIN statistical analysis ####
-    tabItem(tabName = "StatAnalysis_tab",
-            h2("Statistical analysis"),
-            fluidRow(
-              box(width = 12,
-                  title = "Upload the analysis",
-                  fluidRow(
-                    column(
-                      9,
-                      fileInput(
-                        inputId = "loadStatAnalysis_file",
-                        label = "",
-                        placeholder = "Select the RDs files storing ORCA analyses",
-                        width = "80%", 
-                        multiple = TRUE)
-                    ),
-                    column(
-                      2,
-                      actionButton( label = "Load",
-                                    style = "margin-top: 20px; width: 100%;",
-                                    icon = shiny::icon("upload"),
-                                    inputId = "loadStatAnalysis_file_Button" )
-                    )
-                  )
-              )
-            ),
-            fluidRow(
-              box(
-                width = 12,
-                collapsible = TRUE,
-                collapsed = TRUE,
-                title = "Statistical decision",
-                fluidRow(
-                  column(9,
-                         style = "border-right: 1px solid #000000;",
-                         plotOutput("decision_tree_plot")
-                  ),
-                  column(3,
-                         tags$style(HTML("#analysis_output {font-size: 12px; font-style: italic; }")),
-                         htmlOutput("analysis_output")
+      ),
+      #### END data analysis: FACS ####
+      
+      #### BEGIN data analysis: IF ####
+      tabItem(
+        tabName = "uploadIF",
+        h2("Load IF data"),
+        fluidRow(
+          column(9,
+                 fileInput(
+                   inputId = "IFImport",
+                   label = "",
+                   placeholder = "Select an Excel file.",
+                   width = "80%", 
+                   multiple = TRUE
+                 )
+          ),
+          column(2,
+                 actionButton(
+                   label = "Load",
+                   style = "margin-top: 20px; width: 100%;",
+                   icon = shiny::icon("upload"),
+                   inputId = "LoadIF_Button"
+                 )
+          ),
+          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+        )
+      ),
+      tabItem(tabName = "tablesIF",
+              h2("Quantification"),
+              fluidRow(
+                column(
+                  width = 3,
+                  selectInput(
+                    inputId = "IF_expcond",
+                    label = "Experimental condition:",
+                    choices = ""
                   )
                 )
-              )
-            ),
-            fluidRow(
-              box(
-                width = 12,
-                collapsible = T,
-                collapsed = T,
-                title = "Comparison analysis",
-                selectizeInput("StatAnalysis",
-                               label = "Select the analysis:",
-                               choices = ""),
-                fluidRow(
-                  column(10, offset = 1,
-                         fluidRow(plotOutput("PlotStat")),
-                         fluidRow(DTOutput("TabStat")),
-                         fluidRow(DTOutput("TabTTest"))
-                  ), 
+              ),
+              fluidRow(
+                box(width = 12,title = "Data informations",
+                    fluidRow(
+                      column(
+                        width = 12,
+                        DTOutput("IFtable"),
+                        DTOutput("IFtable_stat")
+                      )
+                    )
+                ),
+                box(width = 12,title = "T-test",
+                    fluidRow(
+                      column(
+                        width = 6,
+                        selectInput(
+                          inputId = "IF_TTestvariable",
+                          label = "Ttest variable:",
+                          choices = ""
+                        )
+                      )
+                    ),
+                    fluidRow(
+                      column(
+                        width = 6,
+                        DTOutput("IFsummariseMean")
+                      ),
+                      column(
+                        width = 6,
+                        plotOutput("IFsummarise_plot")
+                      )
+                    ),
+                    fluidRow(
+                      column(
+                        width = 12,
+                        DTOutput("IFtable_ttest")
+                      )
+                    )
                 ),
                 fluidRow(
-                  column(8,
-                         # New download button for statistical analysis
-                         downloadButton("downloadStatisticalAnalysis", "Download Statistical Analysis")
+                  column(width = 2,offset = 9,
+                         downloadButton( label = "Download Analysis & Excel", 
+                                         outputId = "downloadIFAnalysis",
+                                         icon = icon("download") 
+                         )
                   )
                 )
               )
-            )
-    ),
-    ###### BEGIN DATAVERSE #####
-    tabItem(tabName = "Dataverse_tab",
-            h2("Dataverse"),
-            fluidRow(
-              box(width = 12,
-                  title = "Upload and Maintain",
-                  collapsible = T,
-                  h4(
-                    em(
-                      "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
-                      " for obtaining an account and setting up an API key."
-                    ) 
-                  ),
-                  fluidRow(
-                    column(
-                      width = 10,offset = 1,
-                      verbatimTextOutput("LoadingError_DATAVERSE")
-                    )
-                  ),
-                  fluidRow(
-                    column(width=6, 
-                           textInput("APIkey",
-                                     value = ifelse(system.file("Data",".APIkey", package = "ORCA") != "",
-                                                    read.table(paste0(system.file("Data", package = "ORCA"),
-                                                                      "/.APIkey"),
-                                                               quote="\"",
-                                                               comment.char=""),
-                                                    ""), 
-                                     label = "API key linked to a Dataverse installation account:")),
-                    column(2,
-                           selectizeInput("selectAnalysis_DV",
-                                          label = "Select the analysis:",
-                                          choices = "")
-                    )
-                  ),
-                  fluidRow(
-                    column(3,
-                           textInput("Title_DV",
-                                     label = "Title:",
-                                     value=""
-                           )
+      ),
+      #### END data analysis: IF ####
+      
+      #### BEGIN statistical analysis ####
+      tabItem(tabName = "StatAnalysis_tab",
+              h2("Statistical analysis"),
+              fluidRow(
+                box(width = 12,
+                    title = "Upload the analysis",
+                    fluidRow(
+                      column(
+                        9,
+                        fileInput(
+                          inputId = "loadStatAnalysis_file",
+                          label = "",
+                          placeholder = "Select the RDs files storing ORCA analyses",
+                          width = "80%", 
+                          multiple = TRUE)
+                      ),
+                      column(
+                        2,
+                        actionButton( label = "Load",
+                                      style = "margin-top: 20px; width: 100%;",
+                                      icon = shiny::icon("upload"),
+                                      inputId = "loadStatAnalysis_file_Button" )
+                      )
                     ),
-                    column(4,
-                           textInput("Description_DV",
-                                     label = "Description:",
-                                     value=""
-                           )
+                    fluidRow(
+                      column(3,offset = 1,
+                        selectizeInput("StatAnalysis",
+                                     label = "Select the analysis:",
+                                     choices = "")
+                      )
                     )
-                  ),
+                )
+              ),
+              fluidRow(
+                box(
+                  width = 12,
+                  collapsible = TRUE,
+                  collapsed = TRUE,
+                  title = "Statistical decision",
                   fluidRow(
-                    column(3,
-                           textInput("Author_DV",
-                                     label = "Author name:",
-                                     value=""
-                           )
+                    column(9,
+                           style = "border-right: 1px solid #000000;",
+                           plotOutput("decision_tree_plot")
                     ),
                     column(3,
-                           textInput("AuthorAff_DV",
-                                     label = "Author affiliation:",
-                                     value=""
-                           )
-                    )
-                  ),
-                  fluidRow(
-                    column(3,
-                           textInput("ContactN_DV",
-                                     label = "Contact name:",
-                                     value=""
-                           )
-                    ),
-                    column(3,
-                           textInput("ContactEmail_DV",
-                                     label = "Contact email:",
-                                     value=""
-                           )
-                    )
-                  ),
-                  fluidRow(
-                    column(3,
-                           actionButton(
-                             label = "Upload",
-                             inputId = "DataverseUpload_Button" 
-                           )
+                           tags$style(HTML("#analysis_output {font-size: 12px; font-style: italic; }")),
+                           htmlOutput("analysis_output")
                     )
                   )
-              )
-            ),
-            fluidRow(
-              box(width = 12,
-                  title = "Download Analysis",
+                )
+              ),
+              fluidRow(
+                box(
+                  width = 12,
                   collapsible = T,
+                  collapsed = T,
+                  title = "Comparison analysis",
                   fluidRow(
-                    column(3,
-                           textInput("DOIdownload",
-                                     label = "DOI:",
-                                     value=""
-                           )
-                    ),
-                    column(3,
-                           actionButton(
-                             label = "Download",
-                             inputId = "DataverseDownload_Button" 
-                           )
+                    column(10, offset = 1,
+                           fluidRow(plotOutput("PlotStat")),
+                           fluidRow(DTOutput("TabStat")),
+                           fluidRow(DTOutput("TabBivTest")),
+                           fluidRow(DTOutput("TabMulvTest")),
+                           fluidRow(DTOutput("PairwiseTest"))
+                    ), 
+                  ),
+                  fluidRow(
+                    column(8,
+                           # New download button for statistical analysis
+                           downloadButton("downloadStatisticalAnalysis", "Download Statistical Analysis")
                     )
                   )
+                )
               )
-            )
+      ),
+      ###### BEGIN DATAVERSE #####
+      tabItem(tabName = "Dataverse_tab",
+              h2("Dataverse"),
+              fluidRow(
+                box(width = 12,
+                    title = "Upload and Maintain",
+                    collapsible = T,
+                    h4(
+                      em(
+                        "Check ", a("here", href="https://guides.dataverse.org/en/latest/user/account.html"),
+                        " for obtaining an account and setting up an API key."
+                      ) 
+                    ),
+                    fluidRow(
+                      column(
+                        width = 10,offset = 1,
+                        verbatimTextOutput("LoadingError_DATAVERSE")
+                      )
+                    ),
+                    fluidRow(
+                      column(width=6, 
+                             textInput("APIkey",
+                                       value = ifelse(system.file("Data",".APIkey", package = "ORCA") != "",
+                                                      read.table(paste0(system.file("Data", package = "ORCA"),
+                                                                        "/.APIkey"),
+                                                                 quote="\"",
+                                                                 comment.char=""),
+                                                      ""), 
+                                       label = "API key linked to a Dataverse installation account:")),
+                      column(2,
+                             selectizeInput("selectAnalysis_DV",
+                                            label = "Select the analysis:",
+                                            choices = "")
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             textInput("Title_DV",
+                                       label = "Title:",
+                                       value=""
+                             )
+                      ),
+                      column(4,
+                             textInput("Description_DV",
+                                       label = "Description:",
+                                       value=""
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             textInput("Author_DV",
+                                       label = "Author name:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             textInput("AuthorAff_DV",
+                                       label = "Author affiliation:",
+                                       value=""
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             textInput("ContactN_DV",
+                                       label = "Contact name:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             textInput("ContactEmail_DV",
+                                       label = "Contact email:",
+                                       value=""
+                             )
+                      )
+                    ),
+                    fluidRow(
+                      column(3,
+                             actionButton(
+                               label = "Upload",
+                               inputId = "DataverseUpload_Button" 
+                             )
+                      )
+                    )
+                )
+              ),
+              fluidRow(
+                box(width = 12,
+                    title = "Download Analysis",
+                    collapsible = T,
+                    fluidRow(
+                      column(3,
+                             textInput("DOIdownload",
+                                       label = "DOI:",
+                                       value=""
+                             )
+                      ),
+                      column(3,
+                             actionButton(
+                               label = "Download",
+                               inputId = "DataverseDownload_Button" 
+                             )
+                      )
+                    )
+                )
+              )
+      )
+      ####### END DATAVERSE ####
     )
-    ####### END DATAVERSE ####
   )
-)
 )
 
