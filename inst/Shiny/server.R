@@ -882,7 +882,7 @@ server <- function(input, output, session) {
     if(length(unique(traces$ID)) == 1)
     {
       pl<-ggplot( )+
-        facet_wrap(~ Place, scales = "free",ncol = floor(length(places_to_keep)/2))+
+        facet_wrap(~ Place, scales = "free",ncol = ceiling(length(places_to_keep)/2))+
         geom_line(data=traces,
                   aes(x=Time,y=Marking))+
         theme(axis.text=element_text(size=10),
@@ -902,7 +902,7 @@ server <- function(input, output, session) {
         ungroup()
       
       pl<-ggplot( )+
-        facet_wrap(~ Place,scales = "free",ncol = floor(length(places_to_keep)/2) )+
+        facet_wrap(~ Place,scales = "free",ncol = ceiling(length(places_to_keep)/2) )+
         geom_line(data=traces,
                   aes(x=Time,y=Marking,group = ID),alpha = .2,col = "grey")+
         geom_line(data=meanTrace,
@@ -5478,14 +5478,14 @@ server <- function(input, output, session) {
              "WB" = {
                do.call(rbind, results) -> results
                points <- results %>%
-                 select(DataSet, SampleName, AdjRelDensity) %>%
-                 mutate(SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
+                 dplyr::select(DataSet, SampleName, AdjRelDensity) %>%
+                 dplyr::mutate(SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
                         SampleName = trimws(SampleName),
                         ColorSet = as.character(DataSet))
                
                stats <- points %>%
                  group_by(SampleName) %>%
-                 summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
+                 dplyr::summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
                
                res <- testStat.function(points %>% select(SampleName, AdjRelDensity) %>% as_tibble())
                BivTest <- res$BivTest
@@ -5526,7 +5526,7 @@ server <- function(input, output, session) {
                  group_by(ExpCond) %>% 
                  summarise(Mean = mean(Values), sd = sd(Values))
                
-               res <- testStat.function(resultsNew[,c("ExpCond", "Values")])
+               res <- testStat.function(resultsNew[,c("ExpCond", "Values")] %>% as_tibble() )
                BivTest <- res$BivTest
                MulvTest <- res$test
                PairwiseTest <- res$pairwise
@@ -5566,7 +5566,7 @@ server <- function(input, output, session) {
                  dplyr::group_by(GeneH) %>% 
                  dplyr::summarise(Mean = mean((Q)), sd = sd(Q))
                
-               res <- testStat.function(resultsNew[, c("GeneH", "Q")])
+               res <- testStat.function(resultsNew[, c("GeneH", "Q")] %>% as_tibble())
                
                BivTest <- res$BivTest
                MulvTest <- res$test
@@ -5612,7 +5612,7 @@ server <- function(input, output, session) {
                
                resList <- lapply(unique(resultsNew$Gate), function(g) {
                  gate_results <- resultsNew %>% dplyr::filter(Gate == g)
-                 testStat.function(gate_results[, c("ExpCondition", "Perc")])
+                 testStat.function(gate_results[, c("ExpCondition", "Perc")]  %>% as_tibble() )
                })
                
                BivTest <- do.call(rbind, lapply(resList, function(res) res$BivTest))

@@ -122,16 +122,20 @@ ui <- dashboardPage(
                                   menuSubItem("Statistics", tabName = "statFACS")) 
                 ),
                 menuItem('Statistical analysis', tabName = 'StatAnalysis_tab', icon = icon('magnifying-glass-chart')),
-                menuItem('Model Integration',
+                menuItem('Computational Modeling',
                          tabName = 'integ',
                          icon = icon('file'),
-                         menuSubItem("Omics Data", tabName = "Omics_tab"),
-                         menuSubItem("Data analysed", tabName = "DataIntegration_tab"),
-                         menuItem('GreatMod',
+                         menuItem("Data Integration",
                                   tabName = 'greatmod',
-                                  icon = icon('file'),
-                                  menuSubItem("GreatSPN", tabName = "greatspn_tab"),
-                                  menuSubItem("Epimod", tabName = "epimod_tab")
+                                  icon = icon('file-circle-plus'),
+                                  menuSubItem("Omics Data Upload", tabName = "Omics_tab"),
+                                  menuSubItem("Data Harmonization", tabName = "DataIntegration_tab")
+                         ),
+                         menuItem('GreatORCA',
+                                  tabName = 'greatmod',
+                                  icon = icon('diagram-project'),
+                                  menuSubItem("Model Parametrization", tabName = "greatspn_tab"),
+                                  menuSubItem("Model Simulation", tabName = "epimod_tab")
                          )
                 ),
                 menuItem('Dataverse', tabName = 'Dataverse_tab', icon = icon('eye')),
@@ -163,7 +167,7 @@ ui <- dashboardPage(
               ),
               p(img(src = "Logo_QBio.png", height = "15%", width = "15%", style = "margin:100px 0px"), align = "center")
       ),
-      ###### BEGIN MODEL INTEGRATION ####
+      ###### BEGIN Computational Modeling ####
       ## BEGIN model integration: Omics ####
       tabItem(tabName = "Omics_tab",
               h2("Omics data"),
@@ -436,7 +440,7 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 column(9,
-                       visNetworkOutput("petrinetPlot",height = "400px")
+                       visNetworkOutput("petrinetPlot",height = "800px")
                 )
               )
       ),

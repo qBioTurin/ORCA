@@ -1768,7 +1768,7 @@ testStat.function <- function(data) {
     step_counter <- step_counter + 1 
     path <- c(path, "groups check (normal)")
     
-    vars <- unique(data[,1])
+    vars <- data[,1] %>% distinct() %>% pull() 
     
     if (length(vars) == 2) {
       steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use t-test for analysis", "\n"))
@@ -1838,7 +1838,7 @@ testStat.function <- function(data) {
     step_counter <- step_counter + 1 
     path <- c(path, "groups check (not normal)")
     
-    vars <- unique(data[,1])
+    vars <- data[,1] %>% distinct() %>% pull()
     
     if (length(vars) == 2) {
       steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use Wilcoxon test for analysis", "\n"))
