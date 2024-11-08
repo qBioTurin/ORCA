@@ -3,7 +3,7 @@
 
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "ORCA")
-
+#source("AuxFunction.R")
 source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
 #source("./inst/Shiny/AuxFunctions.R")
 
@@ -1010,11 +1010,12 @@ server <- function(input, output, session) {
   })
   
   loadExcelFileBCA <- function() {
+    
     alert$alertContext <- ""
     mess = readfile(
       filename = input$BCAImport$datapath,
-      isFileUploaded = !is.null(input$BCAImport) && file.exists(input$BCAImport$datapath),
       type = "Excel",
+      isFileUploaded = !is.null(input$BCAImport) && file.exists(input$BCAImport$datapath),
       allDouble = T,
       colname = F,
       colors = T
@@ -1912,7 +1913,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$ResetPan,{
-    NumberOfPlanes$N = 1
+    NumberOfPlanes$N = 0
     PanelStructures$data <- PanelData
   })
   
@@ -2046,7 +2047,7 @@ server <- function(input, output, session) {
       tempXlsxPath <- file.path(tempDir, nomeXLSX)
       results <- DataAnalysisModule$wbResult
       saveRDS(results, file = tempRdsPath)
-      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "WB", PanelStructures)
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "WB")
       
       utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)

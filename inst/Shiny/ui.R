@@ -868,7 +868,7 @@ ui <- dashboardPage(
                         conditionalPanel(condition = "input.PCR_cut_type == 'Both'",
                                          sliderInput(
                                            inputId = "BothCutFoldChange_slider",
-                                           "Filter genes by :", min = 0, max=0, value = c(0,1)
+                                           "Filter genes by :", min = 0, max=0, value = c(0,0)
                                          )
                         )
                       )
