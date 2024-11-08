@@ -5412,6 +5412,26 @@ server <- function(input, output, session) {
                            choices = c("",AnalysisNames),
                            selected = "")
       
+      if("PCR" %in% AnalysisNames ){
+        results <- DataStatisticModule[["PCR"]]
+        resultsNew <- do.call(rbind,
+                              lapply(1:length(results),
+                                     function(l){
+                                       d = results[[l]]$NewPCR
+                                       d$File = l
+                                       d
+                                     } 
+                              ) 
+        )
+        
+        resultsNew <- as.data.frame(resultsNew) %>%
+          mutate(GeneH = paste(Gene, ", Housekeeping: ", HousekGene))
+        
+        updateSelectizeInput(inputId = "stat_genHpcr",
+                             choices = unique(resultsNew$GeneH),
+                             selected = unique(resultsNew$GeneH)[1])
+        }
+      
       DataStatisticModule$Flag = F
     }
   })
@@ -5550,6 +5570,8 @@ server <- function(input, output, session) {
                
              },
              "PCR" = {
+               req(input$stat_genHpcr)
+               
                resultsNew <- do.call(rbind,
                                      lapply(1:length(results),
                                             function(l){
@@ -5561,13 +5583,20 @@ server <- function(input, output, session) {
                )
                
                resultsNew <- as.data.frame(resultsNew) %>%
-                 mutate(Q = as.numeric(Q), GeneH = paste(Gene, ", Housekeeping: ", HousekGene))
+                 mutate(Q = as.numeric(Q), GeneH = paste(Gene, ", Housekeeping: ", HousekGene))%>% 
+                 dplyr::filter(GeneH == input$stat_genHpcr )
+               
                stats <- resultsNew %>%
-                 dplyr::group_by(GeneH) %>% 
+                 dplyr::group_by(Sample) %>% 
                  dplyr::summarise(Mean = mean((Q)), sd = sd(Q))
                
-               res <- testStat.function(resultsNew[, c("GeneH", "Q")] %>% as_tibble())
-               
+               res <- testStat.function(resultsNew%>% dplyr::select(Sample, Q) %>% as_tibble()) 
+            
+               if(is.null(res)){ 
+                 showAlert("Error", "The number of values per group has to be greater than 2.", "error", 5000)
+                 steps = "The number of values per group has to be greater than 2."
+                }
+                 
                BivTest <- res$BivTest
                MulvTest <- res$test
                PairwiseTest <- res$pairwise
@@ -5581,17 +5610,18 @@ server <- function(input, output, session) {
                  ""
                }
                
-               resplot <- ggplot(stats, aes(x = GeneH, y = Mean)) + 
+               resplot <- ggplot(stats, aes(x = Sample, y = Mean)) + 
                  geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
                  geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = resultsNew, aes(x = GeneH, y = Q, color = as.factor(File)),
+                 geom_point(data = resultsNew, aes(x = Sample, y = Q, color = as.factor(File)),
                             position = position_jitter(width = 0.2), size = 3) +
                  theme_bw() +
-                 labs(title = "Results", subtitle = main_test_txt, y = "Q", x = "GeneH", color = "File") +
+                 facet_wrap(~GeneH)+
+                 labs(title = "Results", subtitle = main_test_txt, y = "Q", x = "Sample", color = "Experiments") +
                  annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
                           hjust = 1.1, vjust = 1.5, size = 5, color = "black")
                
-               stats <- stats %>% rename(SampleName = GeneH)
+               stats <- stats %>% rename(SampleName = Sample)
              },
              "FACS" = {
                resultsNew <- do.call(rbind,

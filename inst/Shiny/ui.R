@@ -122,16 +122,16 @@ ui <- dashboardPage(
                                   menuSubItem("Statistics", tabName = "statFACS")) 
                 ),
                 menuItem('Statistical analysis', tabName = 'StatAnalysis_tab', icon = icon('magnifying-glass-chart')),
-                menuItem('Computational Modeling',
+                menuItem('GreatORCA',
                          tabName = 'integ',
                          icon = icon('file'),
                          menuItem("Data Integration",
-                                  tabName = 'greatmod',
+                                  tabName = 'data_integr',
                                   icon = icon('file-circle-plus'),
                                   menuSubItem("Omics Data Upload", tabName = "Omics_tab"),
                                   menuSubItem("Data Harmonization", tabName = "DataIntegration_tab")
                          ),
-                         menuItem('GreatORCA',
+                         menuItem('Computational Modeling',
                                   tabName = 'greatmod',
                                   icon = icon('diagram-project'),
                                   menuSubItem("Model Parametrization", tabName = "greatspn_tab"),
@@ -1804,7 +1804,12 @@ ui <- dashboardPage(
                         selectizeInput("StatAnalysis",
                                      label = "Select the analysis:",
                                      choices = "")
-                      )
+                      ),
+                      column(3,
+                             conditionalPanel(condition = "input.StatAnalysis == 'PCR'",
+                                              selectizeInput("stat_genHpcr",
+                                                             label = "Select the Gene:",
+                                                             choices = "")))
                     )
                 )
               ),

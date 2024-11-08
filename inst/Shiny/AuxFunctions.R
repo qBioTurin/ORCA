@@ -1733,7 +1733,14 @@ testStat.function <- function(data) {
   
   data$Value <- as.numeric(gsub("^\\s+|\\s+$", "", as.character(data[[2]])))
   
-  shapiro_results <- data %>%
+  minN = data %>%
+    group_by(data[[1]]) %>%
+    dplyr::summarise(n = n()) %>%
+    dplyr::summarise(minN = min(n)) %>% pull(minN)
+  
+  if(minN < 3) return(NULL) # all the groups must have more than 2 elements
+    
+    shapiro_results <- data %>%
     group_by(data[[1]]) %>%
     dplyr::filter(n() >= 3) %>%
     summarize(
