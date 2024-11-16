@@ -2004,13 +2004,20 @@ server <- function(input, output, session) {
                                    im,PanelData)
       )
       
-      
+      #wbResult$PanelsValue <- PanelsValue
+      # wbResult$Plots <- lapply(unique(PanelsValue$ID), function(id) {
+      #   ggplot(PanelsValue %>% dplyr::filter(ID == id), aes(x = Y, y = Values)) +
+      #     geom_line() +
+      #     theme_bw() +
+      #     labs(title = id)
+      # })
+
       pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-        geom_line() + 
+        geom_line() +
         theme_bw() +
-        facet_wrap(~ID) + 
+        facet_wrap(~ID) +
         lims(y=c(0,max(PanelsValue$Values)))
-      
+
       wbResult$PanelsValue <- PanelsValue
       wbResult$Plots <- pl
       
@@ -2024,12 +2031,55 @@ server <- function(input, output, session) {
                           selected = "No lanes available")
       }
       
+
       output$DataPlot <- renderPlot({pl})
-      
+      # output$DataPlot <- renderPlot({
+      #   gridExtra::grid.arrange(grobs = lapply(wbResult$Plots, ggplotGrob))
+      # })
       aucList = lapply(unique(PanelsValue$ID), function(IDlane) AUCfunction(wbResult0$AUCdf,PanelsValue,SName = IDlane) )
       wbResult$AUCdf <- do.call(rbind,aucList)
     }
   })
+  
+  
+  observeEvent(input$CustomizePlot, {
+    showModal(modalDialog(
+      title = "Customize Plot",
+      #selectInput("selectedPlot", "Select Plot", choices = unique(wbResult$PanelsValue$ID)),
+      colourpicker::colourInput("lineColor", "Line Color", value = "#000000"),
+      sliderInput("lineWidth", "Line Width", min = 1, max = 5, value = 1),
+      textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
+      textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
+      actionButton("applyChanges", "Apply Changes"),
+      easyClose = FALSE
+    ))
+  })
+  
+  observeEvent(input$applyChanges, {
+    #selectedPlot <- input$selectedPlot
+    lineColor <- input$lineColor
+    lineWidth <- input$lineWidth
+    xAxisLabel <- input$xAxisLabel  
+    yAxisLabel <- input$yAxisLabel
+    
+    updatedPlot<- ggplot(wbResult$PanelsValue, aes(x =Y,y=Values)) +
+      geom_line(color = lineColor, size = lineWidth) +
+      theme_bw() +
+      facet_wrap(~ID) +
+      lims(y=c(0,max(wbResult$PanelsValue$Values)))+
+      labs(x = xAxisLabel, y = yAxisLabel)
+    
+    wbResult$Plots<- updatedPlot
+    output$DataPlot <- renderPlot({updatedPlot})
+    
+    # output$DataPlot <- renderPlot({
+    #   gridExtra::grid.arrange(grobs = lapply(wbResult$Plots, ggplotGrob))
+    # })
+    removeModal()
+  })
+  
+  
+  
   
   output$downloadWBAnalysis <- downloadHandler(
     filename = function() {

@@ -1,3 +1,4 @@
+library(colourpicker)
 library(shinydashboard)
 library(shiny)
 library(shinyjs)
@@ -27,6 +28,7 @@ library(flowCore)
 library(xml2)
 library(visNetwork)
 library(shinyFiles)  # Load shinyFiles package
+library(colourpicker)
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
@@ -611,8 +613,16 @@ ui <- dashboardPage(
                        ) 
                 )
               ),
-              box(width = 12,
-                  plotOutput("DataPlot")
+              box(
+                width = 12,
+                plotOutput("DataPlot"),
+                # Add customize button below the plot
+                actionButton(
+                  inputId = "CustomizePlot",
+                  label = "Customize Plot",
+                  icon = icon("paint-brush"),
+                  class = "btn-primary"
+                )
               ),
               fluidRow(
                 box(width = 6,
