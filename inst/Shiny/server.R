@@ -2181,10 +2181,11 @@ server <- function(input, output, session) {
       }
       
       pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-        geom_line() + 
+        geom_line(color = wbResult$Plots$layers[[1]]$aes_params$colour, size = wbResult$Plots$layers[[1]]$aes_params$size) + 
         theme_bw() +
         facet_wrap(~ID)+ 
-        lims(y=c(0,maxPanelsValue))
+        lims(y=c(0,maxPanelsValue))+
+        labs(x = wbResult$Plots$labels$x , y = wbResult$Plots$labels$y)
       
       wbResult$TruncatedPanelsValue <- PanelsValue
       wbResult$TruncatedPlots <- pl
