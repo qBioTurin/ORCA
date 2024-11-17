@@ -1139,7 +1139,7 @@ updateTable <- function(position, analysis, info, data, result, flag) {
   new_value <- info$value
   
   # change the exp_condition column to ENDOC or sample_name to ELISA  
-  if (selected_col == 4) {
+  if (selected_col == 4 || (selected_col==5&&analysis=="BCA")) {
     color_code <- data[selected_row, "ColorCode"]
     
     if (!is.na(color_code) && color_code != "" && color_code != "white" && color_code != "#FFFFFF") {
@@ -1161,9 +1161,15 @@ updateTable <- function(position, analysis, info, data, result, flag) {
           
           result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
           # if ELISA, modify SN otherwise modify EXP
-          if (analysis %in% c("ELISA","BCA","IF") ) {
+          if (analysis %in% c("ELISA","IF") ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
           } else if (analysis == "ENDOC") {
+            result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
+          }
+          else if(analysis == "BCA"&& info$col==4){
+            result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
+          }
+          else if(analysis == "BCA"&& info$col==5){
             result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
           }
           
