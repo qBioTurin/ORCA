@@ -1138,7 +1138,7 @@ server <- function(input, output, session) {
   observeEvent(input$leftTableBCA_cell_edit, {
     info <- input$leftTableBCA_cell_edit
     data <- left_data_bca() 
-    updatedText <- updateTable("left", "BCA", info, data, bcaResult, FlagsBCA)
+    updatedText <- updateTable("left", "BCA", info, data, bcaResult, FlagsBCA,session)
     
     output$BCASelectedValues <- renderText(updatedText)  
   }, ignoreInit = TRUE, ignoreNULL = TRUE)

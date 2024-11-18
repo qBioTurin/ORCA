@@ -1131,7 +1131,7 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
 #   return(do.call(rbind, formatted_data))
 # }
 
-updateTable <- function(position, analysis, info, data, result, flag) {
+updateTable <- function(position, analysis, info, data, result, flag, session) {
   req(info) 
   
   selected_row <- info$row
@@ -1139,7 +1139,7 @@ updateTable <- function(position, analysis, info, data, result, flag) {
   new_value <- info$value
   
   # change the exp_condition column to ENDOC or sample_name to ELISA  
-  if (selected_col == 4 || (selected_col==5&&analysis=="BCA")) {
+  if (selected_col == 4 ) {
     color_code <- data[selected_row, "ColorCode"]
     
     if (!is.na(color_code) && color_code != "" && color_code != "white" && color_code != "#FFFFFF") {
@@ -1161,17 +1161,12 @@ updateTable <- function(position, analysis, info, data, result, flag) {
           
           result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
           # if ELISA, modify SN otherwise modify EXP
-          if (analysis %in% c("ELISA","IF") ) {
+          if (analysis %in% c("ELISA","IF","BCA") ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
           } else if (analysis == "ENDOC") {
             result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
           }
-          else if(analysis == "BCA"&& info$col==4){
-            result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
-          }
-          else if(analysis == "BCA"&& info$col==5){
-            result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
-          }
+          
           
           assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
         })
@@ -1209,7 +1204,7 @@ updateTable <- function(position, analysis, info, data, result, flag) {
       for (i in seq_along(matching_indices[, "row"])) {
         if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
           # if ELISA, modify EXP otherwise modify TIME
-          if (analysis == "ELISA") {
+          if (analysis == "ELISA"||analysis == "BCA") {
             result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
           } else {
             result[[paste0(analysis, "cell_TIME")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
