@@ -1911,3 +1911,128 @@ testStat.function <- function(data) {
     return(list(BivTest = BivTest, MulvTest = resKRUSKAL, pairwise = resPairwise, steps = steps, path = path))
   }
 }
+
+# Function to customize the Plots
+dinamicallyGenerateTabs<- function(plot){
+  # Dynamically generate tabs for each layer
+  layer_tabs <- lapply(seq_along(plot$layers), function(i) {
+    layer_type <- class(plot$layers[[i]]$geom)[1]
+    
+    tabPanel(
+      paste("Layer", i, "(", layer_type, ")"),
+      wellPanel(
+        h4(paste("Customize Layer", i, "-", layer_type)),
+        # Common controls for all layers
+        colourpicker::colourInput(paste0("layerColor_", i), "Layer Color", value = "#000000"),
+        sliderInput(paste0("layerWidth_", i), "Layer Width", min = 1, max = 5, value = 1),
+        
+        # Additional controls based on layer type
+        if (layer_type == "GeomPoint") {
+          tagList(
+            sliderInput(paste0("pointSize_", i), "Point Size", min = 1, max = 10, value = 3),
+            selectInput(
+              paste0("pointShape_", i),
+              "Point Shape",
+              choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
+              selected = 16
+            )
+          )
+        } else if (layer_type == "GeomLine") {
+          tagList(
+            selectInput(
+              paste0("lineType_", i),
+              "Line Type",
+              choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
+              selected = "solid"
+            )
+          )
+        } else if (layer_type == "GeomBar") {
+          tagList(
+            sliderInput(paste0("barWidth_", i), "Bar Width", min = 0.1, max = 1, value = 0.5),
+            colourpicker::colourInput(paste0("barFillColor_", i), "Bar Fill Color", value = "#FF9999")
+          )
+        } else if (layer_type == "GeomBoxplot") {
+          tagList(
+            checkboxInput(paste0("notch_", i), "Add Notch", value = FALSE),
+            sliderInput(paste0("boxWidth_", i), "Box Width", min = 0.1, max = 1, value = 0.5),
+            colourpicker::colourInput(paste0("boxFillColor_", i), "Fill Color", value = "#FF9999"),
+            colourpicker::colourInput(paste0("boxOutlineColor_", i), "Outline Color", value = "#000000"),
+            sliderInput(paste0("outlierSize_", i), "Outlier Size", min = 1, max = 5, value = 2),
+            colourpicker::colourInput(paste0("outlierColor_", i), "Outlier Color", value = "#FF0000")
+          )
+        } else {
+          p("No specific customization available for this layer type.")
+        }
+      )
+    )
+  })
+  return(layer_tabs)
+}
+
+customizePlot <- function(data,input){
+  
+  if(!is.null(data$TruncatedPanelsValue)){
+    PanelsValue <- data$TruncatedPanelsValue
+  }else{
+    PanelsValue <- data$PanelsValue
+  }
+  backgroundColor <- input$backgroundColor
+  updatedPlot <- ggplot(PanelsValue, aes(x = Y, y = Values)) +
+    theme_bw() +
+    facet_wrap(~ID) +
+    lims(y = c(0, max(PanelsValue$Values))) +
+    labs(x = input$xAxisLabel, y = input$yAxisLabel) +
+    theme(
+      axis.text.x = element_text(size = input$xAxisFontSize),
+      axis.text.y = element_text(size = input$yAxisFontSize),
+      panel.background = element_rect(fill = backgroundColor, color = backgroundColor),
+      plot.background = element_rect(fill = backgroundColor, color = backgroundColor)
+    )
+  
+  for (i in seq_along(data$Plots$layers)) {
+    layer_type <- class(data$Plots$layers[[i]]$geom)[1]
+    
+    # Apply customizations based on the layer type
+    if (layer_type == "GeomPoint") {
+      updatedPlot <- updatedPlot +
+        geom_point(
+          aes(color = factor(ID)), 
+          size = input[[paste0("pointSize_", i)]],
+          shape = as.numeric(input[[paste0("pointShape_", i)]])
+        )
+    } else if (layer_type == "GeomLine") {
+      updatedPlot <- updatedPlot +
+        geom_line(
+          color = input[[paste0("layerColor_", i)]],
+          size = input[[paste0("layerWidth_", i)]],
+          linetype = input[[paste0("lineType_", i)]]
+        )
+    } else if (layer_type == "GeomBar") {
+      updatedPlot <- updatedPlot +
+        geom_bar(
+          aes(fill = factor(ID)),
+          stat = "identity",
+          width = input[[paste0("barWidth_", i)]],
+          color = input[[paste0("barFillColor_", i)]]
+        )
+    } else if (layer_type == "GeomBoxplot") {
+      updatedPlot <- updatedPlot +
+        geom_boxplot(
+          notch = input[[paste0("notch_", i)]],
+          width = input[[paste0("boxWidth_", i)]],
+          fill = input[[paste0("boxFillColor_", i)]],
+          color = input[[paste0("boxOutlineColor_", i)]],
+          outlier.size = input[[paste0("outlierSize_", i)]],
+          outlier.colour = input[[paste0("outlierColor_", i)]]
+        )
+    } else {
+      warning(paste("No specific customizations applied for layer type:", layer_type))
+    }
+  }
+  return(updatedPlot)
+}
+
+
+
+
+

@@ -44,6 +44,7 @@ server <- function(input, output, session) {
   MapAnalysisNames =c("WB", "WB comparison", "Endocytosis", "ELISA", "RT-qPCR", "Cytotoxicity", "FACS","BCA","IF") 
   names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult", "facsResult","bcaResult","ifResult") 
   
+  
   #### DATA INTEGRATION ####
   ### Omics ####
   
@@ -976,6 +977,7 @@ server <- function(input, output, session) {
     DataAnalysisModule$bcaResult = reactiveValuesToList(bcaResult)
     DataAnalysisModule$bcaResult$Flags = reactiveValuesToList(FlagsBCA)
   })
+  
   
   ##
   FlagsBCA <- reactiveValues(cellCoo = NULL,
@@ -2042,44 +2044,38 @@ server <- function(input, output, session) {
   })
   
   
-  observeEvent(input$CustomizePlot, {
+  observeEvent(input$CustomizePlotWB1, {
+    layer_tabs <- dinamicallyGenerateTabs(wbResult$Plots)
     showModal(modalDialog(
       title = "Customize Plot",
-      #selectInput("selectedPlot", "Select Plot", choices = unique(wbResult$PanelsValue$ID)),
-      colourpicker::colourInput("lineColor", "Line Color", value = "#000000"),
-      sliderInput("lineWidth", "Line Width", min = 1, max = 5, value = 1),
-      textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
-      textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
-      actionButton("applyChanges", "Apply Changes"),
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          # Dynamically generate inputs for each layer
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
+          textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
+          sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
+          sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
+          colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+        )
+      ),
+      actionButton("applyChangesWB1", "Apply Changes"),
       easyClose = FALSE
     ))
   })
   
-  observeEvent(input$applyChanges, {
-    #selectedPlot <- input$selectedPlot
-    lineColor <- input$lineColor
-    lineWidth <- input$lineWidth
-    xAxisLabel <- input$xAxisLabel  
-    yAxisLabel <- input$yAxisLabel
+  
+  observeEvent(input$applyChangesWB1, {
     
-    updatedPlot<- ggplot(wbResult$PanelsValue, aes(x =Y,y=Values)) +
-      geom_line(color = lineColor, size = lineWidth) +
-      theme_bw() +
-      facet_wrap(~ID) +
-      lims(y=c(0,max(wbResult$PanelsValue$Values)))+
-      labs(x = xAxisLabel, y = yAxisLabel)
-    
+    updatedPlot<-customizePlot(wbResult,input)
     wbResult$Plots<- updatedPlot
     output$DataPlot <- renderPlot({updatedPlot})
-    
-    # output$DataPlot <- renderPlot({
-    #   gridExtra::grid.arrange(grobs = lapply(wbResult$Plots, ggplotGrob))
-    # })
     removeModal()
   })
-  
-  
-  
   
   output$downloadWBAnalysis <- downloadHandler(
     filename = function() {
@@ -2180,12 +2176,16 @@ server <- function(input, output, session) {
         
       }
       
-      pl <- ggplot(PanelsValue, aes(x =Y,y=Values)) +
-        geom_line(color = wbResult$Plots$layers[[1]]$aes_params$colour, size = wbResult$Plots$layers[[1]]$aes_params$size) + 
+      pl <- ggplot(PanelsValue, aes(x =Y,y=Values))  + 
         theme_bw() +
-        facet_wrap(~ID)+ 
-        lims(y=c(0,maxPanelsValue))+
-        labs(x = wbResult$Plots$labels$x , y = wbResult$Plots$labels$y)
+        facet_wrap(~ID) + 
+        lims(y = c(0, maxPanelsValue)) + 
+        labs(x = wbResult$Plots$labels$x, y = wbResult$Plots$labels$y)
+      
+      # Apply all layers (including geom_line, geom_point, etc.) from the original plot
+      for (layer in wbResult$Plots$layers) {
+        pl <- pl + layer
+      }
       
       wbResult$TruncatedPanelsValue <- PanelsValue
       wbResult$TruncatedPlots <- pl

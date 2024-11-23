@@ -616,9 +616,8 @@ ui <- dashboardPage(
               box(
                 width = 12,
                 plotOutput("DataPlot"),
-                # Add customize button below the plot
                 actionButton(
-                  inputId = "CustomizePlot",
+                  inputId = "CustomizePlotWB1",
                   label = "Customize Plot",
                   icon = icon("paint-brush"),
                   class = "btn-primary"
