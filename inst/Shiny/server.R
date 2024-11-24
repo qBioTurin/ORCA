@@ -1147,7 +1147,7 @@ server <- function(input, output, session) {
   observeEvent(input$rightTableBCA_cell_edit, {
     info <- input$rightTableBCA_cell_edit
     data <- right_data_bca() 
-    updatedText <- updateTable("right", "BCA", info, data, bcaResult, FlagsBCA)
+    updatedText <- updateTable("right", "BCA", info, data, bcaResult, FlagsBCA,session)
     
     output$BCASelectedValues <- renderText(updatedText)  
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
@@ -1664,6 +1664,39 @@ server <- function(input, output, session) {
     })
   })
   
+  observeEvent(input$Customize_IF_TTestButton, {
+    layer_tabs <- dinamicallyGenerateTabs(ifResult$resplot)
+    showModal(modalDialog(
+      title = "Customize Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          # Dynamically generate inputs for each layer
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
+          textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
+          sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
+          sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
+          colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+        )
+      ),
+      actionButton("applyChangesIF_TT", "Apply Changes"),
+      easyClose = FALSE
+    ))
+  })
+  
+  
+  observeEvent(input$applyChangesIF_TT, {
+    updatedPlot<-customizePlot(ifResult$SubStatData,ifResult$resplot,input)
+    ifResult$resplot<- updatedPlot
+    output$IFsummarise_plot <- renderPlot({updatedPlot})
+    removeModal()
+  })
+  
+  
   observeEvent(input$IF_TTestvariable,{
     ifResult$FinalData -> IFinalData
     input$IF_TTestvariable -> varSel
@@ -1672,7 +1705,7 @@ server <- function(input, output, session) {
       IFinalData[,c("ExpCond", paste0(varSel,"_Perc"))] -> SubData
       colnames(SubData) = c("ExpCond", "Values")
       
-      SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values))
+      SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
       
       BivTest = testStat.function(SubData)
       
@@ -1711,7 +1744,7 @@ server <- function(input, output, session) {
         )
       })
       
-      ifResult$SubStatData = SubData
+      ifResult$SubStatData = SubDataStat
       ifResult$TTestData = BivTest
       ifResult$resplot = resplot
     }else{
@@ -2005,7 +2038,7 @@ server <- function(input, output, session) {
                                    },
                                    im,PanelData)
       )
-      
+       
       #wbResult$PanelsValue <- PanelsValue
       # wbResult$Plots <- lapply(unique(PanelsValue$ID), function(id) {
       #   ggplot(PanelsValue %>% dplyr::filter(ID == id), aes(x = Y, y = Values)) +
@@ -2070,9 +2103,13 @@ server <- function(input, output, session) {
   
   
   observeEvent(input$applyChangesWB1, {
-    
-    updatedPlot<-customizePlot(wbResult,input)
-    wbResult$Plots<- updatedPlot
+    if(!is.null(wbResult$TruncatedPanelsValue)){
+      updatedPlot<-customizePlot(wbResult$TruncatedPanelsValue,wbResult$TruncatedPlots,input)
+      wbResult$TruncatedPlots<- updatedPlot
+    }else{
+      updatedPlot<-customizePlot(wbResult$PanelsValue,wbResult$Plots,input)
+      wbResult$Plots<- updatedPlot
+    }
     output$DataPlot <- renderPlot({updatedPlot})
     removeModal()
   })
@@ -2182,9 +2219,14 @@ server <- function(input, output, session) {
         lims(y = c(0, maxPanelsValue)) + 
         labs(x = wbResult$Plots$labels$x, y = wbResult$Plots$labels$y)
       
-      # Apply all layers (including geom_line, geom_point, etc.) from the original plot
-      for (layer in wbResult$Plots$layers) {
-        pl <- pl + layer
+      if(!is.null(wbResult$TruncatedPlots)){
+        for (layer in wbResult$TruncatedPlots$layers) {
+          pl <- pl + layer
+        }
+      }else{
+        for (layer in wbResult$Plots$layers) {
+          pl <- pl + layer
+        }
       }
       
       wbResult$TruncatedPanelsValue <- PanelsValue

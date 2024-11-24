@@ -1762,8 +1762,10 @@ ui <- dashboardPage(
                       ),
                       column(
                         width = 6,
-                        plotOutput("IFsummarise_plot")
-                      )
+                        plotOutput("IFsummarise_plot"),
+                        actionButton("Customize_IF_TTestButton", "Customize Plot")
+                      ),
+                      
                     ),
                     fluidRow(
                       column(
