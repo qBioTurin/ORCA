@@ -1667,7 +1667,7 @@ server <- function(input, output, session) {
   observeEvent(input$Customize_IF_TTestButton, {
     layer_tabs <- dinamicallyGenerateTabs(ifResult$resplot)
     showModal(modalDialog(
-      title = "Customize Plot",
+      title = "Customize or Download Plot",
       tabsetPanel(
         tabPanel(
           "Layer Customization",
@@ -1681,13 +1681,34 @@ server <- function(input, output, session) {
           sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
           sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
           colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
         )
       ),
-      actionButton("applyChangesIF_TT", "Apply Changes"),
+      footer = tagList(
+        actionButton("applyChangesIF_TT", "Apply Changes"),
+        downloadButton("downloadPlotButtonIF_TT", "Download Plot"),
+        modalButton("Close")
+      ),
       easyClose = FALSE
     ))
   })
   
+  output$downloadPlotButtonIF_TT <- downloadHandler(
+    filename = function() {
+      paste0("plot_IF_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      savePlotAsPNG(wbResult$Plots, file, width, height, dpi)
+      manageSpinner(FALSE)
+    }
+  )
   
   observeEvent(input$applyChangesIF_TT, {
     updatedPlot<-customizePlot(ifResult$SubStatData,ifResult$resplot,input)
@@ -2078,9 +2099,9 @@ server <- function(input, output, session) {
   
   
   observeEvent(input$CustomizePlotWB1, {
-    layer_tabs <- dinamicallyGenerateTabs(wbResult$Plots)
+    layer_tabs <- generateLayerParameters(wbResult$Plots)
     showModal(modalDialog(
-      title = "Customize Plot",
+      title = "Customize or Download Plot",
       tabsetPanel(
         tabPanel(
           "Layer Customization",
@@ -2089,17 +2110,35 @@ server <- function(input, output, session) {
         ),
         tabPanel(
           "Common Parameters",
-          textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
-          textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
-          sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
-          sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
-          colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+          generatePlotParameters()
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
         )
       ),
-      actionButton("applyChangesWB1", "Apply Changes"),
+      footer = tagList(
+        actionButton("applyChangesWB1", "Apply Changes"),
+        downloadButton("downloadPlotButtonWB1", "Download Plot"),
+        modalButton("Close")
+      ),
       easyClose = FALSE
     ))
   })
+  
+  output$downloadPlotButtonWB1 <- downloadHandler(
+    filename = function() {
+      paste0("plot_WB_image_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      savePlotAsPNG(wbResult$Plots, file, width, height, dpi)
+      manageSpinner(FALSE)
+    }
+  )
   
   
   observeEvent(input$applyChangesWB1, {

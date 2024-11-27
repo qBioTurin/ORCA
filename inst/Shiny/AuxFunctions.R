@@ -1913,7 +1913,7 @@ testStat.function <- function(data) {
 }
 
 # Function to customize the Plots
-dinamicallyGenerateTabs<- function(plot){
+generateLayerParameters<- function(plot){
   # Dynamically generate tabs for each layer
   layer_tabs <- lapply(seq_along(plot$layers), function(i) {
     layer_type <- class(plot$layers[[i]]$geom)[1]
@@ -1974,12 +1974,29 @@ dinamicallyGenerateTabs<- function(plot){
   return(layer_tabs)
 }
 
+generatePlotParameters <- function() {
+  tagList(
+    textInput("plotTitle", "Plot Title", value = "My Plot"),
+    sliderInput("plotTitleFontSize", "Plot Title Font Size", min = 8, max = 30, value = 16),
+    colourpicker::colourInput("plotTitleColor", "Title Color", value = "#000000"),
+    textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
+    textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
+    sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
+    sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
+    colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+  )
+}
+
+
 customizePlot <- function(PanelsValue,plot,input){
   
   backgroundColor <- input$backgroundColor
   
   updatedPlot <-plot +
+    ggtitle(input$plotTitle) +
+    labs(x = input$xAxisLabel, y = input$yAxisLabel) +
     theme(
+      plot.title = element_text(size = input$plotTitleFontSize, color = input$plotTitleColor),
       axis.text.x = element_text(size = input$xAxisFontSize),
       axis.text.y = element_text(size = input$yAxisFontSize),
       panel.background = element_rect(fill = backgroundColor, color = backgroundColor),
@@ -1992,13 +2009,13 @@ customizePlot <- function(PanelsValue,plot,input){
     layer_type <- class(plot$layers[[i]]$geom)[1]
     layer=plot$layers[[i]]
     current_mapping <- layer$mapping
-    # Apply customizations based on the layer type
+    
     if (layer_type == "GeomPoint") {
       updatedPlot <- updatedPlot +
         geom_point(
           mapping = current_mapping, 
           position = layer$position,
-          #color = input[[paste0("layerColor_", i)]],
+          color = input[[paste0("layerColor_", i)]],
           size = input[[paste0("pointSize_", i)]],
           shape = as.numeric(input[[paste0("pointShape_", i)]]),
         )
@@ -2049,6 +2066,26 @@ customizePlot <- function(PanelsValue,plot,input){
   return(updatedPlot)
 }
 
+generateSavePlotTab <- function() {
+  tagList(
+    numericInput("plotWidth", "Plot Width (inches)", value = 6, min = 1, max = 20),
+    numericInput("plotHeight", "Plot Height (inches)", value = 4, min = 1, max = 20),
+    numericInput("plotResolution", "Resolution (dpi)", value = 300, min = 72, max = 600)
+  )
+}
+
+savePlotAsPNG <- function(plot, filePath, width, height, dpi) {
+  req(plot) # Require the plot to be present
+  
+  ggsave(
+    filename = filePath,
+    plot = plot,
+    device = "png",
+    width = width,
+    height = height,
+    dpi = dpi
+  )
+}
 
 
 
