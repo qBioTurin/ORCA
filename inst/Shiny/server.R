@@ -1244,7 +1244,8 @@ server <- function(input, output, session) {
   observeEvent(input$BCA_standcurve,{
     FlagsBCA$STDCselected = input$BCA_standcurve
     FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
-  },ignoreNULL = F)
+  }, ignoreNULL = FALSE, ignoreInit = TRUE) #, ignoreInit = TRUE
+  
   # observeEvent(input$BCA_blanks,{
   #   FlagsBCA$BLANCHEselected = input$BCA_blanks
   #   FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
@@ -1705,7 +1706,7 @@ server <- function(input, output, session) {
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(wbResult$Plots, file, width, height, dpi)
+      savePlotAsPNG(ifResult$resplot, file, width, height, dpi)
       manageSpinner(FALSE)
     }
   )
@@ -2135,7 +2136,10 @@ server <- function(input, output, session) {
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(wbResult$Plots, file, width, height, dpi)
+      if(!is.null(wbResult$TruncatedPlots))
+        savePlotAsPNG(wbResult$TruncatedPlots, file, width, height, dpi)
+      else
+        savePlotAsPNG(wbResult$Plots, file, width, height, dpi)
       manageSpinner(FALSE)
     }
   )
@@ -2169,12 +2173,15 @@ server <- function(input, output, session) {
       tempXlsxPath <- file.path(tempDir, nomeXLSX)
       results <- DataAnalysisModule$wbResult
       saveRDS(results, file = tempRdsPath)
-      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "WB")
+
+      saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "WB", PanelStructures = PanelStructures)
       
       utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
     },
   )
+  
+  
   
   observeEvent(input$actionButton_ResetPlanes,{
     

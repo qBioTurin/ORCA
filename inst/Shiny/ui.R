@@ -618,7 +618,7 @@ ui <- dashboardPage(
                 plotOutput("DataPlot"),
                 actionButton(
                   inputId = "CustomizePlotWB1",
-                  label = "Customize Plot",
+                  label = "Customize or Download Plot",
                   icon = icon("paint-brush"),
                   class = "btn-primary"
                 )
@@ -1018,7 +1018,7 @@ ui <- dashboardPage(
                                     options = list(create = TRUE)),
                      fluidRow(
                        column(4,
-                              selectizeInput(inputId = "BCA_standcurve",
+                              selectizeInput("BCA_standcurve",
                                              label = "Select standard curve:",
                                              choices = NULL)
                        ),
@@ -1763,7 +1763,7 @@ ui <- dashboardPage(
                       column(
                         width = 6,
                         plotOutput("IFsummarise_plot"),
-                        actionButton("Customize_IF_TTestButton", "Customize Plot")
+                        actionButton("Customize_IF_TTestButton", "Customize or Download Plot")
                       ),
                       
                     ),

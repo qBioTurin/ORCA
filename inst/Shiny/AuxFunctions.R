@@ -501,16 +501,17 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
            insertPlot(wb = wb, sheet="WBimage")
            
+           if(!is.null(PanelStructures$data)){
+             
            addWorksheet(wb, "WBimage and protein bands")
            plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
            rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
-           if (!is.null(PanelStructures$data)) {
-             for (i in seq_len(nrow(PanelStructures$data))) {
+           for (i in seq_len(nrow(PanelStructures$data))) {
                with(PanelStructures$data, {
                  rect(xmin[i], ymin[i], xmax[i], ymax[i], border = "red")
                })
-             }
            }
+           
            insertPlot(wb = wb, sheet = "WBimage and protein bands",
                       fileType = "tiff",
                       units = "in",
@@ -518,6 +519,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            startRow <- 22
            writeDataTable(wb, PanelStructures$data, sheet = "WBimage and protein bands", startRow = startRow, startCol = 1)
+          }
            
            addWorksheet(wb, "Plot")
            print(ResultList[["Plots"]])
@@ -2068,7 +2070,7 @@ customizePlot <- function(PanelsValue,plot,input){
 
 generateSavePlotTab <- function() {
   tagList(
-    numericInput("plotWidth", "Plot Width (inches)", value = 6, min = 1, max = 20),
+    numericInput("plotWidth", "Plot Width (inches)", value = 10, min = 1, max = 20),
     numericInput("plotHeight", "Plot Height (inches)", value = 4, min = 1, max = 20),
     numericInput("plotResolution", "Resolution (dpi)", value = 300, min = 72, max = 600)
   )
