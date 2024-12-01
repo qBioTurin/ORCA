@@ -561,22 +561,25 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            addWorksheet(wb,"AdjRelDensity")
            writeDataTable(wb, sheet = "AdjRelDensity", ResultList[["AdjRelDensity"]])
            
-           addWorksheet(wb,"Barplot AdjRelDensity")
-           if(!is.null( ResultList[["AdjRelDensity"]])){
+           if(!is.null( ResultList[["AdjRelDensityPlot"]])){
+             addWorksheet(wb,"Barplot AdjRelDensity")
              print(
-               ResultList[["AdjRelDensity"]]   %>%
-                 ggplot() +
-                 geom_bar(aes(x = SampleName,
-                              y = AdjRelDensity,
-                              fill = SampleName ),
-                          stat = "identity" ) +
-                 theme_bw()
+               ResultList[["AdjRelDensityPlot"]]
              )
+               # ResultList[["AdjRelDensity"]]   %>%
+               #   ggplot() +
+               #   geom_bar(aes(x = SampleName,
+               #                y = AdjRelDensity,
+               #                fill = SampleName ),
+               #            stat = "identity" ) +
+               #   theme_bw()
+               # 
+             insertPlot(wb, sheet = "Barplot AdjRelDensity",
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600, width = 10,height = 8)
+             
            }
-           insertPlot(wb, sheet = "Barplot AdjRelDensity",
-                      fileType = "tiff",
-                      units = "in",
-                      dpi = 600, width = 10,height = 8)
          }, 
          "RT-qPCR" = {
            wb <- createWorkbook("RTqPCR")
@@ -1990,7 +1993,7 @@ generatePlotParameters <- function() {
 }
 
 
-customizePlot <- function(PanelsValue,plot,input){
+customizePlot <- function(plot,input){
   
   backgroundColor <- input$backgroundColor
   

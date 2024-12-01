@@ -747,12 +747,23 @@ ui <- dashboardPage(
                    ),
                    plotOutput("plot_AdjRelDens"),
                    fluidRow(
-                     column(width = 1,offset = 9,
-                            downloadButton( label = "Download Analysis & Excel", 
-                                            outputId = "downloadWBquantAnalysis",
-                                            #href = "Results.RData",
-                                            #download = "Results.RData",
-                                            icon = icon("download") )
+                     column(
+                       width = 2, offset = 7,  # Adjusting offset to align properly
+                       actionButton(
+                         inputId = "CustomizePlotWBQuantification", 
+                         label = "Customize or Download Plot", 
+                         icon = icon("paint-brush")
+                       )
+                     ),
+                     column(
+                       width = 2, 
+                       downloadButton(
+                         label = "Download Analysis & Excel", 
+                         outputId = "downloadWBquantAnalysis",
+                         #href = "Results.RData",
+                         #download = "Results.RData",
+                         icon = icon("download")
+                       )
                      )
                    )
               )

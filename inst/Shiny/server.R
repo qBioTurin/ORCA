@@ -1,4 +1,5 @@
-# shiny.maxRequestSize=1000*1024^2
+
+options(shiny.maxRequestSize=1000*1024^2)
 # shiny.launch.browser = .rs.invokeShinyWindowExternal
 
 Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
@@ -1666,7 +1667,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$Customize_IF_TTestButton, {
-    layer_tabs <- dinamicallyGenerateTabs(ifResult$resplot)
+    layer_tabs <- generateLayerParameters(ifResult$resplot)
     showModal(modalDialog(
       title = "Customize or Download Plot",
       tabsetPanel(
@@ -1712,7 +1713,7 @@ server <- function(input, output, session) {
   )
   
   observeEvent(input$applyChangesIF_TT, {
-    updatedPlot<-customizePlot(ifResult$SubStatData,ifResult$resplot,input)
+    updatedPlot<-customizePlot(ifResult$resplot,input)
     ifResult$resplot<- updatedPlot
     output$IFsummarise_plot <- renderPlot({updatedPlot})
     removeModal()
@@ -1931,10 +1932,12 @@ server <- function(input, output, session) {
   observeEvent(input$panelSelect_button,{
     e <- input$plot_brush
     if (!is.null(e)) {
-      vals <- data.frame(xmin = round(e$xmin, 1),
-                         ymin = round(e$ymin, 1),
-                         xmax = round(e$xmax, 1),
-                         ymax = round(e$ymax, 1))
+      vals <- data.frame(
+        xmin = pmax(0, round(e$xmin, 1)), #Avoid eventually negative values 
+        ymin = pmax(0, round(e$ymin, 1)),  
+        xmax = pmax(0, round(e$xmax, 1)),  
+        ymax = pmax(0, round(e$ymax, 1))   
+        )
       
       if (!identical(vals,prev_vals))  
       {
@@ -2147,10 +2150,10 @@ server <- function(input, output, session) {
   
   observeEvent(input$applyChangesWB1, {
     if(!is.null(wbResult$TruncatedPanelsValue)){
-      updatedPlot<-customizePlot(wbResult$TruncatedPanelsValue,wbResult$TruncatedPlots,input)
+      updatedPlot<-customizePlot(wbResult$TruncatedPlots,input)
       wbResult$TruncatedPlots<- updatedPlot
     }else{
-      updatedPlot<-customizePlot(wbResult$PanelsValue,wbResult$Plots,input)
+      updatedPlot<-customizePlot(wbResult$Plots,input)
       wbResult$Plots<- updatedPlot
     }
     output$DataPlot <- renderPlot({updatedPlot})
@@ -2380,16 +2383,20 @@ server <- function(input, output, session) {
                                  WBanalysis = NULL,
                                  WBanalysis_filtered = NULL,
                                  RelDensitiy = NULL,
-                                 AdjRelDensity = NULL
+                                 AdjRelDensity = NULL,
+                                 AdjRelDensityPlot = NULL
   )
   wbquantResult0 = list(NormWBanalysis = NULL,
                         NormWBanalysis_filtered = NULL,
                         WBanalysis = NULL,
                         WBanalysis_filtered = NULL,
                         RelDensitiy = NULL,
-                        AdjRelDensity = NULL
+                        AdjRelDensity = NULL,
+                        AdjRelDensityPlot = NULL
   )
   FlagsWBquant = reactiveValues(BothUploaded = F)
+  
+  wbquantPlot = reactiveValues(Plots = NULL)
   
   observeEvent(input$NextWBQuantif,{
     if(!is.null(wbResult$AUCdf))
@@ -2465,7 +2472,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$actionB_loadingWB, {
     alert$alertContext <- "WBQuant-reset"
-    if(!is.null(wbquantResult$NormWBanalysis) ) { 
+    if(!is.null(wbquantResult$WBanalysis) ) { 
       shinyalert(
         title = "Important message",
         text = "Do you want to update the WB data already present, by resetting the previous analysis?",
@@ -2473,7 +2480,7 @@ server <- function(input, output, session) {
         showCancelButton = TRUE,
         confirmButtonText = "Update",
         cancelButtonText = "Cancel",
-      )
+      ) 
     } else{
       wbquantResult$WBanalysis = loadWBanalysi4Quant(input$WBImport$datapath,wbResult)
       wbquantResult$WBanalysis_filtered = NULL
@@ -2645,8 +2652,64 @@ server <- function(input, output, session) {
         barPlotAdjRelDens
       })
       
+      wbquantResult$AdjRelDensityPlot <- barPlotAdjRelDens
     })
   })
+  
+  
+  observeEvent(input$CustomizePlotWBQuantification, {
+    layer_tabs <- generateLayerParameters(wbquantResult$AdjRelDensityPlot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          # Dynamically generate inputs for each layer
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
+          textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
+          sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
+          sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
+          colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
+        )
+      ),
+      footer = tagList(
+        actionButton("applyChangesWbQuantification", "Apply Changes"),
+        downloadButton("downloadPlotWbQuantification", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  output$downloadPlotWbQuantification <- downloadHandler(
+    filename = function() {
+      paste0("plot_IF_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      savePlotAsPNG(wbquantResult$AdjRelDensityPlot, file, width, height, dpi)
+      manageSpinner(FALSE)
+    }
+  )
+  
+  observeEvent(input$applyChangesWbQuantification, {
+    updatedPlot<-customizePlot(wbquantResult$AdjRelDensityPlot,input)
+    wbquantResult$AdjRelDensityPlot<- updatedPlot
+    output$plot_AdjRelDens <- renderPlot({updatedPlot})
+    removeModal()
+  })
+  
   
   output$downloadWBquantAnalysis <- downloadHandler(
     filename = function() {
