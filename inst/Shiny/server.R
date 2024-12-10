@@ -1678,11 +1678,7 @@ server <- function(input, output, session) {
         ),
         tabPanel(
           "Common Parameters",
-          textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
-          textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
-          sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
-          sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
-          colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+          generatePlotParameters(ifResult$resplot)
         ),
         tabPanel(
           "Save Plot",
@@ -1720,6 +1716,7 @@ server <- function(input, output, session) {
   })
   
   
+  
   observeEvent(input$IF_TTestvariable,{
     ifResult$FinalData -> IFinalData
     input$IF_TTestvariable -> varSel
@@ -1732,15 +1729,15 @@ server <- function(input, output, session) {
       
       BivTest = testStat.function(SubData)
       
-      resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
-        geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-        geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-        geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
-                   position = position_jitter(width = 0.2), size = 3) +
-        theme_bw()+
-        labs(color = "Experimental Condition", y = "Percentages (%)" , x = "")
-      annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-               hjust = 1.1, vjust = 1.5, size = 5, color = "black")
+        resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
+          geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+          geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+          geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
+                     position = position_jitter(width = 0.2), size = 3) +
+          theme_bw()+
+          labs(color = "Experimental Condition", y = "Percentages (%)" , x = "")
+        annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
+                 hjust = 1.1, vjust = 1.5, size = 5, color = "black")
       
       
       output$IFsummarise_plot = renderPlot({resplot})
@@ -2114,7 +2111,7 @@ server <- function(input, output, session) {
         ),
         tabPanel(
           "Common Parameters",
-          generatePlotParameters()
+          generatePlotParameters(wbResult$Plots)
         ),
         tabPanel(
           "Save Plot",
@@ -2669,11 +2666,7 @@ server <- function(input, output, session) {
         ),
         tabPanel(
           "Common Parameters",
-          textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
-          textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
-          sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
-          sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
-          colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
+          generatePlotParameters(wbquantResult$AdjRelDensityPlot)
         ),
         tabPanel(
           "Save Plot",
@@ -2691,7 +2684,7 @@ server <- function(input, output, session) {
   
   output$downloadPlotWbQuantification <- downloadHandler(
     filename = function() {
-      paste0("plot_IF_", Sys.Date(), ".png")
+      paste0("plot_WBQ_", Sys.Date(), ".png")
     },
     content = function(file) {
       manageSpinner(TRUE)

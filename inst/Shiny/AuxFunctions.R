@@ -1917,87 +1917,253 @@ testStat.function <- function(data) {
   }
 }
 
-# Function to customize the Plots
-generateLayerParameters<- function(plot){
+
+generateLayerParameters <- function(plot) {
+  # Build the plot to extract computed data and aesthetics
+  plot_build <- ggplot_build(plot)
+  
   # Dynamically generate tabs for each layer
   layer_tabs <- lapply(seq_along(plot$layers), function(i) {
-    layer_type <- class(plot$layers[[i]]$geom)[1]
+    layer <- plot$layers[[i]]
+    layer_type <- class(layer$geom)[1]
     
+    aes_mapping <- layer$mapping
+    data <- plot_build$data[[i]]
+    default_params <- layer$aes_params
+    
+    #Function to extract specific aesthetic values
+    extract_aes_value <- function(aesthetic, default) {
+      if (!is.null(aes_mapping[[aesthetic]])) {
+        return(unique(data[[aesthetic]]))
+      }
+      if (!is.null(default_params[[aesthetic]])) {
+        return(default_params[[aesthetic]])
+      }
+      return(default)
+    }
+    
+    # Generate inputs dynamically for layer-specific parameters
     tabPanel(
       paste("Layer", i, "(", layer_type, ")"),
       wellPanel(
         h4(paste("Customize Layer", i, "-", layer_type)),
-        # Common controls for all layers
-        colourpicker::colourInput(paste0("layerColor_", i), "Layer Color", value = "#000000"),
-        sliderInput(paste0("layerWidth_", i), "Layer Width", min = 1, max = 5, value = 1),
         
-        # Additional controls based on layer type
+        # Common controls for all layers
+        sliderInput(
+          paste0("layerSize_", i), "Layer Size", 
+          min = 1, max = 5, value = extract_aes_value("size", 1)
+        ),
+        
+        # Layer-specific customization
         if (layer_type == "GeomPoint") {
           tagList(
-            sliderInput(paste0("pointSize_", i), "Point Size", min = 1, max = 10, value = 3),
-            selectInput(
-              paste0("pointShape_", i),
-              "Point Shape",
-              choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
-              selected = 16
-            )
+            if ("colour" %in% names(aes_mapping)) {
+              lapply(unique(data[["group"]]), function(x_val) {
+                colourpicker::colourInput(
+                  paste0("pointColor_", i, "_", x_val),
+                  paste("Point Color for Group", x_val),
+                  value = extract_aes_value("colour", "#000000")
+                )
+              })
+            } else {
+              colourpicker::colourInput(
+                paste0("pointColor_", i),
+                "Point Color",
+                value = extract_aes_value("colour", "#000000")
+              )
+            },
+            
+            if ("shape" %in% names(aes_mapping)) {
+              lapply(unique(data[["group"]]), function(x_val) {
+                selectInput(
+                  paste0("pointShape_", i, "_", x_val),
+                  paste("Point Shape for Group", x_val),
+                  choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
+                  selected = extract_aes_value("shape", 16)
+                )
+              })
+            } else {
+              selectInput(
+                paste0("pointShape_", i),
+                "Point Shape",
+                choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
+                selected = extract_aes_value("shape", 16)
+              )
+            }
           )
         } else if (layer_type == "GeomLine") {
           tagList(
-            selectInput(
-              paste0("lineType_", i),
-              "Line Type",
-              choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
-              selected = "solid"
-            )
+            # Line Type
+            if ("linetype" %in% names(aes_mapping)) {
+              lapply(unique(data[["group"]]), function(x_val) {
+                selectInput(
+                  paste0("lineType_", i, "_", x_val),
+                  paste("Line Type for Group", x_val),
+                  choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
+                  selected = extract_aes_value("linetype", "solid")
+                )
+              })
+            } else {
+              selectInput(
+                paste0("lineType_", i),
+                "Line Type",
+                choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
+                selected = extract_aes_value("linetype", "solid")
+              )
+            },
+            
+            # Line Color
+            if ("colour" %in% names(aes_mapping)) {
+              lapply(unique(data[["group"]]), function(x_val) {
+                colourpicker::colourInput(
+                  paste0("lineColor_", i, "_", x_val),
+                  paste("Line Color for Group", x_val),
+                  value = extract_aes_value("colour", "#000000")
+                )
+              })
+            } else {
+              colourpicker::colourInput(
+                paste0("lineColor_", i),
+                "Line Color",
+                value = extract_aes_value("colour", "#000000")
+              )
+            }
           )
         } else if (layer_type == "GeomBar") {
           tagList(
-            sliderInput(paste0("barWidth_", i), "Bar Width", min = 0.1, max = 1, value = 0.5),
-            colourpicker::colourInput(paste0("barFillColor_", i), "Bar Fill Color", value = "#FF9999")
-          )
-        } else if (layer_type == "GeomBoxplot") {
-          tagList(
-            checkboxInput(paste0("notch_", i), "Add Notch", value = FALSE),
-            sliderInput(paste0("boxWidth_", i), "Box Width", min = 0.1, max = 1, value = 0.5),
-            colourpicker::colourInput(paste0("boxFillColor_", i), "Fill Color", value = "#FF9999"),
-            colourpicker::colourInput(paste0("boxOutlineColor_", i), "Outline Color", value = "#000000"),
-            sliderInput(paste0("outlierSize_", i), "Outlier Size", min = 1, max = 5, value = 2),
-            colourpicker::colourInput(paste0("outlierColor_", i), "Outlier Color", value = "#FF0000")
+            # Bar Fill Color
+            if ("fill" %in% names(aes_mapping)) {
+              lapply(unique(data[["group"]]), function(x_val) {
+                colourpicker::colourInput(
+                  paste0("barFillColor_", i, "_", x_val),
+                  paste("Bar Fill Color for Group", x_val),
+                  value = extract_aes_value("fill", "#FF9999")
+                )
+              })
+            } else {
+              colourpicker::colourInput(
+                paste0("barFillColor_", i),
+                "Bar Fill Color",
+                value = extract_aes_value("fill", "#FF9999")
+              )
+            },
+            sliderInput(
+              paste0("barWidth_", i),
+              "Bar Width",
+              min = 0.1, max = 1, value = extract_aes_value("width", 0.5)
+            ),
+            if("color" %in% names(aes_mapping)){
+              lapply(unique(data[["group"]]), function(x_val) {
+                colourpicker::colourInput(
+                  paste0("barColor_", i, "_", x_val),
+                  paste("Bar Color for Group", x_val),
+                  value = extract_aes_value("colour", "#000000")
+                )
+              })
+            } else {
+              colourpicker::colourInput(
+                paste0("barColor_", i),
+                "Bar Color",
+                value = extract_aes_value("colour", "#000000")
+              )
+            }
           )
         } else if (layer_type == "GeomErrorbar") {
           tagList(
-            colourpicker::colourInput(paste0("errorBarColor_", i), "Error Bar Color", value = "#000000"),
-            sliderInput(paste0("errorBarWidth_", i), "Error Bar Width", min = 0.1, max = 2, value = 0.5)
+            sliderInput(
+              paste0("errorBarWidth_", i),
+              "Error Bar Width",
+              min = 0.1, max = 2, value = extract_aes_value("width", 0.5)
+            )
+            ,
+            if ("colour" %in% names(aes_mapping)) {
+              lapply(unique(data[["group"]]), function(x_val) {
+                colourpicker::colourInput(
+                  paste0("errorBarColor_", i, "_", x_val),
+                  paste("Error Bar Color for Group", x_val),
+                  value = extract_aes_value("colour", "#000000")
+                )
+              })
+            } else {
+              colourpicker::colourInput(
+                paste0("errorBarColor_", i),
+                "Error Bar Color",
+                value = extract_aes_value("colour", "#000000")
+              )
+            }
           )
-        }else {
+        } else if (layer_type == "GeomBoxplot") {
+          tagList(
+            # Notch
+            checkboxInput(
+              paste0("notch_", i),
+              "Add Notch",
+              value = extract_aes_value("notch", FALSE)
+            ),
+            
+            if ("fill" %in% names(aes_mapping)) {
+              lapply(unique(data[["group"]]), function(x_val) {
+                colourpicker::colourInput(
+                  paste0("boxFillColor_", i, "_", x_val),
+                  paste("Boxplot Fill Color for Group", x_val),
+                  value = extract_aes_value("fill", "#FF9999")
+                )
+              })
+            } else {
+              colourpicker::colourInput(
+                paste0("boxFillColor_", i),
+                "Boxplot Fill Color",
+                value = extract_aes_value("fill", "#FF9999")
+              )
+            },
+            
+            if("colour" %in% names(aes_mapping)){
+              lapply(unique(data[["group"]]), function(x_val) {
+                colourpicker::colourInput(
+                  paste0("boxOutlineColor_", i, "_", x_val),
+                  paste("Boxplot Outline Color for Group", x_val),
+                  value = extract_aes_value("colour", "#000000")
+                )
+              })
+            } else {
+              colourpicker::colourInput(
+                paste0("boxOutlineColor_", i),
+                "Boxplot Outline Color",
+                value = extract_aes_value("colour", "#000000")
+              )
+            },
+            colourpicker::colourInput(
+              paste0("outlierColor_", i),
+              "Outlier Color",
+              value = extract_aes_value("outlier.colour", "#FF0000")
+            ),
+            sliderInput(
+              paste0("outlierSize_", i),
+              "Outlier Size",
+              min = 1, max = 5, value = extract_aes_value("outlier.size", 2)
+            ),
+            sliderInput(
+              paste0("boxWidth_", i),
+              paste("Box Width"),
+              min = 0.1, max = 1, value = extract_aes_value("width", 0.5)
+            )
+          )
+        } else {
           p("No specific customization available for this layer type.")
         }
       )
     )
   })
+  
   return(layer_tabs)
 }
 
-generatePlotParameters <- function() {
-  tagList(
-    textInput("plotTitle", "Plot Title", value = "My Plot"),
-    sliderInput("plotTitleFontSize", "Plot Title Font Size", min = 8, max = 30, value = 16),
-    colourpicker::colourInput("plotTitleColor", "Title Color", value = "#000000"),
-    textInput("xAxisLabel", "X-Axis Label", value = "X Axis"),
-    textInput("yAxisLabel", "Y-Axis Label", value = "Y Axis"),
-    sliderInput("xAxisFontSize", "X-Axis Font Size", min = 8, max = 20, value = 12),
-    sliderInput("yAxisFontSize", "Y-Axis Font Size", min = 8, max = 20, value = 12),
-    colourpicker::colourInput("backgroundColor", "Background Color", value = "#FFFFFF")
-  )
-}
 
-
-customizePlot <- function(plot,input){
-  
+customizePlot <- function(plot, input) {
+  # General theme and title customization
   backgroundColor <- input$backgroundColor
   
-  updatedPlot <-plot +
+  updatedPlot <- plot +
     ggtitle(input$plotTitle) +
     labs(x = input$xAxisLabel, y = input$yAxisLabel) +
     theme(
@@ -2009,67 +2175,403 @@ customizePlot <- function(plot,input){
     )
   
   updatedPlot$layers <- list()
+  plot_build=ggplot_build(plot)
   
   for (i in seq_along(plot$layers)) {
-    layer_type <- class(plot$layers[[i]]$geom)[1]
-    layer=plot$layers[[i]]
+    layer <- plot$layers[[i]]
+    layer_type <- class(layer$geom)[1]
     current_mapping <- layer$mapping
     
+    # Determine if properties are mapped
+    is_colour_mapped <- "colour" %in% names(current_mapping)
+    is_fill_mapped <- "fill" %in% names(current_mapping)
+    is_shape_mapped <- "shape" %in% names(current_mapping)
+    is_linetype_mapped <- "linetype" %in% names(current_mapping)
+    
+    
+    unique_x<-unique(plot_build$data[[i]][["group"]] )
+    
+    # Customize each type of geom layer
     if (layer_type == "GeomPoint") {
-      updatedPlot <- updatedPlot +
-        geom_point(
-          mapping = current_mapping, 
-          position = layer$position,
-          color = input[[paste0("layerColor_", i)]],
-          size = input[[paste0("pointSize_", i)]],
-          shape = as.numeric(input[[paste0("pointShape_", i)]]),
+      
+      colour_scale <- if (is_colour_mapped) {
+        scale_color_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("pointColor_", i, "_", x_val)]]
+          }))
         )
-    } else if (layer_type == "GeomLine") {
-      updatedPlot <- updatedPlot +
-        geom_line(
-          mapping = current_mapping, 
-          position = layer$position,
-          color = input[[paste0("layerColor_", i)]],
-          size = input[[paste0("layerWidth_", i)]],
-          linetype = input[[paste0("lineType_", i)]]
+      } else NULL
+      
+      shape_scale <- if (is_shape_mapped) {
+        scale_shape_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            as.integer(input[[paste0("pointShape_", i, "_", x_val)]])
+          }))
         )
+      } else NULL
+      
+      if(!is_shape_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_point(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            shape = as.integer(input[[paste0("pointShape_", i)]]),
+            colour= input[[paste0("pointColor_", i)]]
+          )+
+          colour_scale +
+          shape_scale
+      }
+      else if(is_shape_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_point(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            colour= input[[paste0("pointColor_", i)]]
+          )+
+          colour_scale +
+          shape_scale
+      }
+      else if(!is_shape_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_point(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            shape = as.integer(input[[paste0("pointShape_", i)]]),
+          )+
+          colour_scale +
+          shape_scale
+      }
+      else if(is_shape_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_point(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+          )+
+          colour_scale +
+          shape_scale
+      }
+      
     } else if (layer_type == "GeomBar") {
-      updatedPlot <- updatedPlot +
-        geom_bar(
-          mapping = current_mapping, 
-          position = layer$position,
-          color = input[[paste0("layerColor_", i)]],
-          stat = "identity",
-          width = input[[paste0("barWidth_", i)]],
-          fill = input[[paste0("barFillColor_", i)]]
+      
+      colour_scale <- if (is_colour_mapped) {
+        scale_color_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("barColor_", i,"_", x_val)]]
+          }))
         )
+      } else NULL
+      fill_scale <- if (is_fill_mapped) {
+        scale_fill_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("barFillColor_", i,"_", x_val)]]
+          }))
+        )
+      } else NULL
+      
+      if(!is_fill_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_bar(
+            mapping = layer$mapping,
+            position = layer$position,
+            stat = "identity",
+            size = input[[paste0("layerSize_", i)]],
+            width = input[[paste0("barWidth_", i)]],
+            fill= input[[paste0("barFillColor_", i)]],
+            color= input[[paste0("barColor_", i)]]
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      else if(is_fill_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_bar(
+            #data = layer$data,
+            mapping = layer$mapping,
+            position = layer$position,
+            stat = "identity",
+            size = input[[paste0("layerSize_", i)]],
+            width = input[[paste0("barWidth_", i)]],
+            color= input[[paste0("barColor_", i)]]
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      else if(!is_fill_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_bar(
+            mapping = layer$mapping,
+            position = layer$position,
+            stat = "identity",
+            size = input[[paste0("layerSize_", i)]],
+            width = input[[paste0("barWidth_", i)]],
+            fill= input[[paste0("barFillColor_", i)]]
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      else if(is_fill_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_bar(
+            mapping = layer$mapping,
+            position = layer$position,
+            stat = "identity",
+            size = input[[paste0("layerSize_", i)]],
+            width = input[[paste0("barWidth_", i)]],
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      
+    } else if (layer_type == "GeomLine") {
+      colour_scale <- if (is_colour_mapped) {
+        scale_color_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("lineColor_", i,"_", x_val)]]
+          }))
+        )
+      } else NULL
+      linetype_scale <- if (is_linetype_mapped) {
+        scale_linetype_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("lineType_", i,"_", x_val)]]
+          }))
+        )
+      } else NULL
+      
+      if(!is_linetype_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_line(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            linetype= input[[paste0("lineType_", i)]],
+            color= input[[paste0("lineColor_", i)]]
+          ) +
+          colour_scale +
+          linetype_scale
+      }
+      else if(is_linetype_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_line(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            color= input[[paste0("lineColor_", i)]]
+          ) +
+          colour_scale +
+          linetype_scale
+      }
+      else if(!is_linetype_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_line(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            linetype= input[[paste0("lineType_", i)]]
+          ) +
+          colour_scale +
+          linetype_scale
+      }
+      else if(is_linetype_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_line(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]]
+          ) +
+          colour_scale +
+          linetype_scale
+      }
+      
     } else if (layer_type == "GeomBoxplot") {
-      updatedPlot <- updatedPlot +
-        geom_boxplot(
-          mapping = current_mapping, 
-          position = layer$position,
-          notch = input[[paste0("notch_", i)]],
-          width = input[[paste0("boxWidth_", i)]],
-          fill = input[[paste0("boxFillColor_", i)]],
-          color = input[[paste0("boxOutlineColor_", i)]],
-          outlier.size = input[[paste0("outlierSize_", i)]],
-          outlier.colour = input[[paste0("outlierColor_", i)]]
+      
+      colour_scale <- if (is_colour_mapped) {
+        scale_color_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("boxOutlineColor_", i,"_", x_val)]]
+          }))
         )
+      } else NULL
+      fill_scale <- if (is_fill_mapped) {
+        scale_fill_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("boxFillColor_", i,"_", x_val)]]
+          }))
+        )
+      } else NULL
+      
+      if(!is_fill_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_boxplot(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            notch = input[[paste0("notch_", i)]],
+            width = input[[paste0("boxWidth_", i)]],
+            outlier.size = input[[paste0("outlierSize_", i)]],
+            outlier.colour = input[[paste0("outlierColor_", i)]],
+            color= input[[paste0("boxOutlineColor_", i)]],
+            fill = input[[paste0("boxFillColor_", i)]]
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      else if(is_fill_mapped&&!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_boxplot(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            notch = input[[paste0("notch_", i)]],
+            width = input[[paste0("boxWidth_", i)]],
+            outlier.size = input[[paste0("outlierSize_", i)]],
+            outlier.colour = input[[paste0("outlierColor_", i)]],
+            color= input[[paste0("boxOutlineColor_", i)]]
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      else if(!is_fill_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_boxplot(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            notch = input[[paste0("notch_", i)]],
+            width = input[[paste0("boxWidth_", i)]],
+            outlier.size = input[[paste0("outlierSize_", i)]],
+            outlier.colour = input[[paste0("outlierColor_", i)]],
+            fill= input[[paste0("boxFillColor_", i)]]
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      else if(is_fill_mapped&&is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_boxplot(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            notch = input[[paste0("notch_", i)]],
+            width = input[[paste0("boxWidth_", i)]],
+            outlier.size = input[[paste0("outlierSize_", i)]],
+            outlier.colour = input[[paste0("outlierColor_", i)]]
+          ) +
+          colour_scale +
+          fill_scale
+      }
+      
     } else if (layer_type == "GeomErrorbar") {
-      updatedPlot <- updatedPlot +
-        geom_errorbar(
-          mapping = current_mapping, 
-          position = layer$position,
-          color = input[[paste0("errorBarColor_", i)]],
-          width = input[[paste0("errorBarWidth_", i)]]
+      colour_scale <- if (is_colour_mapped) {
+        scale_color_manual(
+          values = unlist(lapply(unique_x, function(x_val) {
+            input[[paste0("errorBarColor_", i,"_", x_val)]]
+          }))
         )
-    }
-    else {
+      } else NULL
+      
+      if(!is_colour_mapped){
+        updatedPlot <- updatedPlot +
+          geom_errorbar(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            width = input[[paste0("errorBarWidth_", i)]],
+            color= input[[paste0("errorBarColor_", i)]]
+          ) +
+          colour_scale
+      }
+      else{
+        updatedPlot <- updatedPlot +
+          geom_errorbar(
+            mapping = layer$mapping,
+            position = layer$position,
+            size = input[[paste0("layerSize_", i)]],
+            width = input[[paste0("errorBarWidth_", i)]]
+          ) +
+          colour_scale
+      }
+      
+    } else {
       warning(paste("No specific customizations applied for layer type:", layer_type))
     }
   }
+  
   return(updatedPlot)
 }
+
+
+generatePlotParameters <- function(plot) {
+  
+  plot_title <- plot$labels$title
+  x_axis_label <- plot$labels$x
+  y_axis_label <- plot$labels$y
+  
+  # Extract theme elements
+  theme_elements <- ggplot2::theme_get()
+  if (!is.null(plot$theme)) {
+    theme_elements <- ggplot2::theme_update(plot$theme)
+  }
+  title_size <- theme_elements$text$size %||% 14
+  title_color <- theme_elements$text$colour %||% "#000000"
+  x_axis_size <- theme_elements$axis.text.x$size %||% 12
+  y_axis_size <- theme_elements$axis.text.y$size %||% 12
+  background_color <- theme_elements$panel.background$fill %||% "#FFFFFF"
+  
+  tagList(
+    textInput(
+      "plotTitle", 
+      "Plot Title", 
+      value = plot_title %||% "My Plot"
+    ),
+    sliderInput(
+      "plotTitleFontSize", 
+      "Plot Title Font Size", 
+      min = 8, 
+      max = 30, 
+      value = title_size
+    ),
+    colourpicker::colourInput(
+      "plotTitleColor", 
+      "Title Color", 
+      value = title_color
+    ),
+    textInput(
+      "xAxisLabel", 
+      "X-Axis Label", 
+      value = x_axis_label %||% "X Axis"
+    ),
+    textInput(
+      "yAxisLabel", 
+      "Y-Axis Label", 
+      value = y_axis_label %||% "Y Axis"
+    ),
+    sliderInput(
+      "xAxisFontSize", 
+      "X-Axis Font Size", 
+      min = 8, 
+      max = 20, 
+      value = x_axis_size
+    ),
+    sliderInput(
+      "yAxisFontSize", 
+      "Y-Axis Font Size", 
+      min = 8, 
+      max = 20, 
+      value = y_axis_size
+    ),
+    colourpicker::colourInput(
+      "backgroundColor", 
+      "Background Color", 
+      value = background_color
+    )
+  )
+}
+
 
 generateSavePlotTab <- function() {
   tagList(
@@ -2091,6 +2593,7 @@ savePlotAsPNG <- function(plot, filePath, width, height, dpi) {
     dpi = dpi
   )
 }
+
 
 
 
