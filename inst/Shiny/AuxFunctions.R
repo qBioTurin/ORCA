@@ -1136,91 +1136,108 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
 #   return(do.call(rbind, formatted_data))
 # }
 
-updateTable <- function(position, analysis, info, data, result, flag, session) {
-  req(info) 
+updateTable <- function(color_name, analysis, info, data, result, flag, session) {
+  req(info)
   
   selected_row <- info$row
   selected_col <- info$col
   new_value <- info$value
   
-  # change the exp_condition column to ENDOC or sample_name to ELISA  
-  if (selected_col == 4 ) {
-    color_code <- data[selected_row, "ColorCode"]
-    
-    if (!is.na(color_code) && color_code != "" && color_code != "white" && color_code != "#FFFFFF") {
-      analysis_lower <- tolower(analysis)
-      matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
-      
-      if (nrow(matching_indices) > 0) {
-        current_values <- c()
-        
-        apply(matching_indices, 1, function(idx) {
-          current_values <<- c(current_values, result[[paste0("Initdata")]][idx["row"], idx["col"]])
-          old_value_key <- names(flag[[paste0("EXPcol")]])[names(flag[[paste0("EXPcol")]]) == result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]]]
-          
-          if (length(old_value_key) > 0) {
-            flag[[paste0("EXPcol")]][new_value] <- flag[[paste0("EXPcol")]][old_value_key]
-            flag[[paste0("EXPcol")]] <- flag[[paste0("EXPcol")]][!names(flag[[paste0("EXPcol")]]) %in% old_value_key]
-            assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
-          }
-          
-          result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
-          # if ELISA, modify SN otherwise modify EXP
-          if (analysis %in% c("ELISA","IF","BCA") ) {
-            result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
-          } else if (analysis == "ENDOC") {
-            result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
-          }
-          
-          
-          assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
-        })
-        
-        if (!new_value %in% flag[[paste0("AllExp")]]) {
-          flag[[paste0("AllExp")]] <- unique(c(flag[[paste0("AllExp")]], new_value))
-          assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
-        }
-      }
-    }
-  } 
-  # change the time column to ENDOC or exp_condition to ELISA  
-  else if (selected_col == 5) {
-    color_code <- data[selected_row, "ColorCode"]
-    req(color_code != "", color_code != "white", color_code != "#FFFFFF")
-    
-    analysis_lower <- tolower(analysis)
-    matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
-    num_matches <- nrow(matching_indices)
-    
-    # operation to set the unfilled values to NA and save only the modified position
-    processed_value <- gsub(" -  - ", " - NA - ", new_value)
-    processed_value <- sub("^ - ", "NA - ", processed_value)
-    processed_value <- sub(" - $", " - NA", processed_value)
-    
-    new_values <- strsplit(processed_value, " - ", fixed = TRUE)[[1]]
-    new_values[new_values == ""] <- NA  
-    
-    current_values <- new_values  
-    
-    if (length(new_values) != num_matches) {
-      session$sendCustomMessage(type = "errorNotification", 
-                                message = "Number of values does not match the number of matches.")
-    } else {
-      for (i in seq_along(matching_indices[, "row"])) {
-        if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
-          # if ELISA, modify EXP otherwise modify TIME
-          if (analysis == "ELISA"||analysis == "BCA") {
-            result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
-          } else {
-            result[[paste0(analysis, "cell_TIME")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
-          }
-        } 
-      }
-      assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
-    }
+  if (selected_col == 2) {  # Assuming "Experimental Condition" column is index 2
+    data[selected_row, selected_col] <- new_value
+    return(paste("Updated Experimental Condition for", color_name, ":", new_value))
   }
-  return(paste("Updated values: ", new_value))
+  
+  return("No changes made.")
 }
+
+
+
+# updateTable <- function(position, analysis, info, data, result, flag, session) {
+#     req(info) 
+#     
+#     selected_row <- info$row
+#     selected_col <- info$col
+#     new_value <- info$value
+#     
+#     # change the exp_condition column to ENDOC or sample_name to ELISA  
+#     if (selected_col == 4 ) {
+#       color_code <- data[selected_row, "ColorCode"]
+#       
+#       if (!is.na(color_code) && color_code != "" && color_code != "white" && color_code != "#FFFFFF") {
+#         analysis_lower <- tolower(analysis)
+#         matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
+#         
+#         if (nrow(matching_indices) > 0) {
+#           current_values <- c()
+#           
+#           apply(matching_indices, 1, function(idx) {
+#             current_values <<- c(current_values, result[[paste0("Initdata")]][idx["row"], idx["col"]])
+#             old_value_key <- names(flag[[paste0("EXPcol")]])[names(flag[[paste0("EXPcol")]]) == result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]]]
+#             
+#             if (length(old_value_key) > 0) {
+#               flag[[paste0("EXPcol")]][new_value] <- flag[[paste0("EXPcol")]][old_value_key]
+#               flag[[paste0("EXPcol")]] <- flag[[paste0("EXPcol")]][!names(flag[[paste0("EXPcol")]]) %in% old_value_key]
+#               assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
+#             }
+#             
+#             result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
+#             # if ELISA, modify SN otherwise modify EXP
+#             if (analysis %in% c("ELISA","IF","BCA") ) {
+#               result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
+#             } else if (analysis == "ENDOC") {
+#               result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
+#             }
+#             
+#             
+#             assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
+#           })
+#           
+#           if (!new_value %in% flag[[paste0("AllExp")]]) {
+#             flag[[paste0("AllExp")]] <- unique(c(flag[[paste0("AllExp")]], new_value))
+#             assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
+#           }
+#         }
+#       }
+#     } 
+#     # change the time column to ENDOC or exp_condition to ELISA  
+#     else if (selected_col == 5) {
+#       color_code <- data[selected_row, "ColorCode"]
+#       req(color_code != "", color_code != "white", color_code != "#FFFFFF")
+#       
+#       analysis_lower <- tolower(analysis)
+#       matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
+#       num_matches <- nrow(matching_indices)
+#       
+#       # operation to set the unfilled values to NA and save only the modified position
+#       processed_value <- gsub(" -  - ", " - NA - ", new_value)
+#       processed_value <- sub("^ - ", "NA - ", processed_value)
+#       processed_value <- sub(" - $", " - NA", processed_value)
+#       
+#       new_values <- strsplit(processed_value, " - ", fixed = TRUE)[[1]]
+#       new_values[new_values == ""] <- NA  
+#       
+#       current_values <- new_values  
+#       
+#       if (length(new_values) != num_matches) {
+#         session$sendCustomMessage(type = "errorNotification", 
+#                                   message = "Number of values does not match the number of matches.")
+#       } else {
+#         for (i in seq_along(matching_indices[, "row"])) {
+#           if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
+#             # if ELISA, modify EXP otherwise modify TIME
+#             if (analysis == "ELISA"||analysis == "BCA") {
+#               result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
+#             } else {
+#               result[[paste0(analysis, "cell_TIME")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
+#             }
+#           } 
+#         }
+#         assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
+#       }
+#     }
+#     return(paste("Updated values: ", new_value))
+#   }
 
 updateSelectizeUI <- function(maxDepth) {
   rowContent <- fluidRow(
@@ -1932,9 +1949,10 @@ generateLayerParameters <- function(plot) {
     default_params <- layer$aes_params
     
     #Function to extract specific aesthetic values
-    extract_aes_value <- function(aesthetic, default) {
+    extract_aes_value <- function(aesthetic, default,x_val) {
       if (!is.null(aes_mapping[[aesthetic]])) {
-        return(unique(data[[aesthetic]]))
+        filtered_data <- data[data[["group"]] == x_val, ]
+        return(unique(filtered_data[[aesthetic]]))
       }
       if (!is.null(default_params[[aesthetic]])) {
         return(default_params[[aesthetic]])
@@ -1951,7 +1969,7 @@ generateLayerParameters <- function(plot) {
         # Common controls for all layers
         sliderInput(
           paste0("layerSize_", i), "Layer Size", 
-          min = 1, max = 5, value = extract_aes_value("size", 1)
+          min = 1, max = 5, value = extract_aes_value("size", 1,1)
         ),
         
         # Layer-specific customization
@@ -1962,14 +1980,14 @@ generateLayerParameters <- function(plot) {
                 colourpicker::colourInput(
                   paste0("pointColor_", i, "_", x_val),
                   paste("Point Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000")
+                  value = extract_aes_value("colour", "#000000",x_val)
                 )
               })
             } else {
               colourpicker::colourInput(
                 paste0("pointColor_", i),
                 "Point Color",
-                value = extract_aes_value("colour", "#000000")
+                value = extract_aes_value("colour", "#000000",1)
               )
             },
             
@@ -1979,7 +1997,7 @@ generateLayerParameters <- function(plot) {
                   paste0("pointShape_", i, "_", x_val),
                   paste("Point Shape for Group", x_val),
                   choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
-                  selected = extract_aes_value("shape", 16)
+                  selected = extract_aes_value("shape", 16,x_val)
                 )
               })
             } else {
@@ -1987,7 +2005,7 @@ generateLayerParameters <- function(plot) {
                 paste0("pointShape_", i),
                 "Point Shape",
                 choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
-                selected = extract_aes_value("shape", 16)
+                selected = extract_aes_value("shape", 16,1)
               )
             }
           )
@@ -2000,7 +2018,7 @@ generateLayerParameters <- function(plot) {
                   paste0("lineType_", i, "_", x_val),
                   paste("Line Type for Group", x_val),
                   choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
-                  selected = extract_aes_value("linetype", "solid")
+                  selected = extract_aes_value("linetype", "solid",x_val)
                 )
               })
             } else {
@@ -2008,7 +2026,7 @@ generateLayerParameters <- function(plot) {
                 paste0("lineType_", i),
                 "Line Type",
                 choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
-                selected = extract_aes_value("linetype", "solid")
+                selected = extract_aes_value("linetype", "solid",1)
               )
             },
             
@@ -2018,14 +2036,14 @@ generateLayerParameters <- function(plot) {
                 colourpicker::colourInput(
                   paste0("lineColor_", i, "_", x_val),
                   paste("Line Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000")
+                  value = extract_aes_value("colour", "#000000",x_val)
                 )
               })
             } else {
               colourpicker::colourInput(
                 paste0("lineColor_", i),
                 "Line Color",
-                value = extract_aes_value("colour", "#000000")
+                value = extract_aes_value("colour", "#000000",1)
               )
             }
           )
@@ -2037,14 +2055,14 @@ generateLayerParameters <- function(plot) {
                 colourpicker::colourInput(
                   paste0("barFillColor_", i, "_", x_val),
                   paste("Bar Fill Color for Group", x_val),
-                  value = extract_aes_value("fill", "#FF9999")
+                  value = extract_aes_value("fill", "#FF9999",x_val)
                 )
               })
             } else {
               colourpicker::colourInput(
                 paste0("barFillColor_", i),
                 "Bar Fill Color",
-                value = extract_aes_value("fill", "#FF9999")
+                value = extract_aes_value("fill", "#FF9999",1)
               )
             },
             sliderInput(
@@ -2057,14 +2075,14 @@ generateLayerParameters <- function(plot) {
                 colourpicker::colourInput(
                   paste0("barColor_", i, "_", x_val),
                   paste("Bar Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000")
+                  value = extract_aes_value("colour", "#000000",x_val)
                 )
               })
             } else {
               colourpicker::colourInput(
                 paste0("barColor_", i),
                 "Bar Color",
-                value = extract_aes_value("colour", "#000000")
+                value = extract_aes_value("colour", "#000000",1)
               )
             }
           )
@@ -2073,7 +2091,7 @@ generateLayerParameters <- function(plot) {
             sliderInput(
               paste0("errorBarWidth_", i),
               "Error Bar Width",
-              min = 0.1, max = 2, value = extract_aes_value("width", 0.5)
+              min = 0.1, max = 2, value = extract_aes_value("width", 0.5,1)
             )
             ,
             if ("colour" %in% names(aes_mapping)) {
@@ -2081,14 +2099,14 @@ generateLayerParameters <- function(plot) {
                 colourpicker::colourInput(
                   paste0("errorBarColor_", i, "_", x_val),
                   paste("Error Bar Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000")
+                  value = extract_aes_value("colour", "#000000",x_val)
                 )
               })
             } else {
               colourpicker::colourInput(
                 paste0("errorBarColor_", i),
                 "Error Bar Color",
-                value = extract_aes_value("colour", "#000000")
+                value = extract_aes_value("colour", "#000000",1)
               )
             }
           )
@@ -2098,7 +2116,7 @@ generateLayerParameters <- function(plot) {
             checkboxInput(
               paste0("notch_", i),
               "Add Notch",
-              value = extract_aes_value("notch", FALSE)
+              value = extract_aes_value("notch", FALSE,1)
             ),
             
             if ("fill" %in% names(aes_mapping)) {
@@ -2106,14 +2124,14 @@ generateLayerParameters <- function(plot) {
                 colourpicker::colourInput(
                   paste0("boxFillColor_", i, "_", x_val),
                   paste("Boxplot Fill Color for Group", x_val),
-                  value = extract_aes_value("fill", "#FF9999")
+                  value = extract_aes_value("fill", "#FF9999",x_val)
                 )
               })
             } else {
               colourpicker::colourInput(
                 paste0("boxFillColor_", i),
                 "Boxplot Fill Color",
-                value = extract_aes_value("fill", "#FF9999")
+                value = extract_aes_value("fill", "#FF9999",1)
               )
             },
             
@@ -2122,30 +2140,30 @@ generateLayerParameters <- function(plot) {
                 colourpicker::colourInput(
                   paste0("boxOutlineColor_", i, "_", x_val),
                   paste("Boxplot Outline Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000")
+                  value = extract_aes_value("colour", "#000000",x_val)
                 )
               })
             } else {
               colourpicker::colourInput(
                 paste0("boxOutlineColor_", i),
                 "Boxplot Outline Color",
-                value = extract_aes_value("colour", "#000000")
+                value = extract_aes_value("colour", "#000000",1)
               )
             },
             colourpicker::colourInput(
               paste0("outlierColor_", i),
               "Outlier Color",
-              value = extract_aes_value("outlier.colour", "#FF0000")
+              value = extract_aes_value("outlier.colour", "#FF0000",1)
             ),
             sliderInput(
               paste0("outlierSize_", i),
               "Outlier Size",
-              min = 1, max = 5, value = extract_aes_value("outlier.size", 2)
+              min = 1, max = 5, value = extract_aes_value("outlier.size", 2,1)
             ),
             sliderInput(
               paste0("boxWidth_", i),
               paste("Box Width"),
-              min = 0.1, max = 1, value = extract_aes_value("width", 0.5)
+              min = 0.1, max = 1, value = extract_aes_value("width", 0.5,1)
             )
           )
         } else {
@@ -2511,13 +2529,12 @@ generatePlotParameters <- function(plot) {
   x_axis_label <- plot$labels$x
   y_axis_label <- plot$labels$y
   
-  # Extract theme elements
-  theme_elements <- ggplot2::theme_get()
-  if (!is.null(plot$theme)) {
-    theme_elements <- ggplot2::theme_update(plot$theme)
-  }
-  title_size <- theme_elements$text$size %||% 14
-  title_color <- theme_elements$text$colour %||% "#000000"
+  global_theme <- ggplot2::theme_get()
+  plot_theme <- plot$theme %||% list()
+  theme_elements <- utils::modifyList(global_theme, plot_theme)
+  
+  title_size <- theme_elements$plot.title$size %||% 14
+  title_color <- theme_elements$plot.title$colour %||% "#000000"
   x_axis_size <- theme_elements$axis.text.x$size %||% 12
   y_axis_size <- theme_elements$axis.text.y$size %||% 12
   background_color <- theme_elements$panel.background$fill %||% "#FFFFFF"
@@ -2526,7 +2543,7 @@ generatePlotParameters <- function(plot) {
     textInput(
       "plotTitle", 
       "Plot Title", 
-      value = plot_title %||% "My Plot"
+      value = plot_title %||% ""
     ),
     sliderInput(
       "plotTitleFontSize", 

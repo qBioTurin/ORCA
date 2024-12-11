@@ -1057,8 +1057,9 @@ ui <- dashboardPage(
               )
           ),
           fluidRow(
-            column(6, dataTableOutput("leftTableBCA")),
-            column(6, dataTableOutput("rightTableBCA"))
+            uiOutput("tablesBCA")
+            # column(6, dataTableOutput("leftTableBCA")),
+            # column(6, dataTableOutput("rightTableBCA"))
           ),
           fluidRow(
             column(width = 1,offset = 9,
