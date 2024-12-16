@@ -1100,7 +1100,7 @@ ui <- dashboardPage(
                     collapsed = TRUE,
                     fluidRow(
                       column(width = 3,
-                             textInput(inputId = "BCA_UGvalue_init", label = "Initial protein quantity (ug)", value = "5")
+                             textInput(inputId = "BCA_UGvalue_init", label = "How much lysate did you add to the protein quantitation solution? (ug)", value = "5")
                       ),
                       column(width = 4,
                              textInput(inputId = "BCA_UGvalue" , label = "Write desidered protein quantity (ug)", value = "")

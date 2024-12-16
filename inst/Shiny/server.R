@@ -1151,21 +1151,15 @@ server <- function(input, output, session) {
               col <- info$col
               value <- info$value
               
-              # Update the table_data locally
               table_data[row, col] <- value
-              
-              # Update the global "Experimental condition"
               current_values <- color_tables_bca$'Experimental condition'()
               index <- which(color_tables_bca$ColorCode() == color)
-              
-              # Ensure the existing condition is properly split and updated
               condition_split <- strsplit(current_values[index], " - ")[[1]]
+              
               if (length(condition_split) < nrow(table_data)) {
                 condition_split <- c(condition_split, rep("", nrow(table_data) - length(condition_split)))
               }
               condition_split[row] <- value
-              
-              # Re-serialize the updated condition and assign back to the reactive value
               current_values[index] <- paste(condition_split, collapse = " - ")
               color_tables_bca$'Experimental condition'(current_values)
             }
@@ -1518,7 +1512,7 @@ server <- function(input, output, session) {
         showAlert("Error", "The value must be numeric!", "error", 5000)
         return()
       }else{
-        bcamean[,paste0("Ug/",BCA_UGvalue)] =  bcamean$UgBaseline/BCA_UGvalue
+        bcamean[,paste0("UgBaseline/",BCA_UGvalue)] =  bcamean$UgBaseline/BCA_UGvalue
         
         bcaResult$dataFinal = bcamean
         
@@ -6269,6 +6263,11 @@ observeEvent(input$applyChangesIF_TT, {
       return()
     }
     mess = readRDS(input$loadAnalysis_file$datapath)
+    
+    #Control dependencies for DT
+    if(!is.null(mess$TablePlot)){
+      mess$TablePlot$dependencies[[2]]$src$file <- path.package("DT")
+    }
     
     messNames = names(mess)
     if("Flags"%in% messNames) messNames = messNames[ messNames != "Flags"]
