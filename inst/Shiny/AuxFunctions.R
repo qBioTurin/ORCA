@@ -1136,108 +1136,108 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
 #   return(do.call(rbind, formatted_data))
 # }
 
-updateTable <- function(color_name, analysis, info, data, result, flag, session) {
-  req(info)
-  
-  selected_row <- info$row
-  selected_col <- info$col
-  new_value <- info$value
-  
-  if (selected_col == 2) {  # Assuming "Experimental Condition" column is index 2
-    data[selected_row, selected_col] <- new_value
-    return(paste("Updated Experimental Condition for", color_name, ":", new_value))
-  }
-  
-  return("No changes made.")
-}
-
-
-
-# updateTable <- function(position, analysis, info, data, result, flag, session) {
-#     req(info) 
-#     
-#     selected_row <- info$row
-#     selected_col <- info$col
-#     new_value <- info$value
-#     
-#     # change the exp_condition column to ENDOC or sample_name to ELISA  
-#     if (selected_col == 4 ) {
-#       color_code <- data[selected_row, "ColorCode"]
-#       
-#       if (!is.na(color_code) && color_code != "" && color_code != "white" && color_code != "#FFFFFF") {
-#         analysis_lower <- tolower(analysis)
-#         matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
-#         
-#         if (nrow(matching_indices) > 0) {
-#           current_values <- c()
-#           
-#           apply(matching_indices, 1, function(idx) {
-#             current_values <<- c(current_values, result[[paste0("Initdata")]][idx["row"], idx["col"]])
-#             old_value_key <- names(flag[[paste0("EXPcol")]])[names(flag[[paste0("EXPcol")]]) == result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]]]
-#             
-#             if (length(old_value_key) > 0) {
-#               flag[[paste0("EXPcol")]][new_value] <- flag[[paste0("EXPcol")]][old_value_key]
-#               flag[[paste0("EXPcol")]] <- flag[[paste0("EXPcol")]][!names(flag[[paste0("EXPcol")]]) %in% old_value_key]
-#               assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
-#             }
-#             
-#             result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
-#             # if ELISA, modify SN otherwise modify EXP
-#             if (analysis %in% c("ELISA","IF","BCA") ) {
-#               result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
-#             } else if (analysis == "ENDOC") {
-#               result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
-#             }
-#             
-#             
-#             assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
-#           })
-#           
-#           if (!new_value %in% flag[[paste0("AllExp")]]) {
-#             flag[[paste0("AllExp")]] <- unique(c(flag[[paste0("AllExp")]], new_value))
-#             assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
-#           }
-#         }
-#       }
-#     } 
-#     # change the time column to ENDOC or exp_condition to ELISA  
-#     else if (selected_col == 5) {
-#       color_code <- data[selected_row, "ColorCode"]
-#       req(color_code != "", color_code != "white", color_code != "#FFFFFF")
-#       
-#       analysis_lower <- tolower(analysis)
-#       matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
-#       num_matches <- nrow(matching_indices)
-#       
-#       # operation to set the unfilled values to NA and save only the modified position
-#       processed_value <- gsub(" -  - ", " - NA - ", new_value)
-#       processed_value <- sub("^ - ", "NA - ", processed_value)
-#       processed_value <- sub(" - $", " - NA", processed_value)
-#       
-#       new_values <- strsplit(processed_value, " - ", fixed = TRUE)[[1]]
-#       new_values[new_values == ""] <- NA  
-#       
-#       current_values <- new_values  
-#       
-#       if (length(new_values) != num_matches) {
-#         session$sendCustomMessage(type = "errorNotification", 
-#                                   message = "Number of values does not match the number of matches.")
-#       } else {
-#         for (i in seq_along(matching_indices[, "row"])) {
-#           if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
-#             # if ELISA, modify EXP otherwise modify TIME
-#             if (analysis == "ELISA"||analysis == "BCA") {
-#               result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
-#             } else {
-#               result[[paste0(analysis, "cell_TIME")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
-#             }
-#           } 
-#         }
-#         assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
-#       }
-#     }
-#     return(paste("Updated values: ", new_value))
+# updateTable <- function(color_name, analysis, info, data, result, flag, session) {
+#   req(info)
+#   
+#   selected_row <- info$row
+#   selected_col <- info$col
+#   new_value <- info$value
+#   
+#   if (selected_col == 2) {  # Assuming "Experimental Condition" column is index 2
+#     data[selected_row, selected_col] <- new_value
+#     return(paste("Updated Experimental Condition for", color_name, ":", new_value))
 #   }
+#   
+#   return("No changes made.")
+# }
+
+
+
+updateTable <- function(analysis, info, data, result, flag, session) {
+    req(info)
+
+    selected_row <- info$row
+    selected_col <- info$col
+    new_value <- info$value
+
+    # change the exp_condition column to ENDOC or sample_name to ELISA
+    if (selected_col == 4 ) {
+      color_code <- data[selected_row, "ColorCode"]
+
+      if (!is.na(color_code) && color_code != "" && color_code != "white" && color_code != "#FFFFFF") {
+        analysis_lower <- tolower(analysis)
+        matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
+
+        if (nrow(matching_indices) > 0) {
+          current_values <- c()
+
+          apply(matching_indices, 1, function(idx) {
+            current_values <<- c(current_values, result[[paste0("Initdata")]][idx["row"], idx["col"]])
+            old_value_key <- names(flag[[paste0("EXPcol")]])[names(flag[[paste0("EXPcol")]]) == result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]]]
+
+            if (length(old_value_key) > 0) {
+              flag[[paste0("EXPcol")]][new_value] <- flag[[paste0("EXPcol")]][old_value_key]
+              flag[[paste0("EXPcol")]] <- flag[[paste0("EXPcol")]][!names(flag[[paste0("EXPcol")]]) %in% old_value_key]
+              assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
+            }
+
+            result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
+            # if ELISA, modify SN otherwise modify EXP
+            if (analysis %in% c("ELISA","IF","BCA") ) {
+              result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
+            } else if (analysis == "ENDOC") {
+              result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
+            }
+
+
+            assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
+          })
+
+          if (!new_value %in% flag[[paste0("AllExp")]]) {
+            flag[[paste0("AllExp")]] <- unique(c(flag[[paste0("AllExp")]], new_value))
+            assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
+          }
+        }
+      }
+    }
+    # change the time column to ENDOC or exp_condition to ELISA
+    else if (selected_col == 5) {
+      color_code <- data[selected_row, "ColorCode"]
+      req(color_code != "", color_code != "white", color_code != "#FFFFFF")
+
+      analysis_lower <- tolower(analysis)
+      matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
+      num_matches <- nrow(matching_indices)
+
+      # operation to set the unfilled values to NA and save only the modified position
+      processed_value <- gsub(" -  - ", " - NA - ", new_value)
+      processed_value <- sub("^ - ", "NA - ", processed_value)
+      processed_value <- sub(" - $", " - NA", processed_value)
+
+      new_values <- strsplit(processed_value, " - ", fixed = TRUE)[[1]]
+      new_values[new_values == ""] <- NA
+
+      current_values <- new_values
+
+      if (length(new_values) != num_matches) {
+        session$sendCustomMessage(type = "errorNotification",
+                                  message = "Number of values does not match the number of matches.")
+      } else {
+        for (i in seq_along(matching_indices[, "row"])) {
+          if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
+            # if ELISA, modify EXP otherwise modify TIME
+            if (analysis == "ELISA"||analysis == "BCA") {
+              result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
+            } else {
+              result[[paste0(analysis, "cell_TIME")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
+            }
+          }
+        }
+        assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
+      }
+    }
+    return(paste("Updated values: ", new_value))
+  }
 
 updateSelectizeUI <- function(maxDepth) {
   rowContent <- fluidRow(

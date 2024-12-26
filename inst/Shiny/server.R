@@ -969,7 +969,7 @@ server <- function(input, output, session) {
   
   # left_data_bca <- reactiveVal()
   # right_data_bca <- reactiveVal()
-  color_tables_bca <- reactiveValues()
+  color_tables_bca <- reactiveVal()
   
   # save everytime there is a change in the results
   BCAresultListen <- reactive({
@@ -1077,22 +1077,21 @@ server <- function(input, output, session) {
     } 
   })
   
-  
-  
     observe({
-      colors <- FlagsBCA$EXPcol
+      color_codes <- FlagsBCA$EXPcol
       color_names <- names(FlagsBCA$EXPcol)
-      tables_data <- get_formatted_data(colors, color_names, bcaResult, NULL, "BCA")
+      valid_colors <- color_codes != "white"
+      color_codes <- color_codes[valid_colors]
+      color_names <- color_names[valid_colors]
+      tables_data <- get_formatted_data(color_codes, color_names, bcaResult, bcaResult$BCAcell_EXP, "BCA")
+      color_tables_bca(tables_data)
       
-      for (color_name in names(tables_data)) {
-        color_tables_bca[[color_name]] <- reactiveVal(tables_data[[color_name]])
-      }
     })
     
     output$tablesBCA <- renderUI({
       colors <- FlagsBCA$EXPcol
       color_names <- names(FlagsBCA$EXPcol)
-      
+    
       lapply(color_names, function(color_name) {
         box(
           title = paste("Table for", color_name),
@@ -1111,21 +1110,19 @@ server <- function(input, output, session) {
     })
     
     observe({
-      color_codes <- color_tables_bca$ColorCode()
-      values <- color_tables_bca$Values()
+      color_codes <- color_tables_bca()$ColorCode
+      values <- color_tables_bca()$Values
       
       for (i in seq_along(color_codes)) {
         local({
           color <- color_codes[i]
           value_string <- values[i]
           
-          current_condition <- strsplit(color_tables_bca$'Experimental condition'()[which(color_tables_bca$ColorCode() == color)], " - ")[[1]]
+          current_condition <- strsplit(color_tables_bca()$'Experimental condition'[which(color_tables_bca()$ColorCode== color)], " - ")[[1]]
           
-          # Split the "Values" string into individual rows
           table_data <- data.frame(
             Value = strsplit(value_string, " - ")[[1]],
             ExperimentalCondition = {
-              # Ensure "current_condition" matches the number of rows in "Value"
               value_split <- strsplit(value_string, " - ")[[1]]
               if (length(current_condition) < length(value_split)) {
                 c(current_condition, rep("", length(value_split) - length(current_condition)))
@@ -1144,58 +1141,138 @@ server <- function(input, output, session) {
             )
           })
           
+         
+          
           observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
             info <- input[[paste0("table_", color, "_cell_edit")]]
+        
             if (!is.null(info)) {
               row <- info$row
               col <- info$col
               value <- info$value
-              
+
               table_data[row, col] <- value
-              current_values <- color_tables_bca$'Experimental condition'()
-              index <- which(color_tables_bca$ColorCode() == color)
+              current_values <- color_tables_bca()$'Experimental condition'
+              index <- which(color_tables_bca()$ColorCode == color)
               condition_split <- strsplit(current_values[index], " - ")[[1]]
-              
+
               if (length(condition_split) < nrow(table_data)) {
                 condition_split <- c(condition_split, rep("", nrow(table_data) - length(condition_split)))
               }
               condition_split[row] <- value
               current_values[index] <- paste(condition_split, collapse = " - ")
-              color_tables_bca$'Experimental condition'(current_values)
+              current<-color_tables_bca()
+              current$'Experimental condition' <- current_values
+              color_tables_bca(current)
+              
+              # Sync with matrix
+              cellCoo <- FlagsBCA$cellCoo
+              if (!is.null(cellCoo) && !anyNA(cellCoo)) {
+                bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] <- value
+                output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
+              }
             }
-          })
+          }, ignoreInit = TRUE, ignoreNULL = TRUE)
         })
       }
     })
-
+    
+    observeEvent(input$BCAmatrix_cell_clicked, {
+      req(input$BCAmatrix_cell_clicked)  
+      
+      cellSelected <- as.numeric(input$BCAmatrix_cell_clicked)
+      FlagsBCA$cellCoo <- cellCoo <- c(cellSelected[1], cellSelected[2] + 1)
+      
+      allExp <- unique(na.omit(c(bcaResult$BCAcell_EXP)))  
+      selectedExp <- ifelse(is.null(bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "BCAcell_EXP", 
+                           choices = c("", allExp),
+                           selected = selectedExp)
+      
+      allSN <- unique(na.omit(c(bcaResult$BCAcell_SN)))  
+      selectedSN <- ifelse(is.null(bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "BCAcell_SN",
+                           choices = c("", allSN),
+                           selected = selectedSN)
+    })
+    
+    observeEvent(input$BCAcell_SN, {
+      if (!is.null(bcaResult$BCAcell_COLOR) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
+        BCAtb <- bcaResult$TablePlot
+        cellCoo <- FlagsBCA$cellCoo
+        
+        value.bef <- bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] 
+        value.now <- input$BCAcell_SN
+        
+        if (value.now != "" && value.now != value.bef) {
+          bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] <- value.now
+          bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]] <- value.now
+          BCAtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] <- value.now
+          
+          tableExcelColored(session = session,
+                            Result = bcaResult, 
+                            FlagsExp = FlagsBCA,
+                            type = "Update")
+          
+          output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": sample name ", value.now))
+          output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
+        }
+      }
+    }, ignoreInit = TRUE)
+    
+    observeEvent(input$BCAcell_EXP, {
+      if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
+        BCAtb <- bcaResult$TablePlot
+        cellCoo <- FlagsBCA$cellCoo
+        
+        value.bef <- bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] 
+        value.now <- input$BCAcell_EXP
+        
+        if (value.now != "" && value.now != value.bef) {
+          bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
+          tableExcelColored(session = session,
+                            Result = bcaResult, 
+                            FlagsExp = FlagsBCA,
+                            type = "Update")
+          
+          output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": Exp Condition ", value.now))
+          output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
+        }
+      }
+    }, ignoreInit = TRUE)
+    
+    
+    
 
   # observe({
   #   color_codes <- FlagsBCA$EXPcol
   #   color_names <- names(FlagsBCA$EXPcol)
-  #   
+  # 
   #   valid_colors <- color_codes != "white"
   #   color_codes <- color_codes[valid_colors]
   #   color_names <- color_names[valid_colors]
-  #   
+  # 
   #   mid_point <- ceiling(length(color_codes) / 2)
   #   left_colors <- color_codes[1:mid_point]
   #   right_colors <- color_codes[(mid_point+1):length(color_codes)]
-  #   
+  # 
   #   left_formatted_data <- get_formatted_data(left_colors, color_names[1:mid_point], bcaResult, bcaResult$BCAcell_EXP,"BCA")
   #   right_formatted_data <- get_formatted_data(right_colors, color_names[(mid_point+1):length(color_codes)], bcaResult, bcaResult$BCAcell_EXP, "BCA")
-  #   
+  # 
   #   left_data_bca(left_formatted_data)
   #   right_data_bca(right_formatted_data)
-  #   
+  # 
   #   output$leftTableBCA <- renderDataTable(
-  #     left_data_bca(), 
-  #     escape = FALSE, 
+  #     left_data_bca(),
+  #     escape = FALSE,
   #     editable = list(target = "cell", disable = list(columns = 0:3)),
   #     options = list(
   #       dom = 't',
   #       paging = FALSE,
   #       info = FALSE,
-  #       searching = FALSE, 
+  #       searching = FALSE,
   #       columnDefs = list(
   #         list(targets = 0, visible = FALSE),
   #         list(targets = 1, visible = FALSE),
@@ -1207,10 +1284,10 @@ server <- function(input, output, session) {
   #       )
   #     )
   #   )
-  #   
+  # 
   #   output$rightTableBCA <- renderDataTable(
-  #     right_data_bca(), 
-  #     escape = FALSE, 
+  #     right_data_bca(),
+  #     escape = FALSE,
   #     editable = list(target = "cell", disable = list(columns = 0:3)),
   #     options = list(
   #       dom = 't',
@@ -1233,93 +1310,20 @@ server <- function(input, output, session) {
   # 
   # observeEvent(input$leftTableBCA_cell_edit, {
   #   info <- input$leftTableBCA_cell_edit
-  #   data <- left_data_bca() 
+  #   data <- left_data_bca()
   #   updatedText <- updateTable("left", "BCA", info, data, bcaResult, FlagsBCA,session)
-  #   
-  #   output$BCASelectedValues <- renderText(updatedText)  
+  # 
+  #   output$BCASelectedValues <- renderText(updatedText)
   # }, ignoreInit = TRUE, ignoreNULL = TRUE)
   # observeEvent(input$rightTableBCA_cell_edit, {
   #   info <- input$rightTableBCA_cell_edit
-  #   data <- right_data_bca() 
+  #   data <- right_data_bca()
   #   updatedText <- updateTable("right", "BCA", info, data, bcaResult, FlagsBCA,session)
-  #   
-  #   output$BCASelectedValues <- renderText(updatedText)  
+  # 
+  #   output$BCASelectedValues <- renderText(updatedText)
   # }, ignoreInit = TRUE, ignoreNULL = TRUE)
   
-  observeEvent(input$BCAmatrix_cell_clicked, {
-    req(input$BCAmatrix_cell_clicked)  
-    
-    cellSelected = as.numeric(input$BCAmatrix_cell_clicked)
-    FlagsBCA$cellCoo = cellCoo = c(cellSelected[1], cellSelected[2] + 1)
-    
-    allExp <- unique(na.omit(c(bcaResult$BCAcell_EXP)))  
-    selectedExp <- ifelse(is.null(bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "BCAcell_EXP", 
-                         choices = c("",allExp),
-                         selected = selectedExp)
-    
-    allSN <- unique(na.omit(c(bcaResult$BCAcell_SN)))  
-    selectedSN <- ifelse(is.null(bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]]), "", bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "BCAcell_SN",
-                         choices = c("",allSN),
-                         selected = selectedSN)
-  })
-  
-  observeEvent(input$BCAcell_SN, {
-    if (!is.null(bcaResult$BCAcell_COLOR) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
-      BCAtb = bcaResult$TablePlot
-      cellCoo = FlagsBCA$cellCoo
-      
-      value.bef = bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] 
-      value.now = input$BCAcell_SN
-      
-      if (value.now != "" && value.now != value.bef) {
-        currentValues <- bcaResult$Initdata[cellCoo[1], cellCoo[2]]
-        
-        bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
-        bcaResult$BCAcell_SN[cellCoo[1], cellCoo[2]] = value.now
-        BCAtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] = value.now
-        
-        if (!input$BCAcell_SN %in% FlagsBCA$AllExp) {
-          exp = unique(c(FlagsBCA$AllExp, input$BCAcell_SN))
-          FlagsBCA$AllExp = exp
-        }
-        
-        tableExcelColored(session = session,
-                          Result = bcaResult, 
-                          FlagsExp = FlagsBCA,
-                          type = "Update")
-        
-        output$BCASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": sample name ", value.now))
-        output$BCAmatrix <- renderDataTable({bcaResult$TablePlot})
-      }
-    } else return()
-  }, ignoreInit = TRUE)
-  observeEvent(input$BCAcell_EXP, {
-    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
-      BCAtb = bcaResult$TablePlot
-      cellCoo = FlagsBCA$cellCoo
-      
-      value.bef = bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] 
-      value.now = input$BCAcell_EXP
-      
-      if (value.now != "" && value.now != value.bef) {
-        currentValues <- bcaResult$Initdata[cellCoo[1], cellCoo[2]]
-        
-        bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] = value.now
-        tableExcelColored(session = session,
-                          Result = bcaResult, 
-                          FlagsExp = FlagsBCA,
-                          type = "Update"
-        )
-        
-        output$BCASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": Exp Condition ", value.now))
-        output$BCAmatrix <- renderDataTable({bcaResult$TablePlot})
-      }
-    } else return()
-  }, ignoreInit = TRUE)
+
   
   ## update checkBox
   observeEvent(FlagsBCA$AllExp,{
