@@ -1164,18 +1164,17 @@ server <- function(input, output, session) {
               current<-color_tables_bca()
               current$'Experimental condition' <- current_values
               color_tables_bca(current)
-              
-              # Sync with matrix
-              cellCoo <- FlagsBCA$cellCoo
-              if (!is.null(cellCoo) && !anyNA(cellCoo)) {
-                bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] <- value
-                output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
-              }
+              data <- color_tables_bca()
+              if(info$col==2)
+                info$col<-5
+              updatedText <- updateTable("BCA", info, data, color, bcaResult, FlagsBCA,session)
+              output$BCASelectedValues <- renderText(updatedText)
             }
           }, ignoreInit = TRUE, ignoreNULL = TRUE)
         })
       }
     })
+    
     
     observeEvent(input$BCAmatrix_cell_clicked, {
       req(input$BCAmatrix_cell_clicked)  
