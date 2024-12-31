@@ -1091,10 +1091,19 @@ server <- function(input, output, session) {
     output$tablesBCA <- renderUI({
       colors <- FlagsBCA$EXPcol
       color_names <- names(FlagsBCA$EXPcol)
-    
+      color_values<-unname(FlagsBCA$EXPcol)
+      i <- 1
       lapply(color_names, function(color_name) {
-        box(
-          title = paste("Table for", color_name),
+        color_name <- color_names[i]
+        result<- box(
+          #title = paste("Table for", color_name),
+          title = HTML(
+            paste(
+              "Table for", 
+              sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
+                      color_values[i])
+            )
+          ),
           width = 12,
           solidHeader = TRUE,
           status = "primary",
@@ -1106,6 +1115,8 @@ server <- function(input, output, session) {
           
           DT::dataTableOutput(outputId = paste0("table_", color_name))
         )
+        i <<- i + 1  
+        result
       })
     })
     
@@ -1141,7 +1152,20 @@ server <- function(input, output, session) {
             )
           })
           
-         
+         observeEvent(input[[paste0("sample_name_",color)]], {
+            info <- input[[paste0("sample_name_",color)]]
+            if(!is.null(info)){
+              index<-which(color_tables_bca()$ColorCode == color)
+              current_values <- color_tables_bca()$'Sample Name'
+              current_values[index] <- info
+              current<-color_tables_bca()
+              current$'Sample Name' <- current_values
+              color_tables_bca(current)
+              data <- color_tables_bca()
+              updatedText <- updateTable("BCA_SN", info, data, color, bcaResult, FlagsBCA,session)
+              output$BCASelectedValues <- renderText(updatedText)
+            }
+          })
           
           observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
             info <- input[[paste0("table_", color, "_cell_edit")]]
@@ -1217,6 +1241,7 @@ server <- function(input, output, session) {
           
           output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": sample name ", value.now))
           output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
+          
         }
       }
     }, ignoreInit = TRUE)
@@ -1460,6 +1485,57 @@ server <- function(input, output, session) {
     })
   })
   
+  observeEvent(input$Customize_regression_button, {
+    layer_tabs <- generateLayerParameters(bcaResult$Regression$plot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          # Dynamically generate inputs for each layer
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          generatePlotParameters(bcaResult$Regression$plot)
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
+        )
+      ),
+      footer = tagList(
+        actionButton("applyChanges_Regression", "Apply Changes"),
+        downloadButton("downloadPlotButton_Regression", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  output$downloadPlotButton_Regression <- downloadHandler(
+    filename = function() {
+      paste0("plot_Regression_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      savePlotAsPNG(bcaResult$Regression$plot, file, width, height, dpi)
+      manageSpinner(FALSE)
+    }
+  )
+  
+  
+  observeEvent(input$applyChanges_Regression, {
+    updatedPlot<-customizePlot(bcaResult$Regression$plot,input)
+    bcaResult$Regression$plot<- updatedPlot
+    output$BCAregression <- renderPlot({updatedPlot})
+    removeModal()
+  })
+  
+  
   observeEvent(input$BCA_buttonRegression,{
     standcurve = bcaResult$Tablestandcurve
     
@@ -1503,6 +1579,9 @@ server <- function(input, output, session) {
       regressionPlot = ggplot()
     }
     output$BCAregression <- renderPlot(regressionPlot)
+    output$customize_regression_button <- renderUI({
+      actionButton("Customize_regression_button", "Customize Plot", class = "btn-primary")
+    })
   })
   
   observeEvent(input$confirmBCA_UGvalue,{

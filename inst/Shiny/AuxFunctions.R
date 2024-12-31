@@ -1140,10 +1140,16 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
 updateTable <- function(analysis, info, data, color_code, result, flag, session) {
   req(info)
   
-  selected_row <- info$row
-  selected_col <- info$col
-  new_value <- info$value
-  
+  if(analysis=="BCA_SN"){
+    selected_col <- 4
+    analysis<-"BCA"
+    new_value <- info
+  }
+  else{
+    selected_row <- info$row
+    selected_col <- info$col
+    new_value <- info$value
+  }
   # change the exp_condition column to ENDOC or sample_name to ELISA
   if (selected_col == 4 ) {
     
