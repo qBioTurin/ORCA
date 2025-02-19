@@ -823,7 +823,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
   return(1)  # Restituisce 1 per indicare il successo
 }
 
-tableExcelColored = function(session, output,Result, FlagsExp, type){
+tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal){
   switch(type,
          "Initialize" = {
            ExpDataTable = Result$Initdata
@@ -902,13 +902,18 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
              Result[[grep(x=names(Result),pattern = "cell_SN", value = T)]]<- cell_SN
            
            Result$TablePlot = ExpDataTable
-         }, "Update" =  {
+         }, 
+         
+         "Update" =  {
            ColorsSN = rainbow(n = 50, alpha = 0.5)[sample(50, size = 50, replace = FALSE)]
-           
+
            if(is.null(FlagsExp$EXPcol)) {
              print("No existing color mapping found. Creating new one.")
              EXPcol = setNames(ColorsSN[1:length(FlagsExp$AllExp)], FlagsExp$AllExp)
-             EXPcol[names(EXPcol) == ""] <- "white"  
+             unused_colors <- setdiff(ColorsSN, EXPcol)
+             EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1) #random colour not already in the list FlagsExp$EXPcol
+             new_color_name <- inputVal
+             names(EXPcol)[names(EXPcol) == ""] <- new_color_name
              FlagsExp$EXPcol <- EXPcol
            } else {
              print("Existing color mapping found. Updating if necessary.")
@@ -918,20 +923,23 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
                colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1:length(SNnew)]
                names(colNew) = SNnew
                EXPcol = c(FlagsExp$EXPcol, colNew)
-               EXPcol[names(EXPcol) == ""] <- "white"
+               unused_colors <- setdiff(ColorsSN, EXPcol)
+               EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1)
+               new_color_name <- inputVal
+               names(EXPcol)[names(EXPcol) == ""] <- new_color_name
                FlagsExp$EXPcol <- EXPcol
              } else {
                print("No new SNs to update.")
              }
            }
-           
+
            ExpDataTable = Result$TablePlot$x$data
            completeExpDataTable = cbind(Result$Initdata, Result[[grep(x=names(Result), pattern = "cell_COLOR", value = TRUE)]])
            colnames(completeExpDataTable) = colnames(ExpDataTable)
-           
+
            cols.color = grep(x = colnames(ExpDataTable), pattern = "Col", value = TRUE)
            cols.keep = grep(x = colnames(ExpDataTable), pattern = "V", value = TRUE)
-           
+
            Result$TablePlot = datatable(completeExpDataTable,
                                         filter = 'none',
                                         selection = list(mode = 'single', target = 'cell'),
@@ -941,7 +949,7 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
                                             "function(settings, json) {",
                                             "$(this.api().table().body()).find('td').each(function() {",
                                             "  var bgColor = $(this).css('background-color');",
-                                            "  if (bgColor === 'rgb(255, 255, 255)' || bgColor === 'white') {", 
+                                            "  if (bgColor === 'rgb(255, 255, 255)' || bgColor === 'white') {",
                                             "    $(this).addClass('non-clickable').css({'pointer-events': 'none'});",
                                             "  }",
                                             "});",
@@ -954,7 +962,7 @@ tableExcelColored = function(session, output,Result, FlagsExp, type){
              formatStyle(cols.keep,
                          cols.color,
                          backgroundColor = styleEqual(names(FlagsExp$EXPcol), FlagsExp$EXPcol))
-           
+
            print("Table and colors updated.")
          }
   )

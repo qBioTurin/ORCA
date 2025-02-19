@@ -1079,13 +1079,13 @@ server <- function(input, output, session) {
   
     observe({
       color_codes <- FlagsBCA$EXPcol
+      
       color_names <- names(FlagsBCA$EXPcol)
       valid_colors <- color_codes != "white"
       color_codes <- color_codes[valid_colors]
       color_names <- color_names[valid_colors]
       tables_data <- get_formatted_data(color_codes, color_names, bcaResult, bcaResult$BCAcell_EXP, "BCA")
       color_tables_bca(tables_data)
-      
     })
     
     output$tablesBCA <- renderUI({
@@ -1144,6 +1144,9 @@ server <- function(input, output, session) {
             stringsAsFactors = FALSE
           )
           
+          if(nrow(table_data)==0)
+            output=output[-paste0("table_", color)]
+          else
           output[[paste0("table_", color)]] <- renderDataTable({
             datatable(
               table_data,
@@ -1237,10 +1240,17 @@ server <- function(input, output, session) {
           tableExcelColored(session = session,
                             Result = bcaResult, 
                             FlagsExp = FlagsBCA,
-                            type = "Update")
+                            type = "Update",inputVal=value.now)
           
-          output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": sample name ", value.now))
-          output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
+          # 
+          # output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": sample name ", value.now))
+          # output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
+          # current_values <- color_tables_bca()$'Sample Name'
+          # current_values[value.bef] <- value.now
+          # current<-color_tables_bca()
+          # current$'Sample Name' <- c(current$'Sample Name', "")
+          # current$'Sample Name' <- current_values
+          #color_tables_bca(current)
           
         }
       }
