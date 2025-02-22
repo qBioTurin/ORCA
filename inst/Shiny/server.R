@@ -1076,7 +1076,7 @@ server <- function(input, output, session) {
       }
     } 
   })
-  
+   
     observe({
       color_codes <- FlagsBCA$EXPcol
       
@@ -1108,10 +1108,12 @@ server <- function(input, output, session) {
           solidHeader = TRUE,
           status = "primary",
           
-          textInput(inputId = paste0("sample_name_", color_name),
-                    label = "Sample Name",
-                    value = "",
-                    placeholder = paste("Sample Name for", color_name)),
+          selectizeInput(
+            inputId = paste0("sample_name_", color_name),
+            label = "Update Sample Name:",
+            choices = "",
+            options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
+          ),
           
           DT::dataTableOutput(outputId = paste0("table_", color_name))
         )
@@ -1241,17 +1243,6 @@ server <- function(input, output, session) {
                             Result = bcaResult, 
                             FlagsExp = FlagsBCA,
                             type = "Update",inputVal=value.now)
-          
-          # 
-          # output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": sample name ", value.now))
-          # output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
-          # current_values <- color_tables_bca()$'Sample Name'
-          # current_values[value.bef] <- value.now
-          # current<-color_tables_bca()
-          # current$'Sample Name' <- c(current$'Sample Name', "")
-          # current$'Sample Name' <- current_values
-          #color_tables_bca(current)
-          
         }
       }
     }, ignoreInit = TRUE)
@@ -1266,99 +1257,12 @@ server <- function(input, output, session) {
         
         if (value.now != "" && value.now != value.bef) {
           bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
-          tableExcelColored(session = session,
-                            Result = bcaResult, 
-                            FlagsExp = FlagsBCA,
-                            type = "Update")
-          
           output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": Exp Condition ", value.now))
           output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
         }
       }
     }, ignoreInit = TRUE)
     
-    
-    
-
-  # observe({
-  #   color_codes <- FlagsBCA$EXPcol
-  #   color_names <- names(FlagsBCA$EXPcol)
-  # 
-  #   valid_colors <- color_codes != "white"
-  #   color_codes <- color_codes[valid_colors]
-  #   color_names <- color_names[valid_colors]
-  # 
-  #   mid_point <- ceiling(length(color_codes) / 2)
-  #   left_colors <- color_codes[1:mid_point]
-  #   right_colors <- color_codes[(mid_point+1):length(color_codes)]
-  # 
-  #   left_formatted_data <- get_formatted_data(left_colors, color_names[1:mid_point], bcaResult, bcaResult$BCAcell_EXP,"BCA")
-  #   right_formatted_data <- get_formatted_data(right_colors, color_names[(mid_point+1):length(color_codes)], bcaResult, bcaResult$BCAcell_EXP, "BCA")
-  # 
-  #   left_data_bca(left_formatted_data)
-  #   right_data_bca(right_formatted_data)
-  # 
-  #   output$leftTableBCA <- renderDataTable(
-  #     left_data_bca(),
-  #     escape = FALSE,
-  #     editable = list(target = "cell", disable = list(columns = 0:3)),
-  #     options = list(
-  #       dom = 't',
-  #       paging = FALSE,
-  #       info = FALSE,
-  #       searching = FALSE,
-  #       columnDefs = list(
-  #         list(targets = 0, visible = FALSE),
-  #         list(targets = 1, visible = FALSE),
-  #         list(width = '10px', targets = 2),
-  #         list(width = '200px', targets = 3),
-  #         list(width = '80px', targets = 4),
-  #         list(width = '100px', targets = 5),
-  #         list(className = 'dt-head-left dt-body-left', targets = 1)
-  #       )
-  #     )
-  #   )
-  # 
-  #   output$rightTableBCA <- renderDataTable(
-  #     right_data_bca(),
-  #     escape = FALSE,
-  #     editable = list(target = "cell", disable = list(columns = 0:3)),
-  #     options = list(
-  #       dom = 't',
-  #       paging = FALSE,
-  #       info = FALSE,
-  #       searching = FALSE,
-  #       editable = TRUE,
-  #       columnDefs = list(
-  #         list(targets = 0, visible = FALSE),
-  #         list(targets = 1, visible = FALSE),
-  #         list(width = '10px', targets = 2),
-  #         list(width = '200px', targets = 3),
-  #         list(width = '80px', targets = 4),
-  #         list(width = '100px', targets = 5),
-  #         list(className = 'dt-head-left dt-body-left', targets = 1)
-  #       )
-  #     )
-  #   )
-  # })
-  # 
-  # observeEvent(input$leftTableBCA_cell_edit, {
-  #   info <- input$leftTableBCA_cell_edit
-  #   data <- left_data_bca()
-  #   updatedText <- updateTable("left", "BCA", info, data, bcaResult, FlagsBCA,session)
-  # 
-  #   output$BCASelectedValues <- renderText(updatedText)
-  # }, ignoreInit = TRUE, ignoreNULL = TRUE)
-  # observeEvent(input$rightTableBCA_cell_edit, {
-  #   info <- input$rightTableBCA_cell_edit
-  #   data <- right_data_bca()
-  #   updatedText <- updateTable("right", "BCA", info, data, bcaResult, FlagsBCA,session)
-  # 
-  #   output$BCASelectedValues <- renderText(updatedText)
-  # }, ignoreInit = TRUE, ignoreNULL = TRUE)
-  
-
-  
   ## update checkBox
   observeEvent(FlagsBCA$AllExp,{
     if(length(FlagsBCA$AllExp) > 1){

@@ -912,24 +912,19 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal){
              EXPcol = setNames(ColorsSN[1:length(FlagsExp$AllExp)], FlagsExp$AllExp)
              unused_colors <- setdiff(ColorsSN, EXPcol)
              EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1) #random colour not already in the list FlagsExp$EXPcol
-             new_color_name <- inputVal
-             names(EXPcol)[names(EXPcol) == ""] <- new_color_name
+             names(EXPcol)[names(EXPcol) == ""] <- inputVal
              FlagsExp$EXPcol <- EXPcol
            } else {
-             print("Existing color mapping found. Updating if necessary.")
-             SNnew = FlagsExp$AllExp[!FlagsExp$AllExp %in% names(FlagsExp$EXPcol)]
-             if(length(SNnew) > 0) {
+             #SNnew = FlagsExp$AllExp[!FlagsExp$AllExp %in% names(FlagsExp$EXPcol)]
+             SNnew= inputVal %in% names(FlagsExp$EXPcol)
+             if(!SNnew) {
                print(paste("New SNs found:", paste(SNnew, collapse=", ")))
-               colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1:length(SNnew)]
-               names(colNew) = SNnew
+               colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
                EXPcol = c(FlagsExp$EXPcol, colNew)
                unused_colors <- setdiff(ColorsSN, EXPcol)
                EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1)
-               new_color_name <- inputVal
-               names(EXPcol)[names(EXPcol) == ""] <- new_color_name
+               names(EXPcol)[names(EXPcol) == ""] <- inputVal
                FlagsExp$EXPcol <- EXPcol
-             } else {
-               print("No new SNs to update.")
              }
            }
 
