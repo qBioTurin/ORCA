@@ -342,6 +342,7 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
                   lapply(filenames,function(filename){
                     x = readxl::read_excel(filename, col_names = colname)
                     x <- x %>% na.omit()
+                    #x <- dplyr::filter(x, !if_all(everything(), is.na))
                     colnames(x) = x[1,]
                     x = x[-1,]
                     return(x)

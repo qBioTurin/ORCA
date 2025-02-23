@@ -3083,15 +3083,18 @@ observeEvent(input$applyChangesIF_TT, {
         dplyr::mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
       
       pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Cut, text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene) ), size = 3) +
+        geom_point(aes(color = Sample,
+                       alpha = ifelse(Cut == "Greater", 1, 0.5),
+                       text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene) ), size = 3) +
         geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
         facet_wrap(~HousekGene, ncol = 1)+
         theme_bw()+
         labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
-        scale_color_manual(values = c("Greater" = "#0072B2", "Smaller" = "#56B4E9")) +
         theme(axis.text.x=element_blank(), 
               axis.ticks.x=element_blank(),
-              legend.position = "bottom")
+              legend.position = "bottom")+
+        scale_color_brewer(palette = "Set1") +  
+        scale_alpha_identity()
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
@@ -3102,15 +3105,19 @@ observeEvent(input$applyChangesIF_TT, {
         dplyr::mutate(Cut = if_else(-ddCt <= cut,  "Smaller", "Greater"))
       
       pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Cut, text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
+        geom_point(aes(color = Sample, 
+                       alpha = ifelse(Cut == "Smaller", 1, 0.5),
+                       text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
         geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
         facet_wrap(~HousekGene, ncol = 1)+
         theme_bw()+
         labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
-        scale_color_manual(values = c( "Greater" = "#56B4E9", "Smaller" = "#0072B2")) +
+        #scale_color_manual(values = c( "Greater" = "#56B4E9", "Smaller" = "#0072B2")) +
         theme(axis.text.x=element_blank(), 
               axis.ticks.x=element_blank(),
-              legend.position = "bottom")
+              legend.position = "bottom")+
+        scale_color_brewer(palette = "Set1") +  
+        scale_alpha_identity()
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter(-DDCT <= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
@@ -3124,16 +3131,20 @@ observeEvent(input$applyChangesIF_TT, {
         dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , "Outside interval", "Inside interval"))
       
       pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Cut, text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
+        geom_point(aes(color = Sample, 
+                       alpha = ifelse(Cut == "Outside interval", 1, 0.5),
+                       text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
         geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")+
         geom_hline(yintercept = min(cut), color = "red", linetype = "dashed")+
         facet_wrap(~HousekGene, ncol = 1)+
         theme_bw()+
         labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
-        scale_color_manual(values = c("Outside interval" = "#0072B2", "Inside interval" = "#56B4E9")) +
+        #scale_color_manual(values = c("Outside interval" = "#0072B2", "Inside interval" = "#56B4E9")) +
         theme(axis.text.x=element_blank(), 
               axis.ticks.x=element_blank(),
-              legend.position = "bottom")
+              legend.position = "bottom")+
+        scale_color_brewer(palette = "Set1") +  
+        scale_alpha_identity()
       
       table  =  PCRstep5 %>% 
         dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
