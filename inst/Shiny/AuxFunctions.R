@@ -824,7 +824,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
   return(1)  # Restituisce 1 per indicare il successo
 }
 
-tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal){
+tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,prevVal){
   switch(type,
          "Initialize" = {
            ExpDataTable = Result$Initdata
@@ -919,13 +919,20 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal){
              #SNnew = FlagsExp$AllExp[!FlagsExp$AllExp %in% names(FlagsExp$EXPcol)]
              SNnew= inputVal %in% names(FlagsExp$EXPcol)
              if(!SNnew) {
-               print(paste("New SNs found:", paste(SNnew, collapse=", ")))
-               colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
-               EXPcol = c(FlagsExp$EXPcol, colNew)
-               unused_colors <- setdiff(ColorsSN, EXPcol)
-               EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1)
-               names(EXPcol)[names(EXPcol) == ""] <- inputVal
-               FlagsExp$EXPcol <- EXPcol
+               if(is.null(prevVal)||startsWith(prevVal, "Color")){
+                 colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
+                 EXPcol = c(FlagsExp$EXPcol, colNew)
+                 unused_colors <- setdiff(ColorsSN, EXPcol)
+                 EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1)
+                 names(EXPcol)[names(EXPcol) == ""] <- inputVal
+                 FlagsExp$EXPcol <- EXPcol
+               }
+               else{ 
+                 names(FlagsExp$EXPcol)[names(FlagsExp$EXPcol) == prevVal] <- inputVal
+               }
+             }
+             else{
+               FlagsExp$EXPcol <- FlagsExp$EXPcol[names(FlagsExp$EXPcol) != prevVal]
              }
            }
 

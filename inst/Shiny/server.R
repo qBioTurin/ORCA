@@ -1242,7 +1242,7 @@ server <- function(input, output, session) {
           tableExcelColored(session = session,
                             Result = bcaResult, 
                             FlagsExp = FlagsBCA,
-                            type = "Update",inputVal=value.now)
+                            type = "Update",inputVal=value.now,prevVal=value.bef)
         }
       }
     }, ignoreInit = TRUE)
