@@ -906,34 +906,38 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
          }, 
          
          "Update" =  {
-           ColorsSN = rainbow(n = 50, alpha = 0.5)[sample(50, size = 50, replace = FALSE)]
-
-           if(is.null(FlagsExp$EXPcol)) {
-             print("No existing color mapping found. Creating new one.")
-             EXPcol = setNames(ColorsSN[1:length(FlagsExp$AllExp)], FlagsExp$AllExp)
-             unused_colors <- setdiff(ColorsSN, EXPcol)
-             EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1) #random colour not already in the list FlagsExp$EXPcol
-             names(EXPcol)[names(EXPcol) == ""] <- inputVal
-             FlagsExp$EXPcol <- EXPcol
-           } else {
-             #SNnew = FlagsExp$AllExp[!FlagsExp$AllExp %in% names(FlagsExp$EXPcol)]
-             SNnew= inputVal %in% names(FlagsExp$EXPcol)
-             if(!SNnew) {
-               if(is.null(prevVal)||startsWith(prevVal, "Color")){
-                 colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
-                 EXPcol = c(FlagsExp$EXPcol, colNew)
-                 unused_colors <- setdiff(ColorsSN, EXPcol)
-                 EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1)
-                 names(EXPcol)[names(EXPcol) == ""] <- inputVal
-                 FlagsExp$EXPcol <- EXPcol
+           if(!is.null(inputVal)){
+             ColorsSN = rainbow(n = 50, alpha = 0.5)[sample(50, size = 50, replace = FALSE)]
+  
+             if(is.null(FlagsExp$EXPcol)) {
+               print("No existing color mapping found. Creating new one.")
+               EXPcol = setNames(ColorsSN[1:length(FlagsExp$AllExp)], FlagsExp$AllExp)
+               unused_colors <- setdiff(ColorsSN, EXPcol)
+               EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1) #random colour not already in the list FlagsExp$EXPcol
+               names(EXPcol)[names(EXPcol) == ""] <- inputVal
+               FlagsExp$EXPcol <- EXPcol
+             } else {
+               #SNnew = FlagsExp$AllExp[!FlagsExp$AllExp %in% names(FlagsExp$EXPcol)]
+               SNnew= inputVal %in% names(FlagsExp$EXPcol)
+               if(!SNnew) {
+                 if(is.null(prevVal)||startsWith(prevVal, "Color")){
+                   colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
+                   EXPcol = c(FlagsExp$EXPcol, colNew)
+                   unused_colors <- setdiff(ColorsSN, EXPcol)
+                   EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1)
+                   names(EXPcol)[names(EXPcol) == ""] <- inputVal
+                   FlagsExp$EXPcol <- EXPcol
+                 }
+                 else{ 
+                   names(FlagsExp$EXPcol)[names(FlagsExp$EXPcol) == prevVal] <- inputVal
+                 }
                }
-               else{ 
-                 names(FlagsExp$EXPcol)[names(FlagsExp$EXPcol) == prevVal] <- inputVal
+               else{
+                 FlagsExp$EXPcol <- FlagsExp$EXPcol[names(FlagsExp$EXPcol) != prevVal]
                }
              }
-             else{
-               FlagsExp$EXPcol <- FlagsExp$EXPcol[names(FlagsExp$EXPcol) != prevVal]
-             }
+           }else{
+             FlagsExp$EXPcol <- FlagsExp$EXPcol[names(FlagsExp$EXPcol) != prevVal]
            }
 
            ExpDataTable = Result$TablePlot$x$data

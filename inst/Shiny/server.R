@@ -1169,6 +1169,10 @@ server <- function(input, output, session) {
               data <- color_tables_bca()
               updatedText <- updateTable("BCA_SN", info, data, color, bcaResult, FlagsBCA,session)
               output$BCASelectedValues <- renderText(updatedText)
+              tableExcelColored(session = session,
+                                Result = bcaResult, 
+                                FlagsExp = FlagsBCA,
+                                type = "Update",inputVal=NULL,prevVal=color)
             }
           })
           
