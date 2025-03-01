@@ -906,9 +906,8 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
          }, 
          
          "Update" =  {
-           if(!is.null(inputVal)){
+           if(!is.null(inputVal)||!inputVal==""){
              ColorsSN = rainbow(n = 50, alpha = 0.5)[sample(50, size = 50, replace = FALSE)]
-  
              if(is.null(FlagsExp$EXPcol)) {
                print("No existing color mapping found. Creating new one.")
                EXPcol = setNames(ColorsSN[1:length(FlagsExp$AllExp)], FlagsExp$AllExp)
@@ -923,8 +922,6 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
                  if(is.null(prevVal)||startsWith(prevVal, "Color")){
                    colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
                    EXPcol = c(FlagsExp$EXPcol, colNew)
-                   unused_colors <- setdiff(ColorsSN, EXPcol)
-                   EXPcol[names(EXPcol) == ""] <- sample(unused_colors, 1)
                    names(EXPcol)[names(EXPcol) == ""] <- inputVal
                    FlagsExp$EXPcol <- EXPcol
                  }
@@ -1160,6 +1157,11 @@ updateTable <- function(analysis, info, data, color_code, result, flag, session)
     analysis<-"BCA"
     new_value <- info
   }
+  else if(analysis=="CYTOTOX_SN"){
+    selected_col <- 4
+    analysis<-"CYTOTOX"
+    new_value <- info
+  }
   else{
     selected_row <- info$row
     selected_col <- info$col
@@ -1187,7 +1189,7 @@ updateTable <- function(analysis, info, data, color_code, result, flag, session)
           
           result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
           # if ELISA, modify SN otherwise modify EXP
-          if (analysis %in% c("ELISA","IF","BCA") ) {
+          if (analysis %in% c("ELISA","IF","BCA","CYTOTOX") ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
           } else if (analysis == "ENDOC") {
             result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
@@ -1223,7 +1225,7 @@ updateTable <- function(analysis, info, data, color_code, result, flag, session)
       for (i in seq_along(matching_indices[, "row"])) {
         if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
           # if ELISA, modify EXP otherwise modify TIME
-          if (analysis == "ELISA"||analysis == "BCA") {
+          if (analysis == "ELISA"||analysis == "BCA"||analysis=="CYTOTOX") {
             result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
           } else {
             result[[paste0(analysis, "cell_TIME")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]

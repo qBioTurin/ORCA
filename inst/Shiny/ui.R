@@ -1205,8 +1205,7 @@ ui <- dashboardPage(
               )
           ),
           fluidRow(
-            column(6, dataTableOutput("leftTableELISA")),
-            column(6, dataTableOutput("rightTableELISA"))
+            uiOutput("tablesELISA")
           ),
           fluidRow(
             column(width = 1,offset = 9,
@@ -1355,8 +1354,7 @@ ui <- dashboardPage(
               )
           ),
           fluidRow(
-            column(6, dataTableOutput("leftTableEndoc")),
-            column(6, dataTableOutput("rightTableEndoc"))
+            uiOutput("tablesENDOC")
           ),
           fluidRow(
             column(width = 1,offset = 9,
@@ -1472,8 +1470,7 @@ ui <- dashboardPage(
               )
           ),
           fluidRow(
-            column(12, dataTableOutput("leftTableCytotox")),
-            #column(6, dataTableOutput("rightTableCytotox"))            
+            uiOutput("tablesCYTOTOX")   
           ),
           fluidRow(
             column(width = 1,offset = 9,
