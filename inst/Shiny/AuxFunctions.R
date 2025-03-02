@@ -919,7 +919,7 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
                #SNnew = FlagsExp$AllExp[!FlagsExp$AllExp %in% names(FlagsExp$EXPcol)]
                SNnew= inputVal %in% names(FlagsExp$EXPcol)
                if(!SNnew) {
-                 if(is.null(prevVal)||startsWith(prevVal, "Color")){
+                 if(is.null(prevVal)||startsWith(prevVal, "Color")||prevVal==""){
                    colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
                    EXPcol = c(FlagsExp$EXPcol, colNew)
                    names(EXPcol)[names(EXPcol) == ""] <- inputVal

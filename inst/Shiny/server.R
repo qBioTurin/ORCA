@@ -2839,7 +2839,9 @@ observeEvent(input$applyChangesIF_TT, {
     plotPCR = NULL,
     NewPCR = NULL,
     AllGenesFoldChangePlot = NULL,
-    AllGenesFoldChangeTable = NULL)
+    AllGenesFoldChangeTable = NULL,
+    PointPlot = NULL,
+    SavePlot = NULL)
   
   pcrResult0 = list(
     Initdata = NULL,
@@ -3203,28 +3205,28 @@ observeEvent(input$applyChangesIF_TT, {
         if(length(unique(PCRstep5$Time)) >1 )
         {
           plot1 = 
-            ggplot(data = PCRstep5,
-                   aes(x= as.factor(Time), y = ddCt, col = Sample))+
+            ggplot(data = PCRstep5)+
             labs(x = "Time", y = "DDCT")
-          plot2 = ggplot(data = PCRstep5 ,
-                         aes(x= as.factor(Time), y = Q, col = Sample))+
+          plot2 = ggplot(data = PCRstep5 )+
             labs(x = "Time", y = "2^(-DDCT)")
         }else{
           plot1 = 
-            ggplot(data = PCRstep5,
-                   aes(x= as.factor(Sample), y = ddCt, col = Sample))+
+            ggplot(data = PCRstep5)+
             labs(x = "Sample", y = "DDCT")
-          plot2 = ggplot(data = PCRstep5 ,
-                         aes(x= as.factor(Sample), y = Q, col = Sample))+
+          plot2 = ggplot(data = PCRstep5)+
             labs(x = "Sample", y = "2^(-DDCT)")
         }
         
         if (plot_type == "point") {
-          plot1 <- plot1 + geom_jitter(width = 0.1, height = 0,size = 3)
-          plot2 <- plot2 + geom_jitter(width = 0.1, height = 0,size = 3)
+          plot1 <- plot1 + geom_point(aes(x= as.factor(Time), y = ddCt, col = Sample,
+                                          text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+          plot2 <- plot2 + geom_point(aes(x= as.factor(Time), y = Q, col = Sample,
+                                          text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
         } else if (plot_type == "bar") {
-          plot1 <- plot1 + geom_bar(aes(fill = Sample), stat = "identity", position = "dodge")
-          plot2 <- plot2 + geom_bar(aes(fill = Sample), stat = "identity", position = "dodge")
+          plot1 <- plot1 + geom_bar(aes(x= as.factor(Sample), y = ddCt, col = Sample,fill = Sample,
+                                        text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
+          plot2 <- plot2 + geom_bar(aes(x= as.factor(Sample), y = Q, col = Sample,fill = Sample,
+                                        text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
         }
         
         plot1 = plot1  + 
@@ -3235,11 +3237,22 @@ observeEvent(input$applyChangesIF_TT, {
           facet_wrap(~GeneH, ncol = 1) +
           theme_bw()
         
+        FlagsPCR$singleGeneInfo = list(
+          Plot= list(Plot1 = plot1,Plot2 = plot2),
+          Table = PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q)
+        )
         
-        FlagsPCR$singleGeneInfo = list(Plot = plot1|plot2,
-                                       Table = PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q))
-        
-        output$SingleGenePlot = renderPlot({FlagsPCR$singleGeneInfo$Plot})
+        # Render del plot con Plotly
+        output$SingleGenePlot = plotly::renderPlotly({
+          p1 <- plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text") %>%
+            plotly::layout(showlegend = TRUE)
+          
+          p2 <- plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text") %>%
+            plotly::layout(showlegend = TRUE)
+          
+          plotly::subplot(p1, p2, nrows = 1, shareX = TRUE, titleX = TRUE)
+        })
+  
         output$SingleGeneTable = renderTable({FlagsPCR$singleGeneInfo$Table })
       }
     })
@@ -3268,6 +3281,7 @@ observeEvent(input$applyChangesIF_TT, {
               plotOutput(paste0("PCRplot_", i), width = "100%" )
             })
             do.call(tagList, list(plot_output_list))
+            pcrResult$savePlot <- plot_output_list
           })
           PCRtableUI =  renderUI({
             plot_output_list <- lapply(names(plotList), function(i) {
@@ -3278,34 +3292,142 @@ observeEvent(input$applyChangesIF_TT, {
           })
           
         }
+        
         # Dynamically generate plot output UI
         output$PCRplot <- renderUI({PCRplotUI})
+
         output$PCRtables <- renderUI({PCRtableUI})
-        
+
         plotList[[paste0(gene,"_H",Hgene)]]$plot = plot
         plotList[[paste0(gene,"_H",Hgene)]]$table = table
+        
         
         output[[paste0("PCRplot_", gene,"_H",Hgene)]] <- renderPlot({
           plotList[[paste0(gene,"_H",Hgene)]]$plot
         })
         output[[paste0("PCRtable_", gene,"_H",Hgene)]] <- renderTable({ plotList[[paste0(gene,"_H",Hgene)]]$table})
         
-        pcrResult$plotPCR = plotList
+        pcrResult$SavePlot <- plotList[[paste0(gene,"_H",Hgene)]]$plot$Plot2
+        pcrResult$plotPCR <- plotList
         
         df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(Sample != input$PCRbaseline)
         
-        output$PointGenePlot = renderPlot({
-          ggplot(df,aes(x = Gene, y = -DDCT)) +
-            geom_point() +
-            facet_wrap(~HousekGene, ncol = 1)+
-            theme_bw()+
-            labs(x="",y= "Log2(Q)", title = "")+
-            theme(axis.text.x=element_blank(), 
-                  axis.ticks.x=element_blank() )
-        })
+        pcrResult$PointPlot <- ggplot(df) + 
+          geom_point(aes(x = as.factor(Sample), y = -DDCT, col = Sample), size = 3) +  
+          facet_wrap(~HousekGene, ncol = 1) +
+          theme_bw() +
+          labs(x = "", y = "Log2(Q)", title = "") +
+          theme(
+            axis.text.x = element_blank(), 
+            axis.ticks.x = element_blank()
+          )
+        
+        output$PointGenePlot <- renderPlot({pcrResult$PointPlot})
         
       }
     })
+  })
+  
+  #Customize Plot 
+  
+  observeEvent(input$Customize_PCR_Button_1, {
+    layer_tabs <- generateLayerParameters(pcrResult$PointPlot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          # Dynamically generate inputs for each layer
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          generatePlotParameters(pcrResult$PointPlot)
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
+        )
+      ),
+      footer = tagList(
+        actionButton("applyChangesPCR_1", "Apply Changes"),
+        downloadButton("downloadPlotButtonPCR_1", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  output$downloadPlotButtonPCR_1 <- downloadHandler(
+    filename = function() {
+      paste0("plot_PCR_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      savePlotAsPNG(pcrResult$PointPlot, file, width, height, dpi)
+      manageSpinner(FALSE)
+    }
+  )
+  
+  
+  observeEvent(input$applyChangesPCR_1, {
+    updatedPlot<-customizePlot(pcrResult$PointPlot,input)
+    pcrResult$PointPlot<- updatedPlot
+    output$PointGenePlot <- renderPlot({updatedPlot})
+    removeModal()
+  })
+  
+  observeEvent(input$Customize_PCR_Button_2, {
+    layer_tabs <- generateLayerParameters(pcrResult$SavePlot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          # Dynamically generate inputs for each layer
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          generatePlotParameters(pcrResult$SavePlot)
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
+        )
+      ),
+      footer = tagList(
+        actionButton("applyChangesPCR_2", "Apply Changes"),
+        downloadButton("downloadPlotButtonPCR_2", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  output$downloadPlotButtonPCR_2 <- downloadHandler(
+    filename = function() {
+      paste0("plot_PCR_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      savePlotAsPNG(pcrResult$SavePlot, file, width, height, dpi)
+      manageSpinner(FALSE)
+    }
+  )
+  
+  
+  observeEvent(input$applyChangesPCR_2, {
+    updatedPlot<-customizePlot(pcrResult$SavePlot,input)
+    pcrResult$SavePlot<- updatedPlot
+    output$PointGenePlot <- renderPlot({updatedPlot}) #### capire dove salvare
+    removeModal()
   })
   
   observe({

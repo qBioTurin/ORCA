@@ -932,7 +932,7 @@ ui <- dashboardPage(
                     ),
                     fluidRow(
                       column(width = 12,
-                             plotOutput("SingleGenePlot")
+                             plotly::plotlyOutput("SingleGenePlot")
                       )
                     ),
                     fluidRow(
@@ -959,12 +959,14 @@ ui <- dashboardPage(
                     collapsed = TRUE,
                     fluidRow(
                       column(width = 12,
-                             plotOutput("PointGenePlot")
+                             plotOutput("PointGenePlot"),
+                             actionButton("Customize_PCR_Button_1", "Customize or Download Plot")
                       )
                     ),
                     fluidRow(
                       column(width = 12,
-                             uiOutput("PCRplot")
+                             uiOutput("PCRplot"),
+                             actionButton("Customize_PCR_Button_2", "Customize or Download Plot")
                       )
                     ),
                     fluidRow(
