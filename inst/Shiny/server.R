@@ -3088,8 +3088,8 @@ observeEvent(input$applyChangesIF_TT, {
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
       
-      pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Sample,
+      pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
+        geom_point(aes(shape=Time,color = Sample,
                        alpha = ifelse(Cut == "Greater", 1, 0.5),
                        text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene) ), size = 3) +
         geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
@@ -3244,12 +3244,12 @@ observeEvent(input$applyChangesIF_TT, {
         
         # Render del plot con Plotly
         output$SingleGenePlot = plotly::renderPlotly({
-          p1 <- plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text") %>%
+          p1<-plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text") %>%
             plotly::layout(showlegend = TRUE)
           
           p2 <- plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text") %>%
-            plotly::layout(showlegend = TRUE)
-          
+            plotly::layout(showlegend = FALSE)
+
           plotly::subplot(p1, p2, nrows = 1, shareX = TRUE, titleX = TRUE)
         })
   
@@ -3313,7 +3313,7 @@ observeEvent(input$applyChangesIF_TT, {
         df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(Sample != input$PCRbaseline)
         
         pcrResult$PointPlot <- ggplot(df) + 
-          geom_point(aes(x = as.factor(Sample), y = -DDCT, col = Sample), size = 3) +  
+          geom_point(aes(x = as.factor(Sample), y = -DDCT, col = Sample,shape=Time), size = 3) +  
           facet_wrap(~HousekGene, ncol = 1) +
           theme_bw() +
           labs(x = "", y = "Log2(Q)", title = "") +
@@ -3426,7 +3426,7 @@ observeEvent(input$applyChangesIF_TT, {
   observeEvent(input$applyChangesPCR_2, {
     updatedPlot<-customizePlot(pcrResult$SavePlot,input)
     pcrResult$SavePlot<- updatedPlot
-    output$PointGenePlot <- renderPlot({updatedPlot}) #### capire dove salvare
+    output$cio<- renderPlot({updatedPlot}) #### capire dove salvare
     removeModal()
   })
   
@@ -4114,7 +4114,7 @@ observeEvent(input$applyChangesIF_TT, {
     data = NULL,
     TablePlot = NULL,
     dataFinal = NULL,
-    ENDOCcell_TIME = NULL,
+    ENDOCcell_SN = NULL,
     ENDOCcell_COLOR = NULL,
     ENDOCcell_EXP = NULL,
     MapBaseline = NULL,
@@ -4125,8 +4125,9 @@ observeEvent(input$applyChangesIF_TT, {
     data = NULL,
     TablePlot = NULL,
     dataFinal = NULL,
-    ENDOCcell_TIME = NULL,
+    ENDOCcell_SN = NULL,
     ENDOCcell_COLOR = NULL,
+    ENDOCcell_EXP = NULL,
     MapBaseline = NULL,
     MapBlank = NULL)
   
@@ -4169,11 +4170,9 @@ observeEvent(input$applyChangesIF_TT, {
       updateCheckboxGroupInput(session, "ENDOC_baselines", choices = list(), selected = character(0))
       updateCheckboxGroupInput(session, "ENDOC_blanks", choices = list(), selected = character(0))
       
+      updateSelectizeInput(session, "ENDOCcell_SN", choices = character(0), selected = character(0))
       updateSelectizeInput(session, "ENDOCcell_EXP", choices = character(0), selected = character(0))
-      updateSelectizeInput(session, "ENDOCcell_TIME", choices = character(0), selected = character(0))
       
-      left_data_endoc <- NULL
-      right_data_endoc <- NULL
       loadExcelFileENDOC()
     }
   })
@@ -4247,6 +4246,13 @@ observeEvent(input$applyChangesIF_TT, {
         solidHeader = TRUE,
         status = "primary",
         
+        selectizeInput(
+          inputId = paste0("endoc_sample_name_", color_name),
+          label = "Update Experimental Condition:",
+          choices = "",
+          options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
+        ),
+        
         DT::dataTableOutput(outputId = paste0("endoc_table_", color_name))
       )
       i <<- i + 1  
@@ -4289,18 +4295,22 @@ observeEvent(input$applyChangesIF_TT, {
             )
           })
         
-        observeEvent(input[[paste0("endoc_time_",color)]], {
-          info <- input[[paste0("endoc_time_",color)]]
+        observeEvent(input[[paste0("endoc_sample_name_",color)]], {
+          info <- input[[paste0("endoc_sample_name_",color)]]
           if(!is.null(info)){
             index<-which(color_tables_endoc()$ColorCode == color)
-            current_values <- color_tables_endoc()$'Time'
+            current_values <- color_tables_endoc()$'Sample Name'
             current_values[index] <- info
             current<-color_tables_endoc()
-            current$'Time' <- current_values
+            current$'Sample Name' <- current_values
             color_tables_endoc(current)
             data <- color_tables_endoc()
-            updatedText <- updateTable("ENDOC", info, data, color, endocResult, FlagsENDOC,session)
+            updatedText <- updateTable("ENDOC_SN", info, data, color, endocResult, FlagsENDOC,session)
             output$ENDOCSelectedValues <- renderText(updatedText)
+            tableExcelColored(session = session,
+                              Result = endocResult, 
+                              FlagsExp = FlagsENDOC,
+                              type = "Update",inputVal="",prevVal=color)
           }
         })
         
@@ -4340,78 +4350,62 @@ observeEvent(input$applyChangesIF_TT, {
   observeEvent(input$ENDOCmatrix_cell_clicked, {
     req(input$ENDOCmatrix_cell_clicked)  
     
-    cellSelected = as.numeric(input$ENDOCmatrix_cell_clicked)
-    FlagsENDOC$cellCoo = cellCoo = c(cellSelected[1], cellSelected[2] + 1)
+    cellSelected <- as.numeric(input$ENDOCmatrix_cell_clicked)
+    FlagsENDOC$cellCoo <- cellCoo <- c(cellSelected[1], cellSelected[2] + 1)
     
-    allTime <- unique(na.omit(c(endocResult$ENDOCcell_TIME)))  
-    selectedTime <- ifelse(is.null(endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]])
+    allExp <- unique(na.omit(c(endocResult$ENDOCcell_EXP)))  
+    selectedExp <- ifelse(is.null(endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]])
     
-    updateSelectizeInput(inputId = "ENDOCcell_TIME", 
-                         choices = allTime,
-                         selected = selectedTime)
+    updateSelectizeInput(inputId = "ENDOCcell_EXP", 
+                         choices = c("", allExp),
+                         selected = selectedExp)
     
-    allConditions <- unique(na.omit(c(endocResult$ENDOCcell_EXP)))  
-    selectedCondition <- ifelse(is.null(endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]])
+    allSN <- unique(na.omit(c(endocResult$ENDOCcell_SN)))  
+    selectedSN <- ifelse(is.null(endocResult$ENDOCcell_SN[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_SN[cellCoo[1], cellCoo[2]])
     
-    updateSelectizeInput(inputId = "ENDOCcell_EXP",
-                         choices = allConditions,
-                         selected = selectedCondition)
+    updateSelectizeInput(inputId = "ENDOCcell_SN",
+                         choices = c("", allSN),
+                         selected = selectedSN)
   })
   
-  observeEvent(input$ENDOCcell_EXP, {
+  observeEvent(input$ENDOCcell_SN, {
     if (!is.null(endocResult$ENDOCcell_COLOR) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo)) {
-      ENDOCtb = endocResult$TablePlot
-      cellCoo = FlagsENDOC$cellCoo
+      ENDOCtb <- endocResult$TablePlot
+      cellCoo <- FlagsENDOC$cellCoo
       
-      value.bef = endocResult$ENDOCcell_COLOR[cellCoo[1], cellCoo[2]] 
-      value.now = input$ENDOCcell_EXP
+      value.bef <- endocResult$ENDOCcell_COLOR[cellCoo[1], cellCoo[2]] 
+      value.now <- input$ENDOCcell_SN
       
       if (value.now != "" && value.now != value.bef) {
-        currentValues <- endocResult$Initdata[cellCoo[1], cellCoo[2]]
-        
-        endocResult$ENDOCcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
-        endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]] = value.now
-        ENDOCtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] = value.now
-        
-        if (!input$ENDOCcell_EXP %in% FlagsENDOC$AllExp) {
-          exp = unique(c(FlagsENDOC$AllExp, input$ENDOCcell_EXP))
-          FlagsENDOC$AllExp = exp
-        }
+        endocResult$ENDOCcell_COLOR[cellCoo[1], cellCoo[2]] <- value.now
+        endocResult$ENDOCcell_SN[cellCoo[1], cellCoo[2]] <- value.now
+        ENDOCtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] <- value.now
         
         tableExcelColored(session = session,
                           Result = endocResult, 
                           FlagsExp = FlagsENDOC,
-                          type = "Update",inputVal="",prevVal="")
-        
-        output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": experimental condition ", value.now))
-        output$ENDOCmatrix <- renderDataTable({endocResult$TablePlot})
+                          type = "Update",inputVal=value.now,prevVal=value.bef)
+        output$ENDOCmatrix <- renderDataTable({ endocResult$TablePlot })
       }
-    } else return()
+    }
   }, ignoreInit = TRUE)
   
-  observeEvent(input$ENDOCcell_TIME, {
-    if (!is.null(endocResult$ENDOCcell_TIME) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo)) {
-      ENDOCtb = endocResult$TablePlot
-      cellCoo = FlagsENDOC$cellCoo
+  observeEvent(input$ENDOCcell_EXP, {
+    if (!is.null(endocResult$ENDOCcell_EXP) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo)) {
+      ENDOCtb <- endocResult$TablePlot
+      cellCoo <- FlagsENDOC$cellCoo
       
-      value.bef = endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]] 
-      value.now = input$ENDOCcell_TIME
+      value.bef <- endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]] 
+      value.now <- input$ENDOCcell_EXP
       
       if (value.now != "" && value.now != value.bef) {
-        currentValues <- endocResult$Initdata[cellCoo[1], cellCoo[2]]
-        
-        endocResult$ENDOCcell_TIME[cellCoo[1], cellCoo[2]] = value.now
-        tableExcelColored(session = session,
-                          Result = endocResult, 
-                          FlagsExp = FlagsENDOC,
-                          type = "Update",inputVal="",prevVal=""
-        )
-        
-        output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": time ", value.now))
-        output$ENDOCmatrix <- renderDataTable({endocResult$TablePlot})
+        endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
+        output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(endocResult$Initdata[cellCoo[1], cellCoo[2]]), ": Time ", value.now))
+        output$ENDOCmatrix <- renderDataTable({ endocResult$TablePlot })
       }
-    } else return()
+    }
   }, ignoreInit = TRUE)
+  
   
   ## update Baselines checkBox
   observeEvent(c(FlagsENDOC$AllExp,FlagsENDOC$BLANCHEselected),{
@@ -4481,9 +4475,9 @@ observeEvent(input$applyChangesIF_TT, {
     }
     
     if(length(listReturn) == 0){
-      return(list("Nothing",endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_COLOR))
+      return(list("Nothing",endocResult$ENDOCcell_EXP,endocResult$ENDOCcell_COLOR))
     }else{
-      return(c(listReturn,list(endocResult$ENDOCcell_TIME,endocResult$ENDOCcell_COLOR)) )
+      return(c(listReturn,list(endocResult$ENDOCcell_EXP,endocResult$ENDOCcell_COLOR)) )
     }
   })
   
@@ -4526,7 +4520,7 @@ observeEvent(input$applyChangesIF_TT, {
         endocV = expand.grid(seq_len(nrow(mat)), seq_len(ncol(mat))) %>%
           rowwise() %>%
           dplyr::mutate(values = mat[Var1, Var2])
-        matTime =  as.matrix(endocResult$ENDOCcell_TIME)
+        matTime =  as.matrix(endocResult$ENDOCcell_EXP)
         endocT = expand.grid(seq_len(nrow(matTime)), seq_len(ncol(matTime))) %>%
           rowwise() %>%
           dplyr::mutate(time = matTime[Var1, Var2])
@@ -4664,7 +4658,7 @@ observeEvent(input$applyChangesIF_TT, {
     )
     
     ##### Plot the values selected!
-    matTime =  as.matrix(endocResult$ENDOCcell_TIME)
+    matTime =  as.matrix(endocResult$ENDOCcell_EXP)
     matExp =  as.matrix(endocResult$ENDOCcell_COLOR)
     
     if( !( all(matTime == "")  || all(matExp == "") ) ){
@@ -6796,7 +6790,7 @@ observeEvent(input$applyChangesIF_TT, {
       return (FALSE)
     if (!is.null(endocResult$Initdata) || !is.null(endocResult$data) ||
         !is.null(endocResult$TablePlot) || !is.null(endocResult$dataFinal) ||
-        !is.null(endocResult$ENDOCcell_TIME) || !is.null(endocResult$ENDOCcell_SN) ||
+        !is.null(endocResult$ENDOCcell_EXP) || !is.null(endocResult$ENDOCcell_SN) ||
         !is.null(endocResult$MapBaseline) || !is.null(endocResult$MapBlank))
       return (FALSE)
     if (!is.null(ifResult$Initdata) || !is.null(ifResult$data) ||

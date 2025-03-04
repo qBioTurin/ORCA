@@ -982,16 +982,11 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
   column_TIME <- paste0(analysis, "cell_TIME")  
   
   # Set variable names based on analysis type
-  if (analysis %in% c("ELISA","BCA","IF", "CYTOTOX") ){
+  if (analysis %in% c("ELISA","BCA","IF", "CYTOTOX","ENDOC") ){
     value1 = "Sample Name"
     value2 = "Experimental condition"
     column_EXP <- paste0(analysis, "cell_SN") 
-  } else if (analysis == "ENDOC") {
-    value1 = "Experimental condition"
-    value2 = "Time"
-    column_EXP <- paste0(analysis, "cell_EXP") 
-  }
-  
+  } 
   for (i in seq_along(colors)) {
     matching_indices <- which(result[[column_COLOR]] == color_names[i], arr.ind = TRUE)
     if (nrow(matching_indices) > 0) {
@@ -1157,6 +1152,11 @@ updateTable <- function(analysis, info, data, color_code, result, flag, session)
     analysis<-"BCA"
     new_value <- info
   }
+  else if(analysis=="ENDOC_SN"){
+    selected_col <- 4
+    analysis<-"ENDOC"
+    new_value <- info
+  }
   else if(analysis=="CYTOTOX_SN"){
     selected_col <- 4
     analysis<-"CYTOTOX"
@@ -1189,13 +1189,10 @@ updateTable <- function(analysis, info, data, color_code, result, flag, session)
           
           result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]] <- new_value
           # if ELISA, modify SN otherwise modify EXP
-          if (analysis %in% c("ELISA","IF","BCA","CYTOTOX") ) {
+          if (analysis %in% c("ELISA","IF","BCA","CYTOTOX","ENDOC") ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
-          } else if (analysis == "ENDOC") {
-            result[[paste0(analysis, "cell_EXP")]][idx["row"], idx["col"]] <- new_value
-          }
-          
-          
+          } 
+        
           assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
         })
         
@@ -1225,10 +1222,8 @@ updateTable <- function(analysis, info, data, color_code, result, flag, session)
       for (i in seq_along(matching_indices[, "row"])) {
         if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
           # if ELISA, modify EXP otherwise modify TIME
-          if (analysis == "ELISA"||analysis == "BCA"||analysis=="CYTOTOX") {
+          if (analysis == "ELISA"||analysis == "BCA"||analysis=="CYTOTOX"||analysis=="ENDOC") {
             result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
-          } else {
-            result[[paste0(analysis, "cell_TIME")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
           }
         }
       }

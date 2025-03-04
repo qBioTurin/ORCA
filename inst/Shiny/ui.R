@@ -1320,7 +1320,7 @@ ui <- dashboardPage(
               column(width = 6,
                      fluidRow(
                        column(width = 8, offset = 2,
-                              selectizeInput("ENDOCcell_EXP",
+                              selectizeInput("ENDOCcell_SN",
                                              label = "Experimental condition:",
                                              choices = c(),  
                                              options = list(create = TRUE))
@@ -1328,7 +1328,7 @@ ui <- dashboardPage(
                      ),
                      fluidRow(
                        column(width = 8, offset = 2,
-                              selectizeInput("ENDOCcell_TIME",
+                              selectizeInput("ENDOCcell_EXP",
                                              label = "Time:",
                                              choices = c(),  
                                              options = list(create = TRUE))
