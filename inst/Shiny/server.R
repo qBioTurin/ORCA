@@ -968,6 +968,7 @@ server <- function(input, output, session) {
     Regression = NULL)
   
   color_tables_bca <- reactiveVal()
+  existingTables <- reactiveVal(character(0))
   
   # save everytime there is a change in the results
   BCAresultListen <- reactive({
@@ -1087,38 +1088,98 @@ server <- function(input, output, session) {
       color_tables_bca(tables_data)
     })
     
+    # output$tablesBCA <- renderUI({
+    #   colors <- FlagsBCA$EXPcol
+    #   color_names <- names(FlagsBCA$EXPcol)
+    #   color_values<-unname(FlagsBCA$EXPcol)
+    #   i <- 1
+    #   lapply(color_names, function(color_name) {
+    #     color_name <- color_names[i]
+    #     result<- box(
+    #       #title = paste("Table for", color_name),
+    #       title = HTML(
+    #         paste(
+    #           "Table for", 
+    #           sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
+    #                   color_values[i])
+    #         )
+    #       ),
+    #       width = 12,
+    #       solidHeader = TRUE,
+    #       status = "primary",
+    #       
+    #       selectizeInput(
+    #         inputId = paste0("sample_name_", color_name),
+    #         label = "Update Sample Name:",
+    #         choices = "",
+    #         options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
+    #       ),
+    #       
+    #       DT::dataTableOutput(outputId = paste0("table_", color_name))
+    #     )
+    #     i <<- i + 1  
+    #     result
+    #   })
+    # })
+    
+    
     output$tablesBCA <- renderUI({
       colors <- FlagsBCA$EXPcol
       color_names <- names(FlagsBCA$EXPcol)
-      color_values<-unname(FlagsBCA$EXPcol)
+      color_values <- unname(FlagsBCA$EXPcol)
+      
+      existing_ids <- existingTables()
+      to_remove <- setdiff(existing_ids, color_names)
+      
+      if(length(to_remove)>0){
+      
+      #reactives <- names(reactiveValuesToList(input))
+
+      lapply(to_remove, function(color_name) {
+        removeUI(selector = paste0("div:has(> #table_",color_name,")"),immediate = TRUE)
+        
+        # matching_reactives <- grep(paste0("table_", color_name), reactives, value = TRUE)
+        # lapply(matching_reactives, function(reactive_id) {
+        #   removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
+        #   
+        # })
+      })
+      }
+      
+      existingTables(color_names)
+      
       i <- 1
       lapply(color_names, function(color_name) {
         color_name <- color_names[i]
-        result<- box(
-          #title = paste("Table for", color_name),
-          title = HTML(
-            paste(
-              "Table for", 
-              sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
-                      color_values[i])
-            )
-          ),
-          width = 12,
-          solidHeader = TRUE,
-          status = "primary",
-          
-          selectizeInput(
-            inputId = paste0("sample_name_", color_name),
-            label = "Update Sample Name:",
-            choices = "",
-            options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
-          ),
-          
-          DT::dataTableOutput(outputId = paste0("table_", color_name))
+        table_id <- paste0("table_", color_name)
+        result <- div(
+          id = paste0("box_", color_name),
+          box(
+            title = HTML(
+              paste(
+                "Table for", 
+                sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
+                        color_values[i])
+              )
+            ),
+            width = 12,
+            solidHeader = TRUE,
+            status = "primary",
+            
+            selectizeInput(
+              inputId = paste0("sample_name_", color_name),
+              label = "Update Sample Name:",
+              choices = "",
+              options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
+            ),
+            
+            DT::dataTableOutput(outputId = table_id)
+          )
         )
-        i <<- i + 1  
-        result
+          i <<- i + 1  
+          result
       })
+      
     })
     
     observe({
@@ -1262,7 +1323,13 @@ server <- function(input, output, session) {
         if (value.now != "" && value.now != value.bef) {
           bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
           output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": Exp Condition ", value.now))
+          tableExcelColored(session = session,
+                            Result = bcaResult, 
+                            FlagsExp = FlagsBCA,
+                            type = "Update", inputVal="", prevVal=""
+          )
           output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
+          
         }
       }
     }, ignoreInit = TRUE)
@@ -1298,8 +1365,8 @@ server <- function(input, output, session) {
     isolate({
       if( !is.null(BCA_blanks) && !is.null(standcurve) && BCA_blanks == "yes" ){
         
-        exp = FlagsELISA$EXPselected
-        stcd = FlagsELISA$STDCselected
+        exp = FlagsBCA$EXPselected
+        stcd = FlagsBCA$STDCselected
         exp = exp[exp != ""]
         expNotBlank = unique(c(stcd,exp))
         
@@ -3707,7 +3774,7 @@ observeEvent(input$applyChangesIF_TT, {
             current$'Sample Name' <- current_values
             color_tables_elisa(current)
             data <- color_tables_elisa()
-            updatedText <- updateTable("BCA_SN", info, data, color, elisaResult, FlagsELISA,session)
+            updatedText <- updateTable("ELISA_SN", info, data, color, elisaResult, FlagsELISA,session)
             output$BCASelectedValues <- renderText(updatedText)
             tableExcelColored(session = session,
                               Result = elisaResult, 
@@ -3816,7 +3883,7 @@ observeEvent(input$applyChangesIF_TT, {
         tableExcelColored(session = session,
                           Result = elisaResult, 
                           FlagsExp = FlagsELISA,
-                          type = "Update",inputVal=value.now,prevVal=value.bef
+                          type = "Update", inputVal="", prevVal=""
         )
         
         output$ELISASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": Exp Condition ", value.now))
@@ -4227,9 +4294,9 @@ observeEvent(input$applyChangesIF_TT, {
   })
   
   output$tablesENDOC <- renderUI({
-    colors <- FlagsENDOC$EXPcol
-    color_names <- names(FlagsENDOC$EXPcol)
-    color_values<-unname(FlagsENDOC$EXPcol)
+    colors <- FlagsENDOC$EXPcol[FlagsENDOC$EXPcol != "white"]
+    color_names <- names(colors)
+    color_values<-unname(colors)
     i <- 1
     lapply(color_names, function(color_name) {
       color_name <- color_names[i]
@@ -4348,28 +4415,32 @@ observeEvent(input$applyChangesIF_TT, {
   
   
   observeEvent(input$ENDOCmatrix_cell_clicked, {
-    req(input$ENDOCmatrix_cell_clicked)  
-    
-    cellSelected <- as.numeric(input$ENDOCmatrix_cell_clicked)
-    FlagsENDOC$cellCoo <- cellCoo <- c(cellSelected[1], cellSelected[2] + 1)
-    
-    allExp <- unique(na.omit(c(endocResult$ENDOCcell_EXP)))  
-    selectedExp <- ifelse(is.null(endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "ENDOCcell_EXP", 
-                         choices = c("", allExp),
-                         selected = selectedExp)
-    
-    allSN <- unique(na.omit(c(endocResult$ENDOCcell_SN)))  
-    selectedSN <- ifelse(is.null(endocResult$ENDOCcell_SN[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_SN[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "ENDOCcell_SN",
-                         choices = c("", allSN),
-                         selected = selectedSN)
+    if(!is.null(input$ENDOCmatrix_cell_clicked$value)){
+      req(input$ENDOCmatrix_cell_clicked)  
+      
+      cellSelected <- as.numeric(input$ENDOCmatrix_cell_clicked)
+      FlagsENDOC$cellCoo <- cellCoo <- c(cellSelected[1], cellSelected[2] + 1)
+      
+      allExp <- unique(na.omit(c(endocResult$ENDOCcell_EXP)))  
+      selectedExp <- ifelse(is.null(endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "ENDOCcell_EXP", 
+                           choices = c("", allExp),
+                           selected = selectedExp)
+      
+      allSN <- unique(na.omit(c(endocResult$ENDOCcell_SN)))  
+      selectedSN <- ifelse(is.null(endocResult$ENDOCcell_SN[cellCoo[1], cellCoo[2]]), "", endocResult$ENDOCcell_SN[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "ENDOCcell_SN",
+                           choices = c("", allSN),
+                           selected = selectedSN)
+    }else{
+      FlagsENDOC$cellCoo <- cellCoo <- c(input$ENDOCmatrix_cell_clicked$row, input$ENDOCmatrix_cell_clicked$col + 1)
+    }
   })
   
   observeEvent(input$ENDOCcell_SN, {
-    if (!is.null(endocResult$ENDOCcell_COLOR) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo)) {
+    if (!is.null(endocResult$ENDOCcell_COLOR) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo) && !is.na(endocResult$TablePlot$x$data[FlagsENDOC$cellCoo[1],FlagsENDOC$cellCoo[2]])) {
       ENDOCtb <- endocResult$TablePlot
       cellCoo <- FlagsENDOC$cellCoo
       
@@ -4391,7 +4462,7 @@ observeEvent(input$applyChangesIF_TT, {
   }, ignoreInit = TRUE)
   
   observeEvent(input$ENDOCcell_EXP, {
-    if (!is.null(endocResult$ENDOCcell_EXP) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo)) {
+    if (!is.null(endocResult$ENDOCcell_EXP) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo) && !is.na(endocResult$TablePlot$x$data[FlagsENDOC$cellCoo[1],FlagsENDOC$cellCoo[2]])) {
       ENDOCtb <- endocResult$TablePlot
       cellCoo <- FlagsENDOC$cellCoo
       
@@ -4401,11 +4472,16 @@ observeEvent(input$applyChangesIF_TT, {
       if (value.now != "" && value.now != value.bef) {
         endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
         output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(endocResult$Initdata[cellCoo[1], cellCoo[2]]), ": Time ", value.now))
+        tableExcelColored(session = session,
+                          Result = endocResult, 
+                          FlagsExp = FlagsENDOC,
+                          type = "Update", inputVal="", prevVal=""
+        )
         output$ENDOCmatrix <- renderDataTable({ endocResult$TablePlot })
       }
     }
-  }, ignoreInit = TRUE)
-  
+ }, ignoreInit = TRUE)
+ 
   
   ## update Baselines checkBox
   observeEvent(c(FlagsENDOC$AllExp,FlagsENDOC$BLANCHEselected),{

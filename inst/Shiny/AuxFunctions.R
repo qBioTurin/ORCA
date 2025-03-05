@@ -933,8 +933,6 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
                  FlagsExp$EXPcol <- FlagsExp$EXPcol[names(FlagsExp$EXPcol) != prevVal]
                }
              }
-           }else{
-             FlagsExp$EXPcol <- FlagsExp$EXPcol[names(FlagsExp$EXPcol) != prevVal]
            }
 
            ExpDataTable = Result$TablePlot$x$data
@@ -1005,7 +1003,8 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
           val <- result$IFcell_EXP[idx["row"], idx["col"]]
         else if (analysis == "BCA")
           val <- result$BCAcell_EXP[idx["row"], idx["col"]]
-        else val <- result$ENDOCcell_TIME[idx["row"], idx["col"]]
+        else if (analysis == "ENDOC")
+          val <- result$ENDOCcell_EXP[idx["row"], idx["col"]]
         
         if (!is.na(val) && !is.null(val) && val != "") val else ""
       })
@@ -1155,6 +1154,11 @@ updateTable <- function(analysis, info, data, color_code, result, flag, session)
   else if(analysis=="ENDOC_SN"){
     selected_col <- 4
     analysis<-"ENDOC"
+    new_value <- info
+  }
+  else if(analysis=="ELISA_SN"){
+    selected_col <- 4
+    analysis<-"ELISA"
     new_value <- info
   }
   else if(analysis=="CYTOTOX_SN"){
