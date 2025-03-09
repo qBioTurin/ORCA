@@ -960,13 +960,37 @@ ui <- dashboardPage(
                     fluidRow(
                       column(width = 12,
                              plotOutput("PointGenePlot"),
+                             #actionButton("Select_customize_plot_PCR","Select the plot to customize"),
                              actionButton("Customize_PCR_Button_1", "Customize or Download Plot")
                       )
                     ),
                     fluidRow(
                       column(width = 12,
                              uiOutput("PCRplot"),
-                             actionButton("Customize_PCR_Button_2", "Customize or Download Plot")
+                             fluidRow(
+                               column(
+                                 width = 3,
+                                 selectizeInput(
+                                   inputId = "Select_Customize_Gene_plot",
+                                   "Select gene for customization:", 
+                                   choices = c(""),
+                                   selected = ""
+                                 )
+                               ),
+                               column(
+                                 width = 3,
+                                 selectizeInput(
+                                   inputId = "Select_Customize_HousKgene_plot",
+                                   "Select housekeeping gene for customization:", 
+                                   choices = c(""), 
+                                   selected = ""
+                                 )
+                               ),
+                               column(
+                                 width = 3,
+                                 actionButton("Customize_PCR_Button_2", "Customize or Download Plot")
+                               )
+                             )
                       )
                     ),
                     fluidRow(

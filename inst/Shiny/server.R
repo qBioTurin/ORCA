@@ -1133,16 +1133,15 @@ server <- function(input, output, session) {
       
       if(length(to_remove)>0){
       
-      #reactives <- names(reactiveValuesToList(input))
+      reactives <- names(reactiveValuesToList(input))
 
       lapply(to_remove, function(color_name) {
-        removeUI(selector = paste0("div:has(> #table_",color_name,")"),immediate = TRUE)
+        #removeUI(selector = paste0("div:has(> #table_",color_name,")"),immediate = TRUE)
         
-        # matching_reactives <- grep(paste0("table_", color_name), reactives, value = TRUE)
-        # lapply(matching_reactives, function(reactive_id) {
-        #   removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
-        #   
-        # })
+        matching_reactives <- grep(paste0("box_", color_name), reactives, value = TRUE)
+        lapply(matching_reactives, function(reactive_id) {
+          removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
+        })
       })
       }
       
@@ -2908,7 +2907,8 @@ observeEvent(input$applyChangesIF_TT, {
     AllGenesFoldChangePlot = NULL,
     AllGenesFoldChangeTable = NULL,
     PointPlot = NULL,
-    SavePlot = NULL)
+    CustomGene=NULL,
+    CustomHgene=NULL)
   
   pcrResult0 = list(
     Initdata = NULL,
@@ -3130,6 +3130,8 @@ observeEvent(input$applyChangesIF_TT, {
       NewPCRFiltered = NewPCR %>% dplyr::filter(!is.na(ddCt) | Sample == pcrResult$BaselineExp )
       updateSelectizeInput(inputId = "HousKgene_plot", choices = c("",unique(NewPCR$HousekGene)),selected = "" )
       updateSelectizeInput(inputId = "Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
+      updateSelectizeInput(inputId = "Select_Customize_Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
+      updateSelectizeInput(inputId = "Select_Customize_HousKgene_plot",choices = c("",unique(NewPCR$HousekGene)),selected = "" )
       
       if(PCR_cut_type == "Both"){
         updateSliderInput(session = session, inputId = "BothCutFoldChange_slider",
@@ -3177,8 +3179,8 @@ observeEvent(input$applyChangesIF_TT, {
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt <= cut,  "Smaller", "Greater"))
       
-      pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Sample, 
+      pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
+        geom_point(aes(shape=Time,color = Sample, 
                        alpha = ifelse(Cut == "Smaller", 1, 0.5),
                        text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
         geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
@@ -3203,8 +3205,8 @@ observeEvent(input$applyChangesIF_TT, {
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , "Outside interval", "Inside interval"))
       
-      pl = ggplot(PCRstep5,aes(x = Gene, y = -ddCt)) +
-        geom_point(aes(color = Sample, 
+      pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
+        geom_point(aes(shape=Time,color = Sample, 
                        alpha = ifelse(Cut == "Outside interval", 1, 0.5),
                        text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
         geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")+
@@ -3272,9 +3274,9 @@ observeEvent(input$applyChangesIF_TT, {
         if(length(unique(PCRstep5$Time)) >1 )
         {
           plot1 = 
-            ggplot(data = PCRstep5)+
+            ggplot(data = PCRstep5,aes(x = paste(Time," ",Gene), y = ddCt))+
             labs(x = "Time", y = "DDCT")
-          plot2 = ggplot(data = PCRstep5 )+
+          plot2 = ggplot(data = PCRstep5,aes(x = paste(Time," ",Gene), y = Q ))+
             labs(x = "Time", y = "2^(-DDCT)")
         }else{
           plot1 = 
@@ -3285,9 +3287,9 @@ observeEvent(input$applyChangesIF_TT, {
         }
         
         if (plot_type == "point") {
-          plot1 <- plot1 + geom_point(aes(x= as.factor(Time), y = ddCt, col = Sample,
+          plot1 <- plot1 + geom_point(aes(shape=Time, color = Sample,
                                           text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
-          plot2 <- plot2 + geom_point(aes(x= as.factor(Time), y = Q, col = Sample,
+          plot2 <- plot2 + geom_point(aes(shape=Time, color = Sample,
                                           text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
         } else if (plot_type == "bar") {
           plot1 <- plot1 + geom_bar(aes(x= as.factor(Sample), y = ddCt, col = Sample,fill = Sample,
@@ -3348,7 +3350,7 @@ observeEvent(input$applyChangesIF_TT, {
               plotOutput(paste0("PCRplot_", i), width = "100%" )
             })
             do.call(tagList, list(plot_output_list))
-            pcrResult$savePlot <- plot_output_list
+            #pcrResult$savePlot <- plot_output_list
           })
           PCRtableUI =  renderUI({
             plot_output_list <- lapply(names(plotList), function(i) {
@@ -3374,7 +3376,7 @@ observeEvent(input$applyChangesIF_TT, {
         })
         output[[paste0("PCRtable_", gene,"_H",Hgene)]] <- renderTable({ plotList[[paste0(gene,"_H",Hgene)]]$table})
         
-        pcrResult$SavePlot <- plotList[[paste0(gene,"_H",Hgene)]]$plot$Plot2
+        #pcrResult$SavePlot <- plotList[[paste0(gene,"_H",Hgene)]]$plot$Plot2
         pcrResult$plotPCR <- plotList
         
         df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(Sample != input$PCRbaseline)
@@ -3447,32 +3449,45 @@ observeEvent(input$applyChangesIF_TT, {
     removeModal()
   })
   
+  observe({
+    input$Select_Customize_Gene_plot-> gene_select
+    input$Select_Customize_HousKgene_plot-> Hgene_select
+    if(!is.null(pcrResult$plotPCR)){
+      if(!is.null(pcrResult$plotPCR[[paste0(gene_select,"_H",Hgene_select)]])){
+        pcrResult$CustomGene <- gene_select
+        pcrResult$CustomHgene <- Hgene_select
+      }
+    }
+  })
+  
   observeEvent(input$Customize_PCR_Button_2, {
-    layer_tabs <- generateLayerParameters(pcrResult$SavePlot)
-    showModal(modalDialog(
-      title = "Customize or Download Plot",
-      tabsetPanel(
-        tabPanel(
-          "Layer Customization",
-          # Dynamically generate inputs for each layer
-          do.call(tagList, layer_tabs)
+    if(!is.null(pcrResult$plotPCR) && !is.null(pcrResult$CustomGene) && !is.null(pcrResult$CustomHgene)){
+      layer_tabs <- generateLayerParameters(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2)
+      showModal(modalDialog(
+        title = "Customize or Download Plot",
+        tabsetPanel(
+          tabPanel(
+            "Layer Customization",
+            # Dynamically generate inputs for each layer
+            do.call(tagList, layer_tabs)
+          ),
+          tabPanel(
+            "Common Parameters",
+            generatePlotParameters(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2)
+          ),
+          tabPanel(
+            "Save Plot",
+            generateSavePlotTab()
+          )
         ),
-        tabPanel(
-          "Common Parameters",
-          generatePlotParameters(pcrResult$SavePlot)
+        footer = tagList(
+          actionButton("applyChangesPCR_2", "Apply Changes"),
+          downloadButton("downloadPlotButtonPCR_2", "Download Plot"),
+          modalButton("Close")
         ),
-        tabPanel(
-          "Save Plot",
-          generateSavePlotTab()
-        )
-      ),
-      footer = tagList(
-        actionButton("applyChangesPCR_2", "Apply Changes"),
-        downloadButton("downloadPlotButtonPCR_2", "Download Plot"),
-        modalButton("Close")
-      ),
-      easyClose = FALSE
-    ))
+        easyClose = FALSE
+      ))
+    }
   })
   
   output$downloadPlotButtonPCR_2 <- downloadHandler(
@@ -3484,16 +3499,16 @@ observeEvent(input$applyChangesIF_TT, {
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(pcrResult$SavePlot, file, width, height, dpi)
+      savePlotAsPNG(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2, file, width, height, dpi)
       manageSpinner(FALSE)
     }
   )
   
   
   observeEvent(input$applyChangesPCR_2, {
-    updatedPlot<-customizePlot(pcrResult$SavePlot,input)
-    pcrResult$SavePlot<- updatedPlot
-    output$cio<- renderPlot({updatedPlot}) #### capire dove salvare
+    updatedPlot<-customizePlot(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2,input)
+    pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2<- updatedPlot
+    output[[paste0("PCRplot_", pcrResult$CustomGene ,"_H",pcrResult$CustomHgene)]]<- renderPlot({updatedPlot}) 
     removeModal()
   })
   
