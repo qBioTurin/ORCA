@@ -1143,7 +1143,7 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
 # }
 
 
-updateTable <- function(analysis, info, data, color_code, result, flag, session) {
+updateTable <- function(analysis, info, color_code, result, flag, session) {
   req(info)
   
   if(analysis=="BCA_SN"){
@@ -1946,11 +1946,30 @@ generateLayerParameters <- function(plot) {
     data <- plot_build$data[[i]]
     default_params <- layer$aes_params
     
+    if(!is.null(aes_mapping$colour)){
+      colour_mapping<-rlang::quo_name(aes_mapping$colour)
+      data<-data %>% mutate(!!colour_mapping := plot_build$plot$data[[colour_mapping]])
+    }
+    if(!is.null(aes_mapping$shape)){
+      shape_mapping<-rlang::quo_name(aes_mapping$shape)
+      data<-data %>% mutate(!!shape_mapping := plot_build$plot$data[[shape_mapping]])
+    }
+    
     #Function to extract specific aesthetic values
     extract_aes_value <- function(aesthetic, default,x_val) {
       if (!is.null(aes_mapping[[aesthetic]])) {
-        filtered_data <- data[data[["group"]] == x_val, ]
-        return(unique(filtered_data[[aesthetic]]))
+        if (aesthetic == "colour") {
+          filtered_data <- data[data[["colour"]] == x_val, ]
+          return(unique(filtered_data[[aesthetic]]))
+        }
+        else if (aesthetic == "shape") {
+          filtered_data <- data[data[["shape"]] == x_val, ]
+          return(unique(filtered_data[[aesthetic]]))
+        }
+        else{
+          filtered_data <- data[data[["group"]] == x_val, ]
+          return(unique(filtered_data[[aesthetic]]))
+        }
       }
       if (!is.null(default_params[[aesthetic]])) {
         return(default_params[[aesthetic]])
@@ -1974,11 +1993,11 @@ generateLayerParameters <- function(plot) {
         if (layer_type == "GeomPoint") {
           tagList(
             if ("colour" %in% names(aes_mapping)) {
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
-                  paste0("pointColor_", i, "_", x_val),
-                  paste("Point Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000",x_val)
+                  paste0("pointColor_", i, "_", gsub("#", "", x_val)),
+                  paste0("Point Color for ",colour_mapping," ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  value = x_val
                 )
               })
             } else {
@@ -1990,12 +2009,12 @@ generateLayerParameters <- function(plot) {
             },
             
             if ("shape" %in% names(aes_mapping)) {
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["shape"]]), function(x_val) {
                 selectInput(
                   paste0("pointShape_", i, "_", x_val),
-                  paste("Point Shape for Group", x_val),
+                  paste0("Point Shape for ",shape_mapping," ", unique(data[data[["shape"]] == x_val, ][[shape_mapping]])),
                   choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
-                  selected = extract_aes_value("shape", 16,x_val)
+                  selected = x_val
                 )
               })
             } else {
@@ -2030,11 +2049,12 @@ generateLayerParameters <- function(plot) {
             
             # Line Color
             if ("colour" %in% names(aes_mapping)) {
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
-                  paste0("lineColor_", i, "_", x_val),
-                  paste("Line Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000",x_val)
+                  paste0("lineColor_", i, "_",  gsub("#", "", x_val)),
+                  paste0("Line Color for ", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  #value = extract_aes_value("colour", "#000000",x_val)
+                  value = x_val
                 )
               })
             } else {
@@ -2069,11 +2089,12 @@ generateLayerParameters <- function(plot) {
               min = 0.1, max = 1, value = extract_aes_value("width", 0.5)
             ),
             if("color" %in% names(aes_mapping)){
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
-                  paste0("barColor_", i, "_", x_val),
-                  paste("Bar Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000",x_val)
+                  paste0("barColor_", i, "_",  gsub("#", "", x_val)),
+                  paste0("Bar Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  #value = extract_aes_value("colour", "#000000",x_val)
+                  value = x_val
                 )
               })
             } else {
@@ -2093,11 +2114,12 @@ generateLayerParameters <- function(plot) {
             )
             ,
             if ("colour" %in% names(aes_mapping)) {
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
-                  paste0("errorBarColor_", i, "_", x_val),
-                  paste("Error Bar Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000",x_val)
+                  paste0("errorBarColor_", i, "_",  gsub("#", "", x_val)),
+                  paste("Error Bar Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  #value = extract_aes_value("colour", "#000000",x_val)
+                  value = x_val
                 )
               })
             } else {
@@ -2134,11 +2156,12 @@ generateLayerParameters <- function(plot) {
             },
             
             if("colour" %in% names(aes_mapping)){
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
-                  paste0("boxOutlineColor_", i, "_", x_val),
-                  paste("Boxplot Outline Color for Group", x_val),
-                  value = extract_aes_value("colour", "#000000",x_val)
+                  paste0("boxOutlineColor_", i, "_",  gsub("#", "", x_val)),
+                  paste("Boxplot Outline Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  #value = extract_aes_value("colour", "#000000",x_val)
+                  value = x_val
                 )
               })
             } else {
@@ -2206,21 +2229,22 @@ customizePlot <- function(plot, input) {
     
     
     unique_x<-unique(plot_build$data[[i]][["group"]] )
-    
+    unique_x_colour<-unique(plot_build$data[[i]][["colour"]] )
+    unique_x_shape<-unique(plot_build$data[[i]][["shape"]] )
     # Customize each type of geom layer
     if (layer_type == "GeomPoint") {
       
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
-            input[[paste0("pointColor_", i, "_", x_val)]]
+          values = unlist(lapply(unique_x_colour, function(x_val) {
+            input[[paste0("pointColor_", i, "_",  gsub("#", "", x_val))]]
           }))
         )
       } else NULL
       
       shape_scale <- if (is_shape_mapped) {
         scale_shape_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
+          values = unlist(lapply(unique_x_shape, function(x_val) {
             as.integer(input[[paste0("pointShape_", i, "_", x_val)]])
           }))
         )
@@ -2275,7 +2299,7 @@ customizePlot <- function(plot, input) {
       
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
+          values = unlist(lapply(unique_x_colour, function(x_val) {
             input[[paste0("barColor_", i,"_", x_val)]]
           }))
         )
@@ -2345,7 +2369,7 @@ customizePlot <- function(plot, input) {
     } else if (layer_type == "GeomLine") {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
+          values = unlist(lapply(unique_x_colour, function(x_val) {
             input[[paste0("lineColor_", i,"_", x_val)]]
           }))
         )
@@ -2407,7 +2431,7 @@ customizePlot <- function(plot, input) {
       
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
+          values = unlist(lapply(unique_x_colour, function(x_val) {
             input[[paste0("boxOutlineColor_", i,"_", x_val)]]
           }))
         )
@@ -2484,7 +2508,7 @@ customizePlot <- function(plot, input) {
     } else if (layer_type == "GeomErrorbar") {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
+          values = unlist(lapply(unique_x_colour, function(x_val) {
             input[[paste0("errorBarColor_", i,"_", x_val)]]
           }))
         )

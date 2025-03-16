@@ -967,7 +967,14 @@ server <- function(input, output, session) {
     Tablestandcurve = NULL,
     Regression = NULL)
   
-  color_tables_bca <- reactiveVal()
+  #color_tables_bca <- reactiveVal()
+  color_tables_bca<- reactiveValues(
+    ColorCode=NULL,
+    Values=NULL,
+    ExperimentalCondition=NULL,
+    SampleName=NULL
+  )
+  
   existingTables <- reactiveVal(character(0))
   
   # save everytime there is a change in the results
@@ -1085,7 +1092,10 @@ server <- function(input, output, session) {
       color_codes <- color_codes[valid_colors]
       color_names <- color_names[valid_colors]
       tables_data <- get_formatted_data(color_codes, color_names, bcaResult, bcaResult$BCAcell_EXP, "BCA")
-      color_tables_bca(tables_data)
+      color_tables_bca$ColorCode <- tables_data$ColorCode
+      color_tables_bca$Values <- tables_data$Values
+      color_tables_bca$ExperimentalCondition <- tables_data$'Experimental condition'
+      color_tables_bca$SampleName <- tables_data$'Sample Name'
     })
     
     # output$tablesBCA <- renderUI({
@@ -1147,6 +1157,10 @@ server <- function(input, output, session) {
       
       existingTables(color_names)
       
+      color_names_showed <- ifelse(length(color_names[!grepl(pattern = "Color ", x = color_names)]) > 0,
+                                   color_names[!grepl(pattern = "Color ", x = color_names)],
+                                   "")
+      
       i <- 1
       lapply(color_names, function(color_name) {
         color_name <- color_names[i]
@@ -1164,12 +1178,12 @@ server <- function(input, output, session) {
             width = 12,
             solidHeader = TRUE,
             status = "primary",
-            
+            ###########################
             selectizeInput(
               inputId = paste0("sample_name_", color_name),
               label = "Update Sample Name:",
-              choices = "",
-              options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
+              choices = color_names_showed, selected = color_name,
+              options = list(create = TRUE) #placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
             ),
             
             DT::dataTableOutput(outputId = table_id)
@@ -1181,16 +1195,18 @@ server <- function(input, output, session) {
       
     })
     
-    observe({
-      color_codes <- color_tables_bca()$ColorCode
-      values <- color_tables_bca()$Values
+    observeEvent(color_tables_bca$ColorCode,{
+      isolate({
+      req(color_tables_bca$ColorCode, color_tables_bca$Values)
+      color_codes <- color_tables_bca$ColorCode
+      values <- color_tables_bca$Values
       
       for (i in seq_along(color_codes)) {
         local({
           color <- color_codes[i]
           value_string <- values[i]
           
-          current_condition <- strsplit(color_tables_bca()$'Experimental condition'[which(color_tables_bca()$ColorCode== color)], " - ")[[1]]
+          current_condition <- strsplit(color_tables_bca$ExperimentalCondition[which(color_tables_bca$ColorCode== color)], " - ")[[1]]
           
           table_data <- data.frame(
             Value = strsplit(value_string, " - ")[[1]],
@@ -1219,14 +1235,11 @@ server <- function(input, output, session) {
          observeEvent(input[[paste0("sample_name_",color)]], {
             info <- input[[paste0("sample_name_",color)]]
             if(!is.null(info)){
-              index<-which(color_tables_bca()$ColorCode == color)
-              current_values <- color_tables_bca()$'Sample Name'
+              index<-which(color_tables_bca$ColorCode == color)
+              current_values <- color_tables_bca$SampleName
               current_values[index] <- info
-              current<-color_tables_bca()
-              current$'Sample Name' <- current_values
-              color_tables_bca(current)
-              data <- color_tables_bca()
-              updatedText <- updateTable("BCA_SN", info, data, color, bcaResult, FlagsBCA,session)
+              color_tables_bca$SampleName<- current_values
+              updatedText <- updateTable("BCA_SN", info, color, bcaResult, FlagsBCA,session)
               output$BCASelectedValues <- renderText(updatedText)
               tableExcelColored(session = session,
                                 Result = bcaResult, 
@@ -1244,8 +1257,8 @@ server <- function(input, output, session) {
               value <- info$value
 
               table_data[row, col] <- value
-              current_values <- color_tables_bca()$'Experimental condition'
-              index <- which(color_tables_bca()$ColorCode == color)
+              current_values <- color_tables_bca$ExperimentalCondition
+              index <- which(color_tables_bca$ColorCode == color)
               condition_split <- strsplit(current_values[index], " - ")[[1]]
 
               if (length(condition_split) < nrow(table_data)) {
@@ -1253,18 +1266,16 @@ server <- function(input, output, session) {
               }
               condition_split[row] <- value
               current_values[index] <- paste(condition_split, collapse = " - ")
-              current<-color_tables_bca()
-              current$'Experimental condition' <- current_values
-              color_tables_bca(current)
-              data <- color_tables_bca()
+              color_tables_bca$ExperimentalCondition <- current_values
               if(info$col==2)
                 info$col<-5
-              updatedText <- updateTable("BCA", info, data, color, bcaResult, FlagsBCA,session)
+              updatedText <- updateTable("BCA", info, color, bcaResult, FlagsBCA,session)
               output$BCASelectedValues <- renderText(updatedText)
             }
           }, ignoreInit = TRUE, ignoreNULL = TRUE)
         })
       }
+      })
     })
     
     
@@ -3427,6 +3438,8 @@ observeEvent(input$applyChangesIF_TT, {
     ))
   })
   
+  
+  
   output$downloadPlotButtonPCR_1 <- downloadHandler(
     filename = function() {
       paste0("plot_PCR_", Sys.Date(), ".png")
@@ -3714,6 +3727,9 @@ observeEvent(input$applyChangesIF_TT, {
     colors <- FlagsELISA$EXPcol
     color_names <- names(FlagsELISA$EXPcol)
     color_values<-unname(FlagsELISA$EXPcol)
+    color_names_showed <- ifelse(length(grepl(pattern = "Color ", x = color_names)) > 0,
+                                 color_names[!grepl(pattern = "Color ", x = color_names)],
+                                 "")
     i <- 1
     lapply(color_names, function(color_name) {
       color_name <- color_names[i]
@@ -3733,7 +3749,7 @@ observeEvent(input$applyChangesIF_TT, {
         selectizeInput(
           inputId = paste0("sample_name_", color_name),
           label = "Update Sample Name:",
-          choices = "",
+          choices = color_names_showed, selected = color_name,
           options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
         ),
         
@@ -3790,7 +3806,7 @@ observeEvent(input$applyChangesIF_TT, {
             color_tables_elisa(current)
             data <- color_tables_elisa()
             updatedText <- updateTable("ELISA_SN", info, data, color, elisaResult, FlagsELISA,session)
-            output$BCASelectedValues <- renderText(updatedText)
+            output$ELISASelectedValues <- renderText(updatedText)
             tableExcelColored(session = session,
                               Result = elisaResult, 
                               FlagsExp = FlagsELISA,
