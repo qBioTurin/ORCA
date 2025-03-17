@@ -854,6 +854,20 @@ ui <- dashboardPage(
                     )
                   ),
                   column(
+                    width = 6,
+                    h3("Define time patterns"),
+                    textInput(
+                      inputId = "PCR_time_patterns",
+                      label = "Enter time patterns (comma-separated):",
+                      placeholder = "e.g. 1T, 3T, 48H, 5DAYS"
+                    ),
+                    actionButton(
+                      inputId = "ApplyTimePatterns",
+                      label = "Apply Time Extraction",
+                      icon = shiny::icon("check")
+                    )
+                  ),
+                  column(
                     width = 3,
                     offset = 9,
                     actionButton(
