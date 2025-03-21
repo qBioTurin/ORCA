@@ -1085,19 +1085,21 @@ server <- function(input, output, session) {
     } 
   })
    
-    observe({
-      FlagsBCA$EXPcol<-FlagsBCA$EXPcol[names(FlagsBCA$EXPcol)!=""]
-      color_codes <- FlagsBCA$EXPcol
-      
-      color_names <- names(FlagsBCA$EXPcol)
-      valid_colors <- color_codes != "white"
-      color_codes <- color_codes[valid_colors]
-      color_names <- color_names[valid_colors]
-      tables_data <- get_formatted_data(color_codes, color_names, bcaResult, bcaResult$BCAcell_EXP, "BCA")
-      color_tables_bca$ColorCode <- tables_data$ColorCode
-      color_tables_bca$Values <- tables_data$Values
-      color_tables_bca$ExperimentalCondition <- tables_data$'Experimental condition'
-      color_tables_bca$SampleName <- tables_data$'Sample Name'
+  # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
+  observe({
+      color_codes <- FlagsBCA$EXPcol[names(FlagsBCA$EXPcol)!=""]
+      isolate({
+        color_names <- names(color_codes)
+        valid_colors <- color_codes != "white"
+        color_codes <- color_codes[valid_colors]
+        color_names <- color_names[valid_colors]
+        tables_data <- get_formatted_data(color_codes, color_names, bcaResult, bcaResult$BCAcell_EXP, "BCA")
+        color_tables_bca$ColorCode <- tables_data$ColorCode
+        color_tables_bca$Values <- tables_data$Values
+        color_tables_bca$ExperimentalCondition <- tables_data$'Experimental condition'
+        color_tables_bca$SampleName <- tables_data$'Sample Name'
+        color_codes -> FlagsBCA$EXPcol
+      })
     })
     
     # output$tablesBCA <- renderUI({
@@ -1223,26 +1225,63 @@ server <- function(input, output, session) {
           )
           
           if (nrow(table_data) > 0) {
-            output_tables[[paste0("table_", color)]] <- table_data
-          }
-        }
-        
-        for (color in names(output_tables)) {
-          local({
-            color_inner <- color
-            table_data_inner <- output_tables[[color_inner]]
-            output[[color_inner]] <- renderDataTable({
+            #output_tables[[paste0("table_", color)]] <- table_data
+            output[[paste0("table_", color)]] <- renderDataTable({ #FORSE MEGLIO METTERE BCAtable
               datatable(
-                table_data_inner,
+                table_data,
                 editable = list(target = "cell", columns = 2),
                 options = list(dom = "t", paging = FALSE)
               )
             })
-          })
+          }
         }
+        
+        # for (color in names(output_tables)) {
+        #   local({
+        #     color_inner <- color
+        #     table_data_inner <- output_tables[[color_inner]]
+        #     output[[color_inner]] <- renderDataTable({
+        #       datatable(
+        #         table_data_inner,
+        #         editable = list(target = "cell", columns = 2),
+        #         options = list(dom = "t", paging = FALSE)
+        #       )
+        #     })
+        #   })
+        # }
     })
     
-    observeEvent(input, {
+    
+    PrevColorBCA <- reactiveValues(Values = NULL)
+                               
+    observe({
+      req(color_tables_bca$ColorCode)
+      
+      isolate({
+        ListColors = lapply(unique(color_tables_bca$ColorCode), function(color) {
+          input[[paste0("sample_name_", color)]]
+        })
+        names(ListColors) = paste0("sample_name_", unique(color_tables_bca$ColorCode) )
+        
+        if(is.null(PrevColorBCA$Values) ){
+          PrevColorBCA$Values = ListColors
+        }else{
+          if(length(ListColors) == length(PrevColorBCA$Values)){
+            diff_indices <- which(mapply(function(x, y) !identical(x, y),ListColors , PrevColorBCA$Values ))
+            PrevColorBCA$Values = ListColors[diff_indices]
+          }else{
+            PrevColorBCA$Values = ListColors
+          }
+        }
+      })
+      
+    })
+    
+    
+    # aggiorno sotto sample name e devo aggiornare la tabella sotto
+    observeEvent(PrevColorBCA$Values, {
+      req(PrevColorBCA$Values)
+      
       for (color in unique(color_tables_bca$ColorCode)) {
         observeEvent(input[[paste0("sample_name_", color)]], {
           info <- input[[paste0("sample_name_", color)]]
