@@ -4,14 +4,14 @@
 #' @param 
 #'
 #' @author Beccuti Marco, Pernice Simone, Tortarolo Dora
-#' @import randomcoloR rjson openxlsx ggplot2 patchwork shinydashboard dashboardthemes dplyr OpenImageR knitr zoo shinythemes readxl shinyjs
+#' @import shinydashboard shinyjs jsonlite shinyalert shinybusy zoo knitr ggplot2 shinythemes OpenImageR dplyr openxlsx patchwork stringr randomcoloR plotly flowCore xml2 visNetwork shinyFiles
 #' @rawNamespace import(DT, except=c(dataTableOutput,renderDataTable))
 #' @rawNamespace import(shiny,except=runExample)
 #' @rawNamespace import(shinyWidgets,except=alert)
 #' 
 #' @examples
 #'\dontrun{
-#' InteGreat.run()
+#' ORCA.run()
 #' }
 #' @export
 
@@ -25,11 +25,16 @@ ORCA.run <-function()
   source(Appui)
   source(Appserver)
   
-  shinyApp(ui, server,
-           options =  options(shiny.maxRequestSize=1000*1024^2,
-                              shiny.launch.browser = .rs.invokeShinyWindowExternal)
-  )
+  app <-shinyApp(ui, server,
+             options =  options(shiny.maxRequestSize=1000*1024^2,
+                                shiny.launch.browser = .rs.invokeShinyWindowExternal)
+    )
   
+  app$staticPaths <- list(
+      `/` = httpuv::staticPath(system.file("Shiny","www", package = "ORCA"), indexhtml = FALSE, fallthrough = TRUE)
+    )
+  
+  runApp(app)
   # runApp(
   #   appDir = system.file("Shiny", package = "ORCA"),
   #   launch.browser = T

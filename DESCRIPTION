@@ -1,6 +1,6 @@
 Package: ORCA
 Title: ORCA: Omni Reproducible Cell Analysis.
-Version: 1.0
+Version: 2.0
 Authors@R: 
     c(person("Simone", "Pernice", , "simone.pernice@unito.it", role = c("cre"),
            comment = c(ORCID = "YOUR-ORCID-ID")),
@@ -11,5 +11,28 @@ Description: A cellular biologist’s toolbox for data analysis. ORCA  provides 
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a license
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
-Imports: DT, rjson, randomcoloR, OpenImageR, dashboardthemes, dplyr, ggplot2, knitr, openxlsx, patchwork, readxl, rjson, shiny, shinyWidgets, shinydashboard, shinyjs, shinythemes, zoo
+RoxygenNote: 7.3.2
+Imports:
+    shinydashboard,
+    shinyjs,
+    jsonlite,
+    shinyalert,
+    shinybusy,
+    zoo,
+    knitr,
+    ggplot2,
+    shinythemes,
+    OpenImageR,
+    dplyr,
+    openxlsx,
+    patchwork,
+    stringr,
+    DT,
+    shinyWidgets,
+    shiny,
+    randomcoloR,
+    plotly,
+    flowCore, 
+    xml2, 
+    visNetwork,
+    shinyFiles
