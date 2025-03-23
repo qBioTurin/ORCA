@@ -854,17 +854,35 @@ ui <- dashboardPage(
                     )
                   ),
                   column(
-                    width = 6,
-                    h3("Define time patterns"),
-                    textInput(
-                      inputId = "PCR_time_patterns",
-                      label = "Enter time patterns (comma-separated):",
-                      placeholder = "e.g. 1T, 3T, 48H, 5DAYS"
-                    ),
-                    actionButton(
-                      inputId = "ApplyTimePatterns",
-                      label = "Apply Time Extraction",
-                      icon = shiny::icon("check")
+                    width = 12,
+                    actionButton("toggleTimePatterns", "Define Time Patterns", icon = icon("caret-down")),
+                    hidden(
+                      div(
+                        id = "timePatternsSection",
+                        fluidRow(
+                          column(
+                            width = 6,
+                            textInput(
+                              inputId = "PCR_time_patterns",
+                              label = "Enter time patterns (comma-separated):",
+                              placeholder = "e.g. 1T, 3T, 48H, 5DAYS"
+                            )
+                          ),
+                          column(
+                            width = 6,
+                            textInput(
+                              inputId = "PCR_time_colname",
+                              label = "Enter name for the time column:",
+                              placeholder = "e.g. TimePoint"
+                            )
+                          )
+                        ),
+                        actionButton(
+                          inputId = "ApplyTimePatterns",
+                          label = "Apply Time Extraction",
+                          icon = shiny::icon("check")
+                        )
+                      )
                     )
                   ),
                   column(

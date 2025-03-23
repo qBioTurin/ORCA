@@ -1252,8 +1252,8 @@ server <- function(input, output, session) {
     })
     
     
-    PrevColorBCA <- reactiveValues(Values = NULL)
-                               
+    PrevColorBCA <- reactiveValues(Values = NULL,Exp=NULL)
+                  
     observe({
       req(color_tables_bca$ColorCode)
       
@@ -1279,33 +1279,31 @@ server <- function(input, output, session) {
     
     
     # aggiorno sotto sample name e devo aggiornare la tabella sotto
+    
     observeEvent(PrevColorBCA$Values, {
       req(PrevColorBCA$Values)
-      
-      for (color in unique(color_tables_bca$ColorCode)) {
-        observeEvent(input[[paste0("sample_name_", color)]], {
-          info <- input[[paste0("sample_name_", color)]]
-          if (!is.null(info)) {
-            index <- which(color_tables_bca$ColorCode == color)
-            current_values <- color_tables_bca$SampleName
-            current_values[index] <- info
-            color_tables_bca$SampleName <- current_values
-            updatedText <- updateTable("BCA_SN", info, color, bcaResult, FlagsBCA, session)
-            output$BCASelectedValues <- renderText(updatedText)
-            
-            tableExcelColored(
-              session = session,
-              Result = bcaResult, 
-              FlagsExp = FlagsBCA,
-              type = "Update", 
-              inputVal = "", 
-              prevVal = color
-            )
-          }
-        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+      if(length(PrevColorBCA$Values)==1){
+      info <- input[[PrevColorBCA$Values[1]]]
+      if (!is.null(info)) {
+        index <- which(color_tables_bca$ColorCode == color)
+        current_values <- color_tables_bca$SampleName
+        current_values[index] <- info
+        color_tables_bca$SampleName <- current_values
+        updatedText <- updateTable("BCA_SN", info, color, bcaResult, FlagsBCA, session)
+        output$BCASelectedValues <- renderText(updatedText)
+        
+        tableExcelColored(
+          session = session,
+          Result = bcaResult, 
+          FlagsExp = FlagsBCA,
+          type = "Update", 
+          inputVal = "", 
+          prevVal = color )
+      }
       }
     })
     
+     
     observeEvent(input, {
       for (color in unique(color_tables_bca$ColorCode)) {
         observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
@@ -3102,6 +3100,9 @@ observeEvent(input$applyChangesIF_TT, {
                              baseline = F,
                              singleGeneInfo = NULL)
   
+  observeEvent(input$toggleTimePatterns, {
+    toggle("timePatternsSection")
+  })
   
   observeEvent(input$LoadPCR_Button, {
     loadExcelFilePCR()
@@ -3158,26 +3159,29 @@ observeEvent(input$applyChangesIF_TT, {
   
   applyTimePatterns <- function() {
     req(pcrResult$Initdata)  
-    
-    time_patterns <- strsplit(input$PCR_time_patterns, ",")[[1]]
-    time_patterns <- trimws(time_patterns)  # Rimuove eventuali spazi extra
-    
-    if ("Sample" %in% colnames(pcrResult$Initdata)) {
-      pcrResult$Initdata$Time <- NA  # Crea una nuova colonna Time
+    if(!is.null(input$PCR_time_colname) && input$PCR_time_colname != ""){
+      Time<-input$PCR_time_colname
+      time_patterns <- strsplit(input$PCR_time_patterns, ",")[[1]]
+      time_patterns <- trimws(time_patterns)  # Rimuove eventuali spazi inizio e fine
       
-      for (pattern in time_patterns) {
-        matched_rows <- grepl(pattern, pcrResult$Initdata$Sample, ignore.case = TRUE)
-        pcrResult$Initdata$Time[matched_rows] <- pattern
-        pcrResult$Initdata$Sample <- gsub(pattern, "", pcrResult$Initdata$Sample, ignore.case = TRUE)
+      if ("Sample" %in% colnames(pcrResult$Initdata)) {
+        pcrResult$Initdata[Time] <- NA  
+        
+        for (pattern in time_patterns) {
+          matched_rows <- grepl(pattern, pcrResult$Initdata$Sample, ignore.case = TRUE)
+          pcrResult$Initdata[Time][matched_rows,] <- pattern
+          pcrResult$Initdata$Sample <- gsub(pattern, "", pcrResult$Initdata$Sample, ignore.case = TRUE)
+        }
+        
+        
+        pcrResult$Initdata$Sample <- trimws(pcrResult$Initdata$Sample)
+        updateSelectInput(session, "PCR_time",
+                          choices = c("", colnames(pcrResult$Initdata)),
+                          selected = Time)
+        showAlert("Success", "Time patterns applied successfully!", "success", 2000)
+      } else {
+        showAlert("Error", "Sample column not found!", "error", 3000)
       }
-      
-      pcrResult$Initdata$Sample <- trimws(pcrResult$Initdata$Sample)
-      updateSelectInput(session, "PCR_time",
-                        choices = c("", colnames(pcrResult$Initdata)),
-                        selected = "Time")
-      showAlert("Success", "Time patterns applied successfully!", "success", 2000)
-    } else {
-      showAlert("Error", "Sample column not found!", "error", 3000)
     }
   }
   
@@ -3478,11 +3482,13 @@ observeEvent(input$applyChangesIF_TT, {
         
         plot1 = plot1  + 
           facet_wrap(~GeneH, ncol = 1) +
-          theme_bw()
+          theme_bw()+
+          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))
         
         plot2 = plot2 + 
           facet_wrap(~GeneH, ncol = 1) +
-          theme_bw()
+          theme_bw()+
+          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))
         
         FlagsPCR$singleGeneInfo = list(
           Plot= list(Plot1 = plot1,Plot2 = plot2),
