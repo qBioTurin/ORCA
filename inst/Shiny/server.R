@@ -1144,112 +1144,98 @@ server <- function(input, output, session) {
       
       existing_ids <- existingTables()
       to_remove <- setdiff(existing_ids, color_names)
-      
+
       if(length(to_remove)>0){
-      
+
       reactives <- names(reactiveValuesToList(input))
 
       lapply(to_remove, function(color_name) {
         #removeUI(selector = paste0("div:has(> #table_",color_name,")"),immediate = TRUE)
-        
+
         matching_reactives <- grep(paste0("box_", color_name), reactives, value = TRUE)
         lapply(matching_reactives, function(reactive_id) {
           removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
         })
       })
       }
-      
+
       existingTables(color_names)
-      
+
       color_names_showed <- ifelse(length(color_names[!grepl(pattern = "Color ", x = color_names)]) > 0,
                                    color_names[!grepl(pattern = "Color ", x = color_names)],
                                    "")
-      
-      i <- 1
-      lapply(color_names, function(color_name) {
+
+      lapply(seq_along(color_names), function(i) {
         color_name <- color_names[i]
-        table_id <- paste0("table_", color_name)
-        result <- div(
+        table_id <- paste0("BCAtable_", color_name)
+        div(
           id = paste0("box_", color_name),
           box(
             title = HTML(
-              paste(
-                "Table for", 
-                sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
-                        color_values[i])
+              paste("Table for", 
+                    sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
+                            color_values[i])
               )
             ),
             width = 12,
             solidHeader = TRUE,
             status = "primary",
-            ###########################
+            
             selectizeInput(
               inputId = paste0("sample_name_", color_name),
               label = "Update Sample Name:",
-              choices = color_names_showed, selected = color_name,
-              options = list(create = TRUE) #placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
+              choices = color_names_showed, 
+              selected = color_name,
+              options = list(create = TRUE)
             ),
             
             DT::dataTableOutput(outputId = table_id)
           )
         )
-          i <<- i + 1  
-          result
       })
-      
+
     })
     
     # Osserva cambiamenti in ColorCode e Values per aggiornare le tabelle
-    observeEvent(c(color_tables_bca$ColorCode, color_tables_bca$Values), {
-        req(color_tables_bca$ColorCode, color_tables_bca$Values)
+    observe({
+      req(color_tables_bca$ColorCode)
+      
+      for (i in seq_along(color_tables_bca$ColorCode)) {
+        color <- color_tables_bca$ColorCode[i]
+        value_string <- color_tables_bca$Values[i]
         
-        output_tables <- list()
+        current_condition <- strsplit(color_tables_bca$ExperimentalCondition[i], " - ")[[1]]
         
-        for (i in seq_along(color_tables_bca$ColorCode)) {
-          color <- color_tables_bca$ColorCode[i]
-          value_string <- color_tables_bca$Values[i]
-          
-          current_condition <- strsplit(color_tables_bca$ExperimentalCondition[i], " - ")[[1]]
-          
-          table_data <- data.frame(
-            Value = strsplit(value_string, " - ")[[1]],
-            ExperimentalCondition = {
-              value_split <- strsplit(value_string, " - ")[[1]]
-              if (length(current_condition) < length(value_split)) {
-                c(current_condition, rep("", length(value_split) - length(current_condition)))
-              } else {
-                current_condition
-              }
-            },
-            stringsAsFactors = FALSE
-          )
-          
-          if (nrow(table_data) > 0) {
-            #output_tables[[paste0("table_", color)]] <- table_data
-            output[[paste0("table_", color)]] <- renderDataTable({ #FORSE MEGLIO METTERE BCAtable
+        table_data <- data.frame(
+          Value = strsplit(value_string, " - ")[[1]],
+          ExperimentalCondition = {
+            value_split <- strsplit(value_string, " - ")[[1]]
+            if (length(current_condition) < length(value_split)) {
+              c(current_condition, rep("", length(value_split) - length(current_condition)))
+            } else {
+              current_condition
+            }
+          },
+          stringsAsFactors = FALSE
+        )
+        
+        if (nrow(table_data) > 0) {
+          local({
+            color_local <- color  
+            table_data_local <- table_data  
+            
+            output[[paste0("BCAtable_", color_local)]] <- renderDataTable({
               datatable(
-                table_data,
+                table_data_local,
                 editable = list(target = "cell", columns = 2),
                 options = list(dom = "t", paging = FALSE)
               )
             })
-          }
+          })
         }
-        
-        # for (color in names(output_tables)) {
-        #   local({
-        #     color_inner <- color
-        #     table_data_inner <- output_tables[[color_inner]]
-        #     output[[color_inner]] <- renderDataTable({
-        #       datatable(
-        #         table_data_inner,
-        #         editable = list(target = "cell", columns = 2),
-        #         options = list(dom = "t", paging = FALSE)
-        #       )
-        #     })
-        #   })
-        # }
+      }
     })
+    
     
     
     PrevColorBCA <- reactiveValues(Values = NULL,Exp=NULL)
@@ -1273,6 +1259,7 @@ server <- function(input, output, session) {
             PrevColorBCA$Values = ListColors
           }
         }
+
       })
       
     })
@@ -1280,65 +1267,60 @@ server <- function(input, output, session) {
     
     # aggiorno sotto sample name e devo aggiornare la tabella sotto
     
-    observeEvent(PrevColorBCA$Values, {
+    observe({
       req(PrevColorBCA$Values)
-      if(length(PrevColorBCA$Values)==1){
-      info <- input[[PrevColorBCA$Values[1]]]
-      if (!is.null(info)) {
-        index <- which(color_tables_bca$ColorCode == color)
-        current_values <- color_tables_bca$SampleName
-        current_values[index] <- info
-        color_tables_bca$SampleName <- current_values
-        updatedText <- updateTable("BCA_SN", info, color, bcaResult, FlagsBCA, session)
-        output$BCASelectedValues <- renderText(updatedText)
-        
-        tableExcelColored(
-          session = session,
-          Result = bcaResult, 
-          FlagsExp = FlagsBCA,
-          type = "Update", 
-          inputVal = "", 
-          prevVal = color )
-      }
-      }
+      isolate({
+        if(length(PrevColorBCA$Values)==1){
+        info <- input[[PrevColorBCA$Values[1]]]
+        if (!is.null(info)) {
+          index <- which(color_tables_bca$ColorCode == color)
+          current_values <- color_tables_bca$SampleName
+          current_values[index] <- info
+          color_tables_bca$SampleName <- current_values
+          updatedText <- updateTable("BCA_SN", info, color, bcaResult, FlagsBCA, session)
+          output$BCASelectedValues <- renderText(updatedText)
+          
+          tableExcelColored(
+            session = session,
+            Result = bcaResult, 
+            FlagsExp = FlagsBCA,
+            type = "Update", 
+            inputVal = "", 
+            prevVal = color )
+        }
+        }
+      })
     })
     
      
-    observeEvent(input, {
-      for (color in unique(color_tables_bca$ColorCode)) {
-        observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
-          info <- input[[paste0("table_", color, "_cell_edit")]]
-          
-          if (!is.null(info)) {
-            row <- info$row
-            col <- info$col
-            value <- info$value
-            
-            table_data <- data.frame(
-              Value = strsplit(color_tables_bca$Values[which(color_tables_bca$ColorCode == color)], " - ")[[1]],
-              ExperimentalCondition = strsplit(color_tables_bca$ExperimentalCondition[which(color_tables_bca$ColorCode == color)], " - ")[[1]],
-              stringsAsFactors = FALSE
-            )
-            
-            table_data[row, col] <- value
-            current_values <- color_tables_bca$ExperimentalCondition
-            index <- which(color_tables_bca$ColorCode == color)
-            condition_split <- strsplit(current_values[index], " - ")[[1]]
-            
-            if (length(condition_split) < nrow(table_data)) {
-              condition_split <- c(condition_split, rep("", nrow(table_data) - length(condition_split)))
-            }
-            condition_split[row] <- value
-            current_values[index] <- paste(condition_split, collapse = " - ")
-            color_tables_bca$ExperimentalCondition <- current_values
-            
-            if (info$col == 2) info$col <- 5
-            updatedText <- updateTable("BCA", info, color, bcaResult, FlagsBCA, session)
-            output$BCASelectedValues <- renderText(updatedText)
-          }
-        }, ignoreInit = TRUE, ignoreNULL = TRUE)
-      }
+    observe({
+        req(color_tables_bca$ColorCode)
+        isolate({
+          lapply(unique(color_tables_bca$ColorCode), function(color) {
+            observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
+              info <- input[[paste0("table_", color, "_cell_edit")]]
+              req(info)
+              
+              row <- info$row
+              col <- info$col
+              value <- info$value
+              
+              index <- which(color_tables_bca$ColorCode == color)
+              condition_split <- strsplit(color_tables_bca$ExperimentalCondition[index], " - ")[[1]]
+              
+              if (length(condition_split) < row) {
+                condition_split <- c(condition_split, rep("", row - length(condition_split)))
+              }
+              condition_split[row] <- value
+              color_tables_bca$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
+              
+              updatedText <- updateTable("BCA", info, color, bcaResult, FlagsBCA, session)
+              output$BCASelectedValues <- renderText(updatedText)
+            }, ignoreInit = TRUE, ignoreNULL = TRUE)
+          })
+        })
     })
+  
     
     # observeEvent(c(color_tables_bca$ColorCode,color_tables_bca$Values),{
     #   isolate({
