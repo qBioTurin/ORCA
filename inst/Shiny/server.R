@@ -3032,22 +3032,24 @@ server <- function(input, output, session) {
   
   applyTimePatterns <- function() {
     req(pcrResult$Initdata)  
-    if(!is.null(input$PCR_time_colname) && input$PCR_time_colname != ""){
+    if(!is.null(input$PCR_time_colname) && input$PCR_time_colname != "" && !is.null(input$PCR_sample_colname) && input$PCR_sample_colname != ""){
       Time<-input$PCR_time_colname
+      Sample<- input$PCR_sample_colname
+      Sample <- trimws(Sample) 
       time_patterns <- strsplit(input$PCR_time_patterns, ",")[[1]]
       time_patterns <- trimws(time_patterns)  # Rimuove eventuali spazi inizio e fine
       
-      if ("Sample" %in% colnames(pcrResult$Initdata)) {
+      if (Sample %in% colnames(pcrResult$Initdata)) {
         pcrResult$Initdata[Time] <- NA  
         
         for (pattern in time_patterns) {
-          matched_rows <- grepl(pattern, pcrResult$Initdata$Sample, ignore.case = TRUE)
+          matched_rows <- grepl(pattern, pcrResult$Initdata[[Sample]], ignore.case = TRUE)
           pcrResult$Initdata[Time][matched_rows,] <- pattern
-          pcrResult$Initdata$Sample <- gsub(pattern, "", pcrResult$Initdata$Sample, ignore.case = TRUE)
+          pcrResult$Initdata[Sample] <- gsub(pattern, "", pcrResult$Initdata[[Sample]], ignore.case = TRUE)
         }
         
         
-        pcrResult$Initdata$Sample <- trimws(pcrResult$Initdata$Sample)
+        pcrResult$Initdata[Sample] <- trimws(pcrResult$Initdata[[Sample]])
         updateSelectInput(session, "PCR_time",
                           choices = c("", colnames(pcrResult$Initdata)),
                           selected = Time)

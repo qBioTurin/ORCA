@@ -873,7 +873,17 @@ ui <- dashboardPage(
                             textInput(
                               inputId = "PCR_time_colname",
                               label = "Enter name for the time column:",
-                              placeholder = "e.g. TimePoint"
+                              placeholder = "e.g. Time1"
+                            )
+                          )
+                        ),
+                        fluidRow(
+                          column(
+                            width = 6,
+                            textInput(
+                              inputId = "PCR_sample_colname",
+                              label = "Enter name for the sample column:",
+                              placeholder = "e.g. Sample"
                             )
                           )
                         ),
