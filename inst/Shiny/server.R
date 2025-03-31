@@ -1226,6 +1226,7 @@ server <- function(input, output, session) {
       }
     }
   }, ignoreInit = TRUE)
+  
   observeEvent(input$BCAcell_EXP, {
     if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
       BCAtb <- bcaResult$TablePlot
@@ -1295,9 +1296,17 @@ server <- function(input, output, session) {
           output[[paste0("BCAtable_", color_local)]] <- renderDataTable({
             datatable(
               table_data_local,
-              editable = list(target = "cell", columns = 2),
-              options = list(dom = "t", paging = FALSE)
-            )
+              editable = list(target = "cell", columns = 1),  
+              options = list(dom = "t", paging = FALSE),
+              rownames = FALSE,
+              class = "cell-border stripe"
+            ) %>%
+              formatStyle(
+                "Value",
+                target = "cell",
+                `backgroundColor` = "lightgray",
+                `cursor` = "not-allowed"
+              )
           })
         })
       }
@@ -1350,6 +1359,7 @@ server <- function(input, output, session) {
           updatedText <- updateTable("BCA_SN", info, color, bcaResult, FlagsBCA, session)
           output$BCASelectedValues <- renderText(updatedText)
           
+          if(!color %in% names(FlagsBCA$EXPcol)){
           tableExcelColored(
             session = session,
             Result = bcaResult, 
@@ -1357,11 +1367,40 @@ server <- function(input, output, session) {
             type = "Update", 
             inputVal = "", 
             prevVal = color )
+          }
         }
       }
     })
   })
   
+  observe({
+    req(color_tables_bca$ExperimentalCondition)
+    isolate({
+      lapply(unique(color_tables_bca$ColorCode), function(color) {
+        observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
+          info <- input[[paste0("table_", color, "_cell_edit")]]
+          req(info)
+
+          row <- info$row
+          col <- info$col
+          value <- info$value
+
+          index <- which(color_tables_bca$ColorCode == color)
+          condition_split <- strsplit(color_tables_bca$ExperimentalCondition[index], " - ")[[1]]
+
+          if (length(condition_split) < row) {
+            condition_split <- c(condition_split, rep("", row - length(condition_split)))
+          }
+          condition_split[row] <- value
+          color_tables_bca$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
+
+          updatedText <- updateTable("BCA", info, color, bcaResult, FlagsBCA, session)
+          output$BCASelectedValues <- renderText(updatedText)
+        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+      })
+    })
+  })
+    
   ## update checkBox
   observeEvent(FlagsBCA$AllExp,{
     if(length(FlagsBCA$AllExp) > 1){

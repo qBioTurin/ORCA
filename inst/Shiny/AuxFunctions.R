@@ -916,21 +916,15 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
                names(EXPcol)[names(EXPcol) == ""] <- inputVal
                FlagsExp$EXPcol <- EXPcol
              } else {
-               #SNnew = FlagsExp$AllExp[!FlagsExp$AllExp %in% names(FlagsExp$EXPcol)]
-               SNnew= inputVal %in% names(FlagsExp$EXPcol)
-               if(!SNnew) {
-                 if(is.null(prevVal)||startsWith(prevVal, "Color")||prevVal==""){
-                   colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
-                   EXPcol = c(FlagsExp$EXPcol, colNew)
-                   names(EXPcol)[names(EXPcol) == ""] <- inputVal
-                   FlagsExp$EXPcol <- EXPcol
-                 }
-                 else{ 
-                   names(FlagsExp$EXPcol)[names(FlagsExp$EXPcol) == prevVal] <- inputVal
-                 }
+               SNew= inputVal %in% names(FlagsExp$EXPcol)
+               if(!SNew){
+                 colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
+                 EXPcol = c(FlagsExp$EXPcol, colNew)
+                 names(EXPcol)[names(EXPcol) == ""] <- inputVal
+                 FlagsExp$EXPcol <- EXPcol
                }
                else{
-                 FlagsExp$EXPcol <- FlagsExp$EXPcol[names(FlagsExp$EXPcol) != prevVal]
+                 names(FlagsExp$EXPcol)[names(FlagsExp$EXPcol) == prevVal] <- inputVal
                }
              }
            }
@@ -1182,10 +1176,10 @@ updateTable <- function(analysis, info, color_code, result, flag, session) {
         current_values <- c()
         
         apply(matching_indices, 1, function(idx) {
-          current_values <<- c(current_values, result[[paste0("Initdata")]][idx["row"], idx["col"]])
+          current_values <- c(current_values, result[[paste0("Initdata")]][idx["row"], idx["col"]])
           old_value_key <- names(flag[[paste0("EXPcol")]])[names(flag[[paste0("EXPcol")]]) == result[[paste0(analysis, "cell_COLOR")]][idx["row"], idx["col"]]]
           
-          if (length(old_value_key) > 0) {
+          if (length(old_value_key) > 0 && new_value != old_value_key) {
             flag[[paste0("EXPcol")]][new_value] <- flag[[paste0("EXPcol")]][old_value_key]
             flag[[paste0("EXPcol")]] <- flag[[paste0("EXPcol")]][!names(flag[[paste0("EXPcol")]]) %in% old_value_key]
             assign(paste0("Flags", analysis), flag, envir = .GlobalEnv)
