@@ -880,10 +880,10 @@ ui <- dashboardPage(
                         fluidRow(
                           column(
                             width = 6,
-                            textInput(
+                            selectInput(
                               inputId = "PCR_sample_colname",
                               label = "Enter name for the sample column:",
-                              placeholder = "e.g. Sample"
+                              choices = ""
                             )
                           )
                         ),

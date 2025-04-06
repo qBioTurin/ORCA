@@ -924,8 +924,10 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
                  FlagsExp$EXPcol <- EXPcol
                }
                else{
-                 names(FlagsExp$EXPcol)[names(FlagsExp$EXPcol) == prevVal] <- inputVal
+                 colNew = ColorsSN[!ColorsSN %in% FlagsExp$EXPcol][1]
+                 FlagsExp$EXPcol[names(FlagsExp$EXPcol)==inputVal]<- colNew
                }
+               
              }
            }
 

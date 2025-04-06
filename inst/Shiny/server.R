@@ -969,7 +969,6 @@ server <- function(input, output, session) {
     Tablestandcurve = NULL,
     Regression = NULL)
   
-  #color_tables_bca <- reactiveVal()
   color_tables_bca<- reactiveValues(
     ColorCode=NULL,
     Values=NULL,
@@ -977,7 +976,7 @@ server <- function(input, output, session) {
     SampleName=NULL
   )
   
-  existingTables <- reactiveVal(character(0))
+  existingTablesBCA <- reactiveVal(character(0))
   
   # save everytime there is a change in the results
   BCAresultListen <- reactive({
@@ -1086,47 +1085,13 @@ server <- function(input, output, session) {
   })
   
   
-  # output$tablesBCA <- renderUI({
-  #   colors <- FlagsBCA$EXPcol
-  #   color_names <- names(FlagsBCA$EXPcol)
-  #   color_values<-unname(FlagsBCA$EXPcol)
-  #   i <- 1
-  #   lapply(color_names, function(color_name) {
-  #     color_name <- color_names[i]
-  #     result<- box(
-  #       #title = paste("Table for", color_name),
-  #       title = HTML(
-  #         paste(
-  #           "Table for", 
-  #           sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
-  #                   color_values[i])
-  #         )
-  #       ),
-  #       width = 12,
-  #       solidHeader = TRUE,
-  #       status = "primary",
-  #       
-  #       selectizeInput(
-  #         inputId = paste0("sample_name_", color_name),
-  #         label = "Update Sample Name:",
-  #         choices = "",
-  #         options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
-  #       ),
-  #       
-  #       DT::dataTableOutput(outputId = paste0("table_", color_name))
-  #     )
-  #     i <<- i + 1  
-  #     result
-  #   })
-  # })
-  
   # creazione iniziale dei box con tabelle vuote e selectinput aggiornati con il nome messo oppure vuoto se è ancora color
   output$tablesBCA <- renderUI({
     colors <- FlagsBCA$EXPcol
     color_names <- names(FlagsBCA$EXPcol)
     color_values <- unname(FlagsBCA$EXPcol)
     
-    existing_ids <- existingTables()
+    existing_ids <- existingTablesBCA()
     to_remove <- setdiff(existing_ids, color_names)
     
     if(length(to_remove)>0){
@@ -1136,14 +1101,14 @@ server <- function(input, output, session) {
       lapply(to_remove, function(color_name) {
         #removeUI(selector = paste0("div:has(> #table_",color_name,")"),immediate = TRUE)
         
-        matching_reactives <- grep(paste0("box_", color_name), reactives, value = TRUE)
+        matching_reactives <- grep(paste0("BCAbox_", color_name), reactives, value = TRUE)
         lapply(matching_reactives, function(reactive_id) {
           removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
         })
       })
     }
     
-    existingTables(color_names)
+    existingTablesBCA(color_names)
     
     if(length(color_names[!grepl(pattern = "Color ", x = color_names)]) > 0)
       color_names_showed <- color_names[!grepl(pattern = "Color ", x = color_names)]
@@ -1154,7 +1119,7 @@ server <- function(input, output, session) {
       color_name <- color_names[i]
       table_id <- paste0("BCAtable_", color_name)
       div(
-        id = paste0("box_", color_name),
+        id = paste0("BCAbox_", color_name),
         box(
           title = HTML(
             paste("Table for", 
@@ -1167,7 +1132,7 @@ server <- function(input, output, session) {
           status = "primary",
           
           selectizeInput(
-            inputId = paste0("sample_name_", color_name),
+            inputId = paste0("BCA_sample_name_", color_name),
             label = "Update Sample Name:",
             choices = c("",color_names_showed), 
             selected = ifelse(grepl(pattern = "Color ", x = color_name),
@@ -1184,6 +1149,7 @@ server <- function(input, output, session) {
   
   # Gestisce il click nella Main Table
   observeEvent(input$BCAmatrix_cell_clicked, {
+    if(!is.null(input$BCAmatrix_cell_clicked$value)){
     req(input$BCAmatrix_cell_clicked)  
     
     cellSelected <- as.numeric(input$BCAmatrix_cell_clicked)
@@ -1202,11 +1168,14 @@ server <- function(input, output, session) {
     updateSelectizeInput(inputId = "BCAcell_SN",
                          choices = c("", allSN),
                          selected = selectedSN)
+    } else{
+      FlagsBCA$cellCoo <- cellCoo <- c(input$BCAmatrix_cell_clicked$row, input$BCAmatrix_cell_clicked$col + 1)
+    }
   })
   
   # salvano e gesticono i cambiametni nell Main table di SN e EXP
   observeEvent(input$BCAcell_SN, {
-    if (!is.null(bcaResult$BCAcell_COLOR) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
+    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo) && !is.na(bcaResult$TablePlot$x$data[FlagsBCA$cellCoo[1],FlagsBCA$cellCoo[2]])) {
       BCAtb <- bcaResult$TablePlot
       cellCoo <- FlagsBCA$cellCoo
       
@@ -1224,11 +1193,11 @@ server <- function(input, output, session) {
                           type = "Update",inputVal=value.now,prevVal=value.bef)
         output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
       }
-    }
+    } 
   }, ignoreInit = TRUE)
   
   observeEvent(input$BCAcell_EXP, {
-    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo)) {
+    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo) && !is.na(bcaResult$TablePlot$x$data[FlagsBCA$cellCoo[1],FlagsBCA$cellCoo[2]])) {
       BCAtb <- bcaResult$TablePlot
       cellCoo <- FlagsBCA$cellCoo
       
@@ -1246,7 +1215,7 @@ server <- function(input, output, session) {
         output$BCAmatrix <- renderDataTable({ bcaResult$TablePlot })
         
       }
-    }
+    } 
   }, ignoreInit = TRUE)
   
   # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
@@ -1319,7 +1288,7 @@ server <- function(input, output, session) {
   
   # aggiorno sotto sample name e devo aggiornare la tabella sotto
   selectSubTablesChanges = reactive({
-    selectSubTables = grep(pattern = "sample_name_", names(input),value = T)
+    selectSubTables = grep(pattern = "BCA_sample_name_", names(input),value = T)
     if(length(selectSubTables) > 0 ){
       ListColors = lapply(selectSubTables, function(i) input[[i]])
       names(ListColors) = selectSubTables
@@ -1351,7 +1320,7 @@ server <- function(input, output, session) {
       if(length(PrevColorBCA$IndexChang) > 0 ){    
         info <- input[[names(PrevColorBCA$IndexChang)]]
         if (!is.null(info)) {
-          color = gsub(x=names(PrevColorBCA$IndexChang),pattern = "sample_name_",replacement = "")
+          color = gsub(x=names(PrevColorBCA$IndexChang),pattern = "BCA_sample_name_",replacement = "")
           index <- which(color_tables_bca$ColorCode == color)
           current_values <- color_tables_bca$SampleName
           current_values[index] <- info
@@ -3024,6 +2993,12 @@ server <- function(input, output, session) {
   
   observeEvent(input$toggleTimePatterns, {
     toggle("timePatternsSection")
+    if(!is.null(pcrResult$Initdata)){
+      updateSelectInput(session,
+                        "PCR_sample_colname",
+                        choices = c("", colnames(pcrResult$Initdata)),
+                        selected = "")
+    }
   })
   
   observeEvent(input$LoadPCR_Button, {
@@ -3073,6 +3048,10 @@ server <- function(input, output, session) {
                       selected = "")
     updateSelectInput(session,
                       "PCR_time",
+                      choices = c("", colnames(pcrResult$Initdata)),
+                      selected = "")
+    updateSelectInput(session,
+                      "PCR_sample_colname",
                       choices = c("", colnames(pcrResult$Initdata)),
                       selected = "")
     
@@ -3684,7 +3663,14 @@ server <- function(input, output, session) {
     Tablestandcurve = NULL,
     Regression = NULL)
   
-  color_tables_elisa <- reactiveVal()
+  color_tables_elisa<- reactiveValues(
+    ColorCode=NULL,
+    Values=NULL,
+    ExperimentalCondition=NULL,
+    SampleName=NULL
+  )
+  
+  existingTablesELISA <- reactiveVal(character(0))
   
   # save everytime there is a change in the results
   ELISAresultListen <- reactive({
@@ -3808,217 +3794,299 @@ server <- function(input, output, session) {
     } 
   })
   
-  observe({
-    FlagsELISA$EXPcol<-FlagsELISA$EXPcol[names(FlagsELISA$EXPcol)!=""]
-    color_codes <- FlagsELISA$EXPcol
-    
-    color_names <- names(FlagsELISA$EXPcol)
-    valid_colors <- color_codes != "white"
-    color_codes <- color_codes[valid_colors]
-    color_names <- color_names[valid_colors]
-    tables_data <- get_formatted_data(color_codes, color_names, elisaResult, elisaResult$ELISAcell_EXP, "ELISA")
-    color_tables_elisa(tables_data)
-  })
-  
+  # creazione iniziale dei box con tabelle vuote e selectinput aggiornati con il nome messo oppure vuoto se è ancora color
   output$tablesELISA <- renderUI({
     colors <- FlagsELISA$EXPcol
     color_names <- names(FlagsELISA$EXPcol)
-    color_values<-unname(FlagsELISA$EXPcol)
-    color_names_showed <- ifelse(length(grepl(pattern = "Color ", x = color_names)) > 0,
-                                 color_names[!grepl(pattern = "Color ", x = color_names)],
-                                 "")
-    i <- 1
-    lapply(color_names, function(color_name) {
+    color_values <- unname(FlagsELISA$EXPcol)
+    
+    existing_ids <- existingTablesELISA()
+    to_remove <- setdiff(existing_ids, color_names)
+    
+    if(length(to_remove)>0){
+      
+      reactives <- names(reactiveValuesToList(input))
+      
+      lapply(to_remove, function(color_name) {
+        matching_reactives <- grep(paste0("ELISAbox_", color_name), reactives, value = TRUE)
+        lapply(matching_reactives, function(reactive_id) {
+          removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
+        })
+      })
+    }
+    
+    existingTablesELISA(color_names)
+    
+    if(length(color_names[!grepl(pattern = "Color ", x = color_names)]) > 0)
+      color_names_showed <- color_names[!grepl(pattern = "Color ", x = color_names)]
+    else
+      color_names_showed <- ""
+    
+    lapply(seq_along(color_names), function(i) {
       color_name <- color_names[i]
-      result<- box(
-        #title = paste("Table for", color_name),
-        title = HTML(
-          paste(
-            "Table for", 
-            sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
-                    color_values[i])
-          )
-        ),
-        width = 12,
-        solidHeader = TRUE,
-        status = "primary",
-        
-        selectizeInput(
-          inputId = paste0("sample_name_", color_name),
-          label = "Update Sample Name:",
-          choices = color_names_showed, selected = color_name,
-          options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
-        ),
-        
-        DT::dataTableOutput(outputId = paste0("table_", color_name))
+      table_id <- paste0("ELISAtable_", color_name)
+      div(
+        id = paste0("ELISAbox_", color_name),
+        box(
+          title = HTML(
+            paste("Table for", 
+                  sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
+                          color_values[i])
+            )
+          ),
+          width = 12,
+          solidHeader = TRUE,
+          status = "primary",
+          
+          selectizeInput(
+            inputId = paste0("ELISA_sample_name_", color_name),
+            label = "Update Sample Name:",
+            choices = c("",color_names_showed), 
+            selected = ifelse(grepl(pattern = "Color ", x = color_name),
+                              "", color_name),
+            options = list(create = TRUE)
+          ),
+          
+          DT::dataTableOutput(outputId = table_id)
+        )
       )
-      i <<- i + 1  
-      result
     })
+    
   })
   
-  observe({
-    color_codes <- color_tables_elisa()$ColorCode
-    values <- color_tables_elisa()$Values
-    
-    for (i in seq_along(color_codes)) {
-      local({
-        color <- color_codes[i]
-        value_string <- values[i]
-        
-        current_condition <- strsplit(color_tables_elisa()$'Experimental condition'[which(color_tables_elisa()$ColorCode== color)], " - ")[[1]]
-        
-        table_data <- data.frame(
-          Value = strsplit(value_string, " - ")[[1]],
-          ExperimentalCondition = {
-            value_split <- strsplit(value_string, " - ")[[1]]
-            if (length(current_condition) < length(value_split)) {
-              c(current_condition, rep("", length(value_split) - length(current_condition)))
-            } else {
-              current_condition
-            }
-          },
-          stringsAsFactors = FALSE
-        )
-        
-        if(nrow(table_data)==0)
-          output=output[-paste0("table_", color)]
-        else
-          output[[paste0("table_", color)]] <- renderDataTable({
-            datatable(
-              table_data,
-              editable = list(target = "cell", columns = 2),
-              options = list(dom = "t", paging = FALSE)
-            )
-          })
-        
-        observeEvent(input[[paste0("sample_name_",color)]], {
-          info <- input[[paste0("sample_name_",color)]]
-          if(!is.null(info)){
-            index<-which(color_tables_elisa()$ColorCode == color)
-            current_values <- color_tables_elisa()$'Sample Name'
-            current_values[index] <- info
-            current<-color_tables_elisa()
-            current$'Sample Name' <- current_values
-            color_tables_elisa(current)
-            data <- color_tables_elisa()
-            updatedText <- updateTable("ELISA_SN", info, data, color, elisaResult, FlagsELISA,session)
-            output$ELISASelectedValues <- renderText(updatedText)
-            tableExcelColored(session = session,
-                              Result = elisaResult, 
-                              FlagsExp = FlagsELISA,
-                              type = "Update",inputVal="",prevVal=color)
-          }
-        })
-        
-        observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
-          info <- input[[paste0("table_", color, "_cell_edit")]]
-          
-          if (!is.null(info)) {
-            row <- info$row
-            col <- info$col
-            value <- info$value
-            
-            table_data[row, col] <- value
-            current_values <- color_tables_elisa()$'Experimental condition'
-            index <- which(color_tables_elisa()$ColorCode == color)
-            condition_split <- strsplit(current_values[index], " - ")[[1]]
-            
-            if (length(condition_split) < nrow(table_data)) {
-              condition_split <- c(condition_split, rep("", nrow(table_data) - length(condition_split)))
-            }
-            condition_split[row] <- value
-            current_values[index] <- paste(condition_split, collapse = " - ")
-            current<-color_tables_elisa()
-            current$'Experimental condition' <- current_values
-            color_tables_elisa(current)
-            data <- color_tables_elisa()
-            if(info$col==2)
-              info$col<-5
-            updatedText <- updateTable("ELISA", info, data, color, elisaResult, FlagsELISA,session)
-            output$ELISASelectedValues <- renderText(updatedText)
-          }
-        }, ignoreInit = TRUE, ignoreNULL = TRUE)
-      })
+  # Gestisce il click nella Main Table
+  observeEvent(input$ELISAmatrix_cell_clicked, {
+    if(!is.null(input$ELISAmatrix_cell_clicked$value)){
+      req(input$ELISAmatrix_cell_clicked)  
+      
+      cellSelected <- as.numeric(input$ELISAmatrix_cell_clicked)
+      FlagsELISA$cellCoo <- cellCoo <- c(cellSelected[1], cellSelected[2] + 1)
+      
+      allExp <- unique(na.omit(c(elisaResult$ELISAcell_EXP)))  
+      selectedExp <- ifelse(is.null(elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]]), "", elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "ELISAcell_EXP", 
+                           choices = c("", allExp),
+                           selected = selectedExp)
+      
+      allSN <- unique(na.omit(c(elisaResult$ELISAcell_SN)))  
+      selectedSN <- ifelse(is.null(elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]]), "", elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "ELISAcell_SN",
+                           choices = c("", allSN),
+                           selected = selectedSN)
+    } else{
+      FlagsELISA$cellCoo <- cellCoo <- c(input$ELISAmatrix_cell_clicked$row, input$ELISAmatrix_cell_clicked$col + 1)
     }
   })
   
-  
-  observeEvent(input$ELISAmatrix_cell_clicked, {
-    req(input$ELISAmatrix_cell_clicked)  
-    
-    cellSelected = as.numeric(input$ELISAmatrix_cell_clicked)
-    FlagsELISA$cellCoo = cellCoo = c(cellSelected[1], cellSelected[2] + 1)
-    
-    allExp <- unique(na.omit(c(elisaResult$ELISAcell_EXP)))  
-    selectedExp <- ifelse(is.null(elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]]), "", elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "ELISAcell_EXP", 
-                         choices = c("",allExp),
-                         selected = selectedExp)
-    
-    allSN <- unique(na.omit(c(elisaResult$ELISAcell_SN)))  
-    selectedSN <- ifelse(is.null(elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]]), "", elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "ELISAcell_SN",
-                         choices = c("",allSN),
-                         selected = selectedSN)
-  })
-  
+  # salvano e gesticono i cambiametni nell Main table di SN e EXP
   observeEvent(input$ELISAcell_SN, {
-    if (!is.null(elisaResult$ELISAcell_COLOR) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo)) {
-      ELISAtb = elisaResult$TablePlot
-      cellCoo = FlagsELISA$cellCoo
+    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
+      ELISAtb <- elisaResult$TablePlot
+      cellCoo <- FlagsELISA$cellCoo
       
-      value.bef = elisaResult$ELISAcell_COLOR[cellCoo[1], cellCoo[2]] 
-      value.now = input$ELISAcell_SN
+      value.bef <- elisaResult$ELISAcell_COLOR[cellCoo[1], cellCoo[2]] 
+      value.now <- input$ELISAcell_SN
       
       if (value.now != "" && value.now != value.bef) {
-        currentValues <- elisaResult$Initdata[cellCoo[1], cellCoo[2]]
-        
-        elisaResult$ELISAcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
-        elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]] = value.now
-        ELISAtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] = value.now
-        
-        if (!input$ELISAcell_SN %in% FlagsELISA$AllExp) {
-          exp = unique(c(FlagsELISA$AllExp, input$ELISAcell_SN))
-          FlagsELISA$AllExp = exp
-        }
+        elisaResult$ELISAcell_COLOR[cellCoo[1], cellCoo[2]] <- value.now
+        elisaResult$ELISAcell_SN[cellCoo[1], cellCoo[2]] <- value.now
+        ELISAtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] <- value.now
         
         tableExcelColored(session = session,
                           Result = elisaResult, 
                           FlagsExp = FlagsELISA,
                           type = "Update",inputVal=value.now,prevVal=value.bef)
-        
-        output$ELISASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": sample name ", value.now))
-        output$ELISAmatrix <- renderDataTable({elisaResult$TablePlot})
+        output$ELISAmatrix <- renderDataTable({ elisaResult$TablePlot })
       }
-    } else return()
+    } 
   }, ignoreInit = TRUE)
   
   observeEvent(input$ELISAcell_EXP, {
-    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo)) {
-      ELISAtb = elisaResult$TablePlot
-      cellCoo = FlagsELISA$cellCoo
+    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
+      ELISAtb <- elisaResult$TablePlot
+      cellCoo <- FlagsELISA$cellCoo
       
-      value.bef = elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]] 
-      value.now = input$ELISAcell_EXP
+      value.bef <- elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]] 
+      value.now <- input$ELISAcell_EXP
       
       if (value.now != "" && value.now != value.bef) {
-        currentValues <- elisaResult$Initdata[cellCoo[1], cellCoo[2]]
-        
-        elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]] = value.now
+        elisaResult$ELISAcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
+        output$ELISASelectedValues <- renderText(paste("Updated value", paste(elisaResult$Initdata[cellCoo[1], cellCoo[2]]), ": Exp Condition ", value.now))
         tableExcelColored(session = session,
                           Result = elisaResult, 
                           FlagsExp = FlagsELISA,
                           type = "Update", inputVal="", prevVal=""
         )
+        output$ELISAmatrix <- renderDataTable({ elisaResult$TablePlot })
         
-        output$ELISASelectedValues <- renderText(paste("Updated value", paste(currentValues), ": Exp Condition ", value.now))
-        output$ELISAmatrix <- renderDataTable({elisaResult$TablePlot})
       }
-    } else return()
+    } 
   }, ignoreInit = TRUE)
+  
+  # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
+  observe({
+    color_codes <- FlagsELISA$EXPcol[names(FlagsELISA$EXPcol)!=""]
+    isolate({
+      color_names <- names(color_codes)
+      valid_colors <- color_codes != "white"
+      color_codes <- color_codes[valid_colors]
+      color_names <- color_names[valid_colors]
+      tables_data <- get_formatted_data(color_codes, color_names, elisaResult, elisaResult$ELISAcell_EXP, "ELISA")
+      color_tables_elisa$ColorCode <- tables_data$ColorCode
+      color_tables_elisa$Values <- tables_data$Values
+      color_tables_elisa$ExperimentalCondition <- tables_data$'Experimental condition'
+      color_tables_elisa$SampleName <- tables_data$'Sample Name'
+      color_codes -> FlagsELISA$EXPcol
+    })
+  })
+  
+  # aggiorno le subtables ogni volta che il vettore dei colori cambia
+  observe({
+    req(color_tables_elisa$ColorCode)
+    
+    for (i in seq_along(color_tables_elisa$ColorCode)) {
+      color <- color_tables_elisa$ColorCode[i]
+      value_string <- color_tables_elisa$Values[i]
+      
+      current_condition <- strsplit(color_tables_elisa$ExperimentalCondition[i], " - ")[[1]]
+      
+      table_data <- data.frame(
+        Value = strsplit(value_string, " - ")[[1]],
+        ExperimentalCondition = {
+          value_split <- strsplit(value_string, " - ")[[1]]
+          if (length(current_condition) < length(value_split)) {
+            c(current_condition, rep("", length(value_split) - length(current_condition)))
+          } else {
+            current_condition
+          }
+        },
+        stringsAsFactors = FALSE
+      )
+      
+      if (nrow(table_data) > 0) {
+        local({
+          color_local <- color  
+          table_data_local <- table_data  
+          
+          output[[paste0("ELISAtable_", color_local)]] <- renderDataTable({
+            datatable(
+              table_data_local,
+              editable = list(target = "cell", disable=list(columns=0)),  
+              options = list(dom = "t", paging = FALSE),
+              rownames = FALSE,
+              class = "cell-border stripe"
+            ) %>%
+              formatStyle(
+                "Value",
+                target = "cell",
+                `backgroundColor` = "lightgray",
+                `cursor` = "not-allowed"
+              )
+          })
+        })
+      }
+    }
+  })
+  
+  #### CAMBIAMENTI DA SUBTABLES
+  
+  PrevColorELISA <- reactiveValues(Values = NULL,IndexChang = NULL )
+  
+  # aggiorno sotto sample name e devo aggiornare la tabella sotto
+  ELISA_selectSubTablesChanges = reactive({
+    selectSubTables = grep(pattern = "ELISA_sample_name_", names(input),value = T)
+    if(length(selectSubTables) > 0 ){
+      ListColors = lapply(selectSubTables, function(i) input[[i]])
+      names(ListColors) = selectSubTables
+      ListColors
+    }else NULL
+  })
+  
+  observe({
+    ListColors = req(ELISA_selectSubTablesChanges())
+    isolate({
+      if(is.null(PrevColorELISA$Values) ){
+        PrevColorELISA$Values = ListColors
+      }else{
+        if(length(ListColors) == length(PrevColorELISA$Values)){ # cambiato uno esistente
+          diff_indices <- which(mapply(function(x, y) !identical(x, y),ListColors , PrevColorELISA$Values ))
+          PrevColorELISA$IndexChang = ListColors[diff_indices]
+        }else{ # tolto o aggiunto uno
+          PrevColorELISA$IndexChang = ListColors[length(ListColors)] # considero l'ultimo aggiunto
+        }
+        PrevColorELISA$Values = ListColors 
+      }
+      
+    })
+  })
+  
+  observe({
+    req(PrevColorELISA$IndexChang)
+    isolate({
+      if(length(PrevColorELISA$IndexChang) > 0 ){    
+        info <- input[[names(PrevColorELISA$IndexChang)]]
+        if (!is.null(info)) {
+          color = gsub(x=names(PrevColorELISA$IndexChang),pattern = "ELISA_sample_name_",replacement = "")
+          index <- which(color_tables_elisa$ColorCode == color)
+          current_values <- color_tables_elisa$SampleName
+          current_values[index] <- info
+          color_tables_elisa$SampleName <- current_values
+          updatedText <- updateTable("ELISA_SN", info, color, elisaResult, FlagsELISA, session)
+          output$ELISASelectedValues <- renderText(updatedText)
+          
+          if(!color %in% names(FlagsELISA$EXPcol)){
+            tableExcelColored(
+              session = session,
+              Result = elisaResult, 
+              FlagsExp = FlagsELISA,
+              type = "Update", 
+              inputVal = "", 
+              prevVal = color )
+          }
+        }
+      }
+    })
+  })
+  
+  ## exp condition update from bottom
+  ELISA_editSubTables = reactive({
+    selectSubTables = grep(pattern = "^ELISAtable_.*_cell_edit$", names(input),value = T)
+    if(length(selectSubTables) > 0 ){
+      ListExpCond = lapply(selectSubTables, function(i) input[[i]])
+      names(ListExpCond) = selectSubTables
+      ListExpCond
+    }else NULL
+  })
+  
+  observe({
+    editSub<-req(ELISA_editSubTables())
+    isolate({
+      lapply(names(editSub), function(color) {
+        info <- input[[color]]
+        color<-gsub(x=color,pattern = "ELISAtable_|_cell_edit",replacement = "")
+        
+        req(info)
+        
+        row <- info$row
+        col <- info$col
+        value <- info$value
+        
+        index <- which(color_tables_elisa$ColorCode == color)
+        condition_split <- strsplit(color_tables_elisa$ExperimentalCondition[index], " - ")[[1]]
+        
+        if (length(condition_split) < row) {
+          condition_split <- c(condition_split, rep("", row - length(condition_split)))
+        }
+        condition_split[row] <- value
+        color_tables_elisa$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
+        info$col<-5
+        updatedText <- updateTable("ELISA", info, color, elisaResult, FlagsELISA, session)
+        output$ELISASelectedValues <- renderText(updatedText)
+      })
+    })
+  })
   
   ## update checkBox
   observeEvent(FlagsELISA$AllExp,{
@@ -4342,7 +4410,14 @@ server <- function(input, output, session) {
                                EXPselected = "",
                                EXPcol = NULL)
   
-  color_tables_endoc <- reactiveVal()
+  color_tables_endoc<- reactiveValues(
+    ColorCode=NULL,
+    Values=NULL,
+    ExperimentalCondition=NULL,
+    SampleName=NULL
+  )
+  
+  existingTablesENDOC <- reactiveVal(character(0))
   
   observeEvent(input$LoadENDOC_Button,{
     alert$alertContext <- "ENDOC-reset"
@@ -4409,139 +4484,67 @@ server <- function(input, output, session) {
     }
   })
   
-  observe({
-    FlagsENDOC$EXPcol<-FlagsENDOC$EXPcol[names(FlagsENDOC$EXPcol)!=""]
-    color_codes <- FlagsENDOC$EXPcol
-    
-    color_names <- names(FlagsENDOC$EXPcol)
-    valid_colors <- color_codes != "white"
-    color_codes <- color_codes[valid_colors]
-    color_names <- color_names[valid_colors]
-    tables_data <- get_formatted_data(color_codes, color_names, endocResult, endocResult$ENDOCcell_EXP, "ENDOC")
-    color_tables_endoc(tables_data)
-  })
-  
+  # creazione iniziale dei box con tabelle vuote e selectinput aggiornati con il nome messo oppure vuoto se è ancora color
   output$tablesENDOC <- renderUI({
-    colors <- FlagsENDOC$EXPcol[FlagsENDOC$EXPcol != "white"]
-    color_names <- names(colors)
-    color_values<-unname(colors)
-    i <- 1
-    lapply(color_names, function(color_name) {
-      color_name <- color_names[i]
-      result<- box(
-        #title = paste("Table for", color_name),
-        title = HTML(
-          paste(
-            "Table for", 
-            sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
-                    color_values[i])
-          )
-        ),
-        width = 12,
-        solidHeader = TRUE,
-        status = "primary",
-        
-        selectizeInput(
-          inputId = paste0("endoc_sample_name_", color_name),
-          label = "Update Experimental Condition:",
-          choices = "",
-          options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
-        ),
-        
-        DT::dataTableOutput(outputId = paste0("endoc_table_", color_name))
-      )
-      i <<- i + 1  
-      result
-    })
-  })
-  
-  observe({
-    color_codes <- color_tables_endoc()$ColorCode
-    values <- color_tables_endoc()$Values
+    colors <- FlagsENDOC$EXPcol
+    color_names <- names(FlagsENDOC$EXPcol)
+    color_values <- unname(FlagsENDOC$EXPcol)
     
-    for (i in seq_along(color_codes)) {
-      local({
-        color <- color_codes[i]
-        value_string <- values[i]
-        
-        current_condition <- strsplit(color_tables_endoc()$'Experimental condition'[which(color_tables_endoc()$ColorCode== color)], " - ")[[1]]
-        
-        table_data <- data.frame(
-          Value = strsplit(value_string, " - ")[[1]],
-          ExperimentalCondition = {
-            value_split <- strsplit(value_string, " - ")[[1]]
-            if (length(current_condition) < length(value_split)) {
-              c(current_condition, rep("", length(value_split) - length(current_condition)))
-            } else {
-              current_condition
-            }
-          },
-          stringsAsFactors = FALSE
-        )
-        
-        if(nrow(table_data)==0)
-          output=output[-paste0("endoc_table_", color)]
-        else
-          output[[paste0("endoc_table_", color)]] <- renderDataTable({
-            datatable(
-              table_data,
-              editable = list(target = "cell", columns = 2),
-              options = list(dom = "t", paging = FALSE)
-            )
-          })
-        
-        observeEvent(input[[paste0("endoc_sample_name_",color)]], {
-          info <- input[[paste0("endoc_sample_name_",color)]]
-          if(!is.null(info)){
-            index<-which(color_tables_endoc()$ColorCode == color)
-            current_values <- color_tables_endoc()$'Sample Name'
-            current_values[index] <- info
-            current<-color_tables_endoc()
-            current$'Sample Name' <- current_values
-            color_tables_endoc(current)
-            data <- color_tables_endoc()
-            updatedText <- updateTable("ENDOC_SN", info, data, color, endocResult, FlagsENDOC,session)
-            output$ENDOCSelectedValues <- renderText(updatedText)
-            tableExcelColored(session = session,
-                              Result = endocResult, 
-                              FlagsExp = FlagsENDOC,
-                              type = "Update",inputVal="",prevVal=color)
-          }
+    existing_ids <- existingTablesENDOC()
+    to_remove <- setdiff(existing_ids, color_names)
+    
+    if(length(to_remove)>0){
+      
+      reactives <- names(reactiveValuesToList(input))
+      
+      lapply(to_remove, function(color_name) {
+        matching_reactives <- grep(paste0("ENDOCbox_", color_name), reactives, value = TRUE)
+        lapply(matching_reactives, function(reactive_id) {
+          removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
         })
-        
-        observeEvent(input[[paste0("endoc_table_", color, "_cell_edit")]], {
-          info <- input[[paste0("endoc_table_", color, "_cell_edit")]]
-          
-          if (!is.null(info)) {
-            row <- info$row
-            col <- info$col
-            value <- info$value
-            
-            table_data[row, col] <- value
-            current_values <- color_tables_endoc()$'Experimental condition'
-            index <- which(color_tables_endoc()$ColorCode == color)
-            condition_split <- strsplit(current_values[index], " - ")[[1]]
-            
-            if (length(condition_split) < nrow(table_data)) {
-              condition_split <- c(condition_split, rep("", nrow(table_data) - length(condition_split)))
-            }
-            condition_split[row] <- value
-            current_values[index] <- paste(condition_split, collapse = " - ")
-            current<-color_tables_endoc()
-            current$'Experimental condition' <- current_values
-            color_tables_endoc(current)
-            data <- color_tables_endoc()
-            if(info$col==2)
-              info$col<-5
-            updatedText <- updateTable("ENDOC", info, data, color, endocResult, FlagsENDOC,session)
-            output$ENDOCSelectedValues <- renderText(updatedText)
-          }
-        }, ignoreInit = TRUE, ignoreNULL = TRUE)
       })
     }
+    
+    existingTablesENDOC(color_names)
+    
+    if(length(color_names[!grepl(pattern = "Color ", x = color_names)]) > 0)
+      color_names_showed <- color_names[!grepl(pattern = "Color ", x = color_names)]
+    else
+      color_names_showed <- ""
+    
+    lapply(seq_along(color_names), function(i) {
+      color_name <- color_names[i]
+      table_id <- paste0("ENDOCtable_", color_name)
+      div(
+        id = paste0("ENDOCbox_", color_name),
+        box(
+          title = HTML(
+            paste("Table for", 
+                  sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
+                          color_values[i])
+            )
+          ),
+          width = 12,
+          solidHeader = TRUE,
+          status = "primary",
+          
+          selectizeInput(
+            inputId = paste0("ENDOC_sample_name_", color_name),
+            label = "Update Sample Name:",
+            choices = c("",color_names_showed), 
+            selected = ifelse(grepl(pattern = "Color ", x = color_name),
+                              "", color_name),
+            options = list(create = TRUE)
+          ),
+          
+          DT::dataTableOutput(outputId = table_id)
+        )
+      )
+    })
+    
   })
   
-  
+  # Gestisce il click nella Main Table
   observeEvent(input$ENDOCmatrix_cell_clicked, {
     if(!is.null(input$ENDOCmatrix_cell_clicked$value)){
       req(input$ENDOCmatrix_cell_clicked)  
@@ -4562,13 +4565,14 @@ server <- function(input, output, session) {
       updateSelectizeInput(inputId = "ENDOCcell_SN",
                            choices = c("", allSN),
                            selected = selectedSN)
-    }else{
+    } else{
       FlagsENDOC$cellCoo <- cellCoo <- c(input$ENDOCmatrix_cell_clicked$row, input$ENDOCmatrix_cell_clicked$col + 1)
     }
   })
   
+  # salvano e gesticono i cambiametni nell Main table di SN e EXP
   observeEvent(input$ENDOCcell_SN, {
-    if (!is.null(endocResult$ENDOCcell_COLOR) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo) && !is.na(endocResult$TablePlot$x$data[FlagsENDOC$cellCoo[1],FlagsENDOC$cellCoo[2]])) {
+    if (!is.null(endocResult$ENDOCcell_EXP) && !is.null(FlagsENDOC$cellCoo) && !anyNA(FlagsENDOC$cellCoo) && !is.na(endocResult$TablePlot$x$data[FlagsENDOC$cellCoo[1],FlagsENDOC$cellCoo[2]])) {
       ENDOCtb <- endocResult$TablePlot
       cellCoo <- FlagsENDOC$cellCoo
       
@@ -4586,7 +4590,7 @@ server <- function(input, output, session) {
                           type = "Update",inputVal=value.now,prevVal=value.bef)
         output$ENDOCmatrix <- renderDataTable({ endocResult$TablePlot })
       }
-    }
+    } 
   }, ignoreInit = TRUE)
   
   observeEvent(input$ENDOCcell_EXP, {
@@ -4599,16 +4603,180 @@ server <- function(input, output, session) {
       
       if (value.now != "" && value.now != value.bef) {
         endocResult$ENDOCcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
-        output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(endocResult$Initdata[cellCoo[1], cellCoo[2]]), ": Time ", value.now))
+        output$ENDOCSelectedValues <- renderText(paste("Updated value", paste(endocResult$Initdata[cellCoo[1], cellCoo[2]]), ": Exp Condition ", value.now))
         tableExcelColored(session = session,
                           Result = endocResult, 
                           FlagsExp = FlagsENDOC,
                           type = "Update", inputVal="", prevVal=""
         )
         output$ENDOCmatrix <- renderDataTable({ endocResult$TablePlot })
+        
+      }
+    } 
+  }, ignoreInit = TRUE)
+  
+  # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
+  observe({
+    color_codes <- FlagsENDOC$EXPcol[names(FlagsENDOC$EXPcol)!=""]
+    isolate({
+      color_names <- names(color_codes)
+      valid_colors <- color_codes != "white"
+      color_codes <- color_codes[valid_colors]
+      color_names <- color_names[valid_colors]
+      tables_data <- get_formatted_data(color_codes, color_names, endocResult, endocResult$ENDOCcell_EXP, "ENDOC")
+      color_tables_endoc$ColorCode <- tables_data$ColorCode
+      color_tables_endoc$Values <- tables_data$Values
+      color_tables_endoc$ExperimentalCondition <- tables_data$'Experimental condition'
+      color_tables_endoc$SampleName <- tables_data$'Sample Name'
+      color_codes -> FlagsENDOC$EXPcol
+    })
+  })
+  
+  # aggiorno le subtables ogni volta che il vettore dei colori cambia
+  observe({
+    req(color_tables_endoc$ColorCode)
+    
+    for (i in seq_along(color_tables_endoc$ColorCode)) {
+      color <- color_tables_endoc$ColorCode[i]
+      value_string <- color_tables_endoc$Values[i]
+      
+      current_condition <- strsplit(color_tables_endoc$ExperimentalCondition[i], " - ")[[1]]
+      
+      table_data <- data.frame(
+        Value = strsplit(value_string, " - ")[[1]],
+        ExperimentalCondition = {
+          value_split <- strsplit(value_string, " - ")[[1]]
+          if (length(current_condition) < length(value_split)) {
+            c(current_condition, rep("", length(value_split) - length(current_condition)))
+          } else {
+            current_condition
+          }
+        },
+        stringsAsFactors = FALSE
+      )
+      
+      if (nrow(table_data) > 0) {
+        local({
+          color_local <- color  
+          table_data_local <- table_data  
+          
+          output[[paste0("ENDOCtable_", color_local)]] <- renderDataTable({
+            datatable(
+              table_data_local,
+              editable = list(target = "cell", disable=list(columns=0)),  
+              options = list(dom = "t", paging = FALSE),
+              rownames = FALSE,
+              class = "cell-border stripe"
+            ) %>%
+              formatStyle(
+                "Value",
+                target = "cell",
+                `backgroundColor` = "lightgray",
+                `cursor` = "not-allowed"
+              )
+          })
+        })
       }
     }
-  }, ignoreInit = TRUE)
+  })
+  
+  #### CAMBIAMENTI DA SUBTABLES
+  
+  PrevColorENDOC <- reactiveValues(Values = NULL,IndexChang = NULL )
+  
+  # aggiorno sotto sample name e devo aggiornare la tabella sotto
+  ENDOC_selectSubTablesChanges = reactive({
+    selectSubTables = grep(pattern = "ENDOC_sample_name_", names(input),value = T)
+    if(length(selectSubTables) > 0 ){
+      ListColors = lapply(selectSubTables, function(i) input[[i]])
+      names(ListColors) = selectSubTables
+      ListColors
+    }else NULL
+  })
+  
+  observe({
+    ListColors = req(ENDOC_selectSubTablesChanges())
+    isolate({
+      if(is.null(PrevColorENDOC$Values) ){
+        PrevColorENDOC$Values = ListColors
+      }else{
+        if(length(ListColors) == length(PrevColorENDOC$Values)){ # cambiato uno esistente
+          diff_indices <- which(mapply(function(x, y) !identical(x, y),ListColors , PrevColorENDOC$Values ))
+          PrevColorENDOC$IndexChang = ListColors[diff_indices]
+        }else{ # tolto o aggiunto uno
+          PrevColorENDOC$IndexChang = ListColors[length(ListColors)] # considero l'ultimo aggiunto
+        }
+        PrevColorENDOC$Values = ListColors 
+      }
+      
+    })
+  })
+  
+  observe({
+    req(PrevColorENDOC$IndexChang)
+    isolate({
+      if(length(PrevColorENDOC$IndexChang) > 0 ){    
+        info <- input[[names(PrevColorENDOC$IndexChang)]]
+        if (!is.null(info)) {
+          color = gsub(x=names(PrevColorENDOC$IndexChang),pattern = "ENDOC_sample_name_",replacement = "")
+          index <- which(color_tables_endoc$ColorCode == color)
+          current_values <- color_tables_endoc$SampleName
+          current_values[index] <- info
+          color_tables_endoc$SampleName <- current_values
+          updatedText <- updateTable("ENDOC_SN", info, color, endocResult, FlagsENDOC, session)
+          output$ENDOCSelectedValues <-renderText(updatedText)
+          
+          if(!color %in% names(FlagsENDOC$EXPcol)){
+            tableExcelColored(
+              session = session,
+              Result = endocResult, 
+              FlagsExp = FlagsENDOC,
+              type = "Update", 
+              inputVal = "", 
+              prevVal = color )
+          }
+        }
+      }
+    })
+  })
+  
+  ## exp condition update from bottom
+  ENDOC_editSubTables = reactive({
+    selectSubTables = grep(pattern = "^ENDOCtable_.*_cell_edit$", names(input),value = T)
+    if(length(selectSubTables) > 0 ){
+      ListExpCond = lapply(selectSubTables, function(i) input[[i]])
+      names(ListExpCond) = selectSubTables
+      ListExpCond
+    }else NULL
+  })
+  
+  observe({
+    editSub<-req(ENDOC_editSubTables())
+    isolate({
+      lapply(names(editSub), function(color) {
+        info <- input[[color]]
+        color<-gsub(x=color,pattern = "ENDOCtable_|_cell_edit",replacement = "")
+        
+        req(info)
+        
+        row <- info$row
+        col <- info$col
+        value <- info$value
+        
+        index <- which(color_tables_endoc$ColorCode == color)
+        condition_split <- strsplit(color_tables_endoc$ExperimentalCondition[index], " - ")[[1]]
+        
+        if (length(condition_split) < row) {
+          condition_split <- c(condition_split, rep("", row - length(condition_split)))
+        }
+        condition_split[row] <- value
+        color_tables_endoc$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
+        info$col<-5
+        updatedText <- updateTable("ENDOC", info, color, endocResult, FlagsENDOC, session)
+        output$ENDOCSelectedValues <- renderText(updatedText)
+      })
+    })
+  })
   
   
   ## update Baselines checkBox
@@ -4964,7 +5132,14 @@ server <- function(input, output, session) {
     DataAnalysisModule$cytotoxResult$Flags = reactiveValuesToList(FlagsCYTOTOX)
   })
   
-  color_tables_cytotox <- reactiveVal()
+  color_tables_cytotox<- reactiveValues(
+    ColorCode=NULL,
+    Values=NULL,
+    ExperimentalCondition=NULL,
+    SampleName=NULL
+  )
+  
+  existingTablesCYTOTOX <- reactiveVal(character(0))
   
   FlagsCYTOTOX <- reactiveValues(cellCoo = NULL,
                                  AllExp = "",
@@ -5027,188 +5202,142 @@ server <- function(input, output, session) {
     }
   })
   
-  observe({
-    FlagsCYTOTOX$EXPcol<-FlagsCYTOTOX$EXPcol[names(FlagsCYTOTOX$EXPcol)!=""]
-    color_codes <- FlagsCYTOTOX$EXPcol
-    
-    color_names <- names(FlagsCYTOTOX$EXPcol)
-    valid_colors <- color_codes != "white"
-    color_codes <- color_codes[valid_colors]
-    color_names <- color_names[valid_colors]
-    tables_data <- get_formatted_data(color_codes, color_names, cytotoxResult, cytotoxResult$CYTOTOXcell_EXP, "CYTOTOX")
-    color_tables_cytotox(tables_data)
-  })
   
+  # creazione iniziale dei box con tabelle vuote e selectinput aggiornati con il nome messo oppure vuoto se è ancora color
   output$tablesCYTOTOX <- renderUI({
     colors <- FlagsCYTOTOX$EXPcol
     color_names <- names(FlagsCYTOTOX$EXPcol)
-    color_values<-unname(FlagsCYTOTOX$EXPcol)
-    i <- 1
-    lapply(color_names, function(color_name) {
+    color_values <- unname(FlagsCYTOTOX$EXPcol)
+    
+    existing_ids <- existingTablesCYTOTOX()
+    to_remove <- setdiff(existing_ids, color_names)
+    
+    if(length(to_remove)>0){
+      
+      reactives <- names(reactiveValuesToList(input))
+      
+      lapply(to_remove, function(color_name) {
+        matching_reactives <- grep(paste0("CYTOTOXbox_", color_name), reactives, value = TRUE)
+        lapply(matching_reactives, function(reactive_id) {
+          removeUI(selector = paste0("#", reactive_id), immediate = TRUE)
+        })
+      })
+    }
+    
+    existingTablesCYTOTOX(color_names)
+    
+    if(length(color_names[!grepl(pattern = "Color ", x = color_names)]) > 0)
+      color_names_showed <- color_names[!grepl(pattern = "Color ", x = color_names)]
+    else
+      color_names_showed <- ""
+    
+    lapply(seq_along(color_names), function(i) {
       color_name <- color_names[i]
-      result<- box(
-        #title = paste("Table for", color_name),
-        title = HTML(
-          paste(
-            "Table for", 
-            sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
-                    color_values[i])
-          )
-        ),
-        width = 12,
-        solidHeader = TRUE,
-        status = "primary",
-        
-        selectizeInput(
-          inputId = paste0("sample_name_", color_name),
-          label = "Update Sample Name:",
-          choices = "",
-          options = list(create = TRUE, placeholder = ifelse(startsWith(color_name, "Color"), "", color_name))
-        ),
-        
-        DT::dataTableOutput(outputId = paste0("table_", color_name))
+      table_id <- paste0("CYTOTOXtable_", color_name)
+      div(
+        id = paste0("CYTOTOXbox_", color_name),
+        box(
+          title = HTML(
+            paste("Table for", 
+                  sprintf("<span style='display: inline-block; width: 40px; height: 20px; background-color: %s; border: 1px solid black; margin-left: 5px;'></span>",
+                          color_values[i])
+            )
+          ),
+          width = 12,
+          solidHeader = TRUE,
+          status = "primary",
+          
+          selectizeInput(
+            inputId = paste0("CYTOTOX_sample_name_", color_name),
+            label = "Update Sample Name:",
+            choices = c("",color_names_showed), 
+            selected = ifelse(grepl(pattern = "Color ", x = color_name),
+                              "", color_name),
+            options = list(create = TRUE)
+          ),
+          
+          DT::dataTableOutput(outputId = table_id)
+        )
       )
-      i <<- i + 1  
-      result
     })
+    
   })
   
-  observe({
-    color_codes <- color_tables_cytotox()$ColorCode
-    values <- color_tables_cytotox()$Values
-    
-    for (i in seq_along(color_codes)) {
-      local({
-        color <- color_codes[i]
-        value_string <- values[i]
-        
-        current_condition <- strsplit(color_tables_cytotox()$'Experimental condition'[which(color_tables_cytotox()$ColorCode== color)], " - ")[[1]]
-        
-        table_data <- data.frame(
-          Value = strsplit(value_string, " - ")[[1]],
-          ExperimentalCondition = {
-            value_split <- strsplit(value_string, " - ")[[1]]
-            if (length(current_condition) < length(value_split)) {
-              c(current_condition, rep("", length(value_split) - length(current_condition)))
-            } else {
-              current_condition
-            }
-          },
-          stringsAsFactors = FALSE
-        )
-        
-        if(nrow(table_data)==0)
-          output=output[-paste0("table_", color)]
-        else
-          output[[paste0("table_", color)]] <- renderDataTable({
-            datatable(
-              table_data,
-              editable = list(target = "cell", columns = 2),
-              options = list(dom = "t", paging = FALSE)
-            )
-          })
-        
-        observeEvent(input[[paste0("sample_name_",color)]], {
-          info <- input[[paste0("sample_name_",color)]]
-          if(!is.null(info)){
-            index<-which(color_tables_cytotox()$ColorCode == color)
-            current_values <- color_tables_cytotox()$'Sample Name'
-            current_values[index] <- info
-            current<-color_tables_cytotox()
-            current$'Sample Name' <- current_values
-            color_tables_cytotox(current)
-            data <- color_tables_cytotox()
-            updatedText <- updateTable("CYTOTOX_SN", info, data, color, cytotoxResult, FlagsCYTOTOX,session)
-            output$CYTOTOXSelectedValues <- renderText(updatedText)
-            tableExcelColored(session = session,
-                              Result = cytotoxResult, 
-                              FlagsExp = FlagsCYTOTOX,
-                              type = "Update",inputVal="",prevVal=color)
-          }
-        })
-        
-        observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
-          info <- input[[paste0("table_", color, "_cell_edit")]]
-          
-          if (!is.null(info)) {
-            row <- info$row
-            col <- info$col
-            value <- info$value
-            
-            table_data[row, col] <- value
-            current_values <- color_tables_cytotox()$'Experimental condition'
-            index <- which(color_tables_cytotox()$ColorCode == color)
-            condition_split <- strsplit(current_values[index], " - ")[[1]]
-            
-            if (length(condition_split) < nrow(table_data)) {
-              condition_split <- c(condition_split, rep("", nrow(table_data) - length(condition_split)))
-            }
-            condition_split[row] <- value
-            current_values[index] <- paste(condition_split, collapse = " - ")
-            current<-color_tables_cytotox()
-            current$'Experimental condition' <- current_values
-            color_tables_cytotox(current)
-            data <- color_tables_cytotox()
-            if(info$col==2)
-              info$col<-5
-            updatedText <- updateTable("CYTOTOX", info, data, color, cytotoxResult, FlagsCYTOTOX,session)
-            output$CYTOTOXSelectedValues <- renderText(updatedText)
-          }
-        }, ignoreInit = TRUE, ignoreNULL = TRUE)
-      })
+  # Gestisce il click nella Main Table
+  observeEvent(input$CYTOTOXmatrix_cell_clicked, {
+    if(!is.null(input$CYTOTOXmatrix_cell_clicked$value)){
+      req(input$CYTOTOXmatrix_cell_clicked)  
+      
+      cellSelected <- as.numeric(input$CYTOTOXmatrix_cell_clicked)
+      FlagsCYTOTOX$cellCoo <- cellCoo <- c(cellSelected[1], cellSelected[2] + 1)
+      
+      allExp <- unique(na.omit(c(cytotoxResult$CYTOTOXcell_EXP)))  
+      selectedExp <- ifelse(is.null(cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]]), "", cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "CYTOTOXcell_EXP", 
+                           choices = c("", allExp),
+                           selected = selectedExp)
+      
+      allSN <- unique(na.omit(c(cytotoxResult$CYTOTOXcell_SN)))  
+      selectedSN <- ifelse(is.null(cytotoxResult$CYTOTOXcell_SN[cellCoo[1], cellCoo[2]]), "", cytotoxResult$CYTOTOXcell_SN[cellCoo[1], cellCoo[2]])
+      
+      updateSelectizeInput(inputId = "CYTOTOXcell_SN",
+                           choices = c("", allSN),
+                           selected = selectedSN)
+      
+      allREP <- unique(na.omit(c(cytotoxResult$CYTOTOXcell_REP)))
+      selectedREP <- ifelse(is.null(cytotoxResult$CYTOTOXcell_REP[cellCoo[1], cellCoo[2]]), "", cytotoxResult$CYTOTOXcell_REP[cellCoo[1], cellCoo[2]])
+      updateSelectizeInput(inputId = "CYTOTOXcell_REP",
+                           choices = c("", allREP),
+                           selected = selectedREP)
+    } else{
+      FlagsCYTOTOX$cellCoo <- cellCoo <- c(input$CYTOTOXmatrix_cell_clicked$row, input$CYTOTOXmatrix_cell_clicked$col + 1)
     }
   })
   
-  observeEvent(input$CYTOTOXmatrix_cell_clicked,{
-    req(input$CYTOTOXmatrix_cell_clicked)  
-    
-    cellSelected= as.numeric(input$CYTOTOXmatrix_cell_clicked)
-    FlagsCYTOTOX$cellCoo = cellCoo = c(cellSelected[1],cellSelected[2] + 1)
-    
-    allExp <- unique(na.omit(c(cytotoxResult$CYTOTOXcell_EXP)))  
-    selectedExp <- ifelse(is.null(cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]]), "", cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "CYTOTOXcell_EXP",
-                         choices = allExp,
-                         selected = selectedExp)
-    
-    allSN <- unique(na.omit(c(cytotoxResult$CYTOTOXcell_SN)))  
-    selectedSN <- ifelse(is.null(cytotoxResult$CYTOTOXcell_SN[cellCoo[1], cellCoo[2]]), "", cytotoxResult$CYTOTOXcell_SN[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "CYTOTOXcell_SN",
-                         choices = allSN,
-                         selected = selectedSN)
-    
-    allREP <- unique(na.omit(c(cytotoxResult$CYTOTOXcell_REP)))  
-    selectedREP <- ifelse(is.null(cytotoxResult$CYTOTOXcell_REP[cellCoo[1], cellCoo[2]]), "", cytotoxResult$CYTOTOXcell_REP[cellCoo[1], cellCoo[2]])
-    
-    updateSelectizeInput(inputId = "CYTOTOXcell_REP",
-                         choices = allREP,
-                         selected = selectedREP)
-  })
-  
-  observeEvent(input$CYTOTOXcell_EXP,{
-    if (!is.null(cytotoxResult$CYTOTOXcell_EXP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo)) {
-      CYTOTOXtb = cytotoxResult$TablePlot
-      cellCoo = FlagsCYTOTOX$cellCoo
+  # salvano e gesticono i cambiametni nell Main table di SN e EXP
+  observeEvent(input$CYTOTOXcell_SN, {
+    if (!is.null(cytotoxResult$CYTOTOXcell_EXP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo) && !is.na(cytotoxResult$TablePlot$x$data[FlagsCYTOTOX$cellCoo[1],FlagsCYTOTOX$cellCoo[2]])) {
+      CYTOTOXtb <- cytotoxResult$TablePlot
+      cellCoo <- FlagsCYTOTOX$cellCoo
       
-      value.bef = cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]] 
-      value.now = input$CYTOTOXcell_EXP
+      value.bef <- cytotoxResult$CYTOTOXcell_COLOR[cellCoo[1], cellCoo[2]] 
+      value.now <- input$CYTOTOXcell_SN
       
       if (value.now != "" && value.now != value.bef) {
-        currentValues <- cytotoxResult$Initdata[cellCoo[1], cellCoo[2]]
+        cytotoxResult$CYTOTOXcell_COLOR[cellCoo[1], cellCoo[2]] <- value.now
+        cytotoxResult$CYTOTOXcell_SN[cellCoo[1], cellCoo[2]] <- value.now
+        CYTOTOXtb$x$data[cellCoo[1], paste0("Col", cellCoo[2])] <- value.now
         
-        cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]] = value.now
+        tableExcelColored(session = session,
+                          Result = cytotoxResult, 
+                          FlagsExp = FlagsCYTOTOX,
+                          type = "Update",inputVal=value.now,prevVal=value.bef)
+        output$CYTOTOXmatrix <- renderDataTable({ cytotoxResult$TablePlot })
+      }
+    } 
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$CYTOTOXcell_EXP, {
+    if (!is.null(cytotoxResult$CYTOTOXcell_EXP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo) && !is.na(cytotoxResult$TablePlot$x$data[FlagsCYTOTOX$cellCoo[1],FlagsCYTOTOX$cellCoo[2]])) {
+      CYTOTOXtb <- cytotoxResult$TablePlot
+      cellCoo <- FlagsCYTOTOX$cellCoo
+      
+      value.bef <- cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]] 
+      value.now <- input$CYTOTOXcell_EXP
+      
+      if (value.now != "" && value.now != value.bef) {
+        cytotoxResult$CYTOTOXcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
+        output$CYTOTOXSelectedValues <- renderText(paste("Updated value", paste(cytotoxResult$Initdata[cellCoo[1], cellCoo[2]]), ": Exp Condition ", value.now))
         tableExcelColored(session = session,
                           Result = cytotoxResult, 
                           FlagsExp = FlagsCYTOTOX,
                           type = "Update", inputVal="", prevVal=""
         )
+        output$CYTOTOXmatrix <- renderDataTable({ cytotoxResult$TablePlot })
         
-        output$CYTOTOXSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": time ", value.now))
-        output$CYTOTOXmatrix <- renderDataTable({cytotoxResult$TablePlot})
       }
-    }  else return()
+    } 
   }, ignoreInit = TRUE)
   
   observeEvent(input$CYTOTOXcell_REP,{
@@ -5235,37 +5364,168 @@ server <- function(input, output, session) {
     }else return()
   }, ignoreInit = TRUE)
   
-  observeEvent(input$CYTOTOXcell_SN,{
-    if (!is.null(cytotoxResult$CYTOTOXcell_COLOR) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo)) {
-      CYTOTOXtb = cytotoxResult$TablePlot
-      cellCoo = FlagsCYTOTOX$cellCoo
+  # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
+  observe({
+    color_codes <- FlagsCYTOTOX$EXPcol[names(FlagsCYTOTOX$EXPcol)!=""]
+    isolate({
+      color_names <- names(color_codes)
+      valid_colors <- color_codes != "white"
+      color_codes <- color_codes[valid_colors]
+      color_names <- color_names[valid_colors]
+      tables_data <- get_formatted_data(color_codes, color_names, cytotoxResult, cytotoxResult$CYTOTOXcell_EXP, "CYTOTOX")
+      color_tables_cytotox$ColorCode <- tables_data$ColorCode
+      color_tables_cytotox$Values <- tables_data$Values
+      color_tables_cytotox$ExperimentalCondition <- tables_data$'Experimental condition'
+      color_tables_cytotox$SampleName <- tables_data$'Sample Name'
+      color_codes -> FlagsCYTOTOX$EXPcol
+    })
+  })
+  
+  # aggiorno le subtables ogni volta che il vettore dei colori cambia
+  observe({
+    req(color_tables_cytotox$ColorCode)
+    
+    for (i in seq_along(color_tables_cytotox$ColorCode)) {
+      color <- color_tables_cytotox$ColorCode[i]
+      value_string <- color_tables_cytotox$Values[i]
       
-      value.bef = cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]] 
-      value.now = input$CYTOTOXcell_SN
+      current_condition <- strsplit(color_tables_cytotox$ExperimentalCondition[i], " - ")[[1]]
       
-      if (value.now != "" && value.now != value.bef) {
-        currentValues <- cytotoxResult$Initdata[cellCoo[1], cellCoo[2]]
-        
-        cytotoxResult$CYTOTOXcell_COLOR[cellCoo[1], cellCoo[2]] = value.now
-        cytotoxResult$CYTOTOXcell_SN[cellCoo[1],cellCoo[2]] = value.now
-        CYTOTOXtb$x$data[cellCoo[1],paste0("Col",cellCoo[2])] = value.now
-        
-        if(! input$CYTOTOXcell_SN %in% FlagsCYTOTOX$AllExp){
-          exp = unique(c(FlagsCYTOTOX$AllExp,input$CYTOTOXcell_SN))
-          FlagsCYTOTOX$AllExp = exp
-        }
-        
-        ## updating table and colors definition depending on the cell fill 
-        tableExcelColored(session = session,
-                          Result = cytotoxResult, 
-                          FlagsExp = FlagsCYTOTOX,
-                          type = "Update",inputVal=value.now,prevVal=value.bef)
-        
-        output$CYTOTOXSelectedValues <- renderText(paste("Updated value", paste(currentValues), ": sample name ", value.now))
-        output$CYTOTOXmatrix <-renderDataTable({cytotoxResult$TablePlot})
+      table_data <- data.frame(
+        Value = strsplit(value_string, " - ")[[1]],
+        ExperimentalCondition = {
+          value_split <- strsplit(value_string, " - ")[[1]]
+          if (length(current_condition) < length(value_split)) {
+            c(current_condition, rep("", length(value_split) - length(current_condition)))
+          } else {
+            current_condition
+          }
+        },
+        stringsAsFactors = FALSE
+      )
+      
+      if (nrow(table_data) > 0) {
+        local({
+          color_local <- color  
+          table_data_local <- table_data  
+          
+          output[[paste0("CYTOTOXtable_", color_local)]] <- renderDataTable({
+            datatable(
+              table_data_local,
+              editable = list(target = "cell", disable=list(columns=0)),  
+              options = list(dom = "t", paging = FALSE),
+              rownames = FALSE,
+              class = "cell-border stripe"
+            ) %>%
+              formatStyle(
+                "Value",
+                target = "cell",
+                `backgroundColor` = "lightgray",
+                `cursor` = "not-allowed"
+              )
+          })
+        })
       }
-    } else return()
-  }, ignoreInit = TRUE)
+    }
+  })
+  
+  #### CAMBIAMENTI DA SUBTABLES
+  
+  PrevColorCYTOTOX <- reactiveValues(Values = NULL,IndexChang = NULL )
+  
+  # aggiorno sotto sample name e devo aggiornare la tabella sotto
+  CYTOTOX_selectSubTablesChanges = reactive({
+    selectSubTables = grep(pattern = "CYTOTOX_sample_name_", names(input),value = T)
+    if(length(selectSubTables) > 0 ){
+      ListColors = lapply(selectSubTables, function(i) input[[i]])
+      names(ListColors) = selectSubTables
+      ListColors
+    }else NULL
+  })
+  
+  observe({
+    ListColors = req(CYTOTOX_selectSubTablesChanges())
+    isolate({
+      if(is.null(PrevColorCYTOTOX$Values) ){
+        PrevColorCYTOTOX$Values = ListColors
+      }else{
+        if(length(ListColors) == length(PrevColorCYTOTOX$Values)){ # cambiato uno esistente
+          diff_indices <- which(mapply(function(x, y) !identical(x, y),ListColors , PrevColorCYTOTOX$Values ))
+          PrevColorCYTOTOX$IndexChang = ListColors[diff_indices]
+        }else{ # tolto o aggiunto uno
+          PrevColorCYTOTOX$IndexChang = ListColors[length(ListColors)] # considero l'ultimo aggiunto
+        }
+        PrevColorCYTOTOX$Values = ListColors 
+      }
+      
+    })
+  })
+  
+  observe({
+    req(PrevColorCYTOTOX$IndexChang)
+    isolate({
+      if(length(PrevColorCYTOTOX$IndexChang) > 0 ){    
+        info <- input[[names(PrevColorCYTOTOX$IndexChang)]]
+        if (!is.null(info)) {
+          color = gsub(x=names(PrevColorCYTOTOX$IndexChang),pattern = "CYTOTOX_sample_name_",replacement = "")
+          index <- which(color_tables_cytotox$ColorCode == color)
+          current_values <- color_tables_cytotox$SampleName
+          current_values[index] <- info
+          color_tables_cytotox$SampleName <- current_values
+          updatedText <- updateTable("CYTOTOX_SN", info, color, cytotoxResult, FlagsCYTOTOX, session)
+          output$CYTOTOXSelectedValues <-renderText(updatedText)
+          
+          if(!color %in% names(FlagsCYTOTOX$EXPcol)){
+            tableExcelColored(
+              session = session,
+              Result = cytotoxResult, 
+              FlagsExp = FlagsCYTOTOX,
+              type = "Update", 
+              inputVal = "", 
+              prevVal = color )
+          }
+        }
+      }
+    })
+  })
+  
+  ## exp condition update from bottom
+  CYTOTOX_editSubTables = reactive({
+    selectSubTables = grep(pattern = "^CYTOTOXtable_.*_cell_edit$", names(input),value = T)
+    if(length(selectSubTables) > 0 ){
+      ListExpCond = lapply(selectSubTables, function(i) input[[i]])
+      names(ListExpCond) = selectSubTables
+      ListExpCond
+    }else NULL
+  })
+  
+  observe({
+    editSub<-req(CYTOTOX_editSubTables())
+    isolate({
+      lapply(names(editSub), function(color) {
+        info <- input[[color]]
+        color<-gsub(x=color,pattern = "CYTOTOXtable_|_cell_edit",replacement = "")
+        
+        req(info)
+        
+        row <- info$row
+        col <- info$col
+        value <- info$value
+        
+        index <- which(color_tables_cytotox$ColorCode == color)
+        condition_split <- strsplit(color_tables_cytotox$ExperimentalCondition[index], " - ")[[1]]
+        
+        if (length(condition_split) < row) {
+          condition_split <- c(condition_split, rep("", row - length(condition_split)))
+        }
+        condition_split[row] <- value
+        color_tables_cytotox$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
+        info$col<-5
+        updatedText <- updateTable("CYTOTOX", info, color, cytotoxResult, FlagsCYTOTOX, session)
+        output$CYTOTOXSelectedValues <- renderText(updatedText)
+      })
+    })
+  })
   
   ## update Baselines checkBox
   observeEvent(FlagsCYTOTOX$AllExp,{
