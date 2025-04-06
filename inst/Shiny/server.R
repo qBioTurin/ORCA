@@ -1296,7 +1296,7 @@ server <- function(input, output, session) {
           output[[paste0("BCAtable_", color_local)]] <- renderDataTable({
             datatable(
               table_data_local,
-              editable = list(target = "cell", columns = 1),  
+              editable = list(target = "cell", disable=list(columns=0)),  
               options = list(dom = "t", paging = FALSE),
               rownames = FALSE,
               class = "cell-border stripe"
@@ -1373,12 +1373,23 @@ server <- function(input, output, session) {
     })
   })
   
+  ## exp condition update from bottom
+  editSubTables = reactive({
+    selectSubTables = grep(pattern = "^BCAtable_.*_cell_edit$", names(input),value = T)
+    if(length(selectSubTables) > 0 ){
+      ListExpCond = lapply(selectSubTables, function(i) input[[i]])
+      names(ListExpCond) = selectSubTables
+      ListExpCond
+    }else NULL
+  })
+  
   observe({
-    req(color_tables_bca$ExperimentalCondition)
+    editSub<-req(editSubTables())
     isolate({
-      lapply(unique(color_tables_bca$ColorCode), function(color) {
-        observeEvent(input[[paste0("table_", color, "_cell_edit")]], {
-          info <- input[[paste0("table_", color, "_cell_edit")]]
+      lapply(names(editSub), function(color) {
+          info <- input[[color]]
+          color<-gsub(x=color,pattern = "BCAtable_|_cell_edit",replacement = "")
+          
           req(info)
 
           row <- info$row
@@ -1393,13 +1404,12 @@ server <- function(input, output, session) {
           }
           condition_split[row] <- value
           color_tables_bca$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
-
+          info$col<-5
           updatedText <- updateTable("BCA", info, color, bcaResult, FlagsBCA, session)
           output$BCASelectedValues <- renderText(updatedText)
-        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+        })
       })
     })
-  })
     
   ## update checkBox
   observeEvent(FlagsBCA$AllExp,{
