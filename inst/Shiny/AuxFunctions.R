@@ -688,8 +688,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            addWorksheet(wb,"Analysis")
            writeDataTable(wb,ResultList[["dataFinal"]], sheet="Analysis")
            print(ResultList[["dataFinal"]] %>%
-                   ggplot( aes(x = Time, y = Quantification,
-                               fill= Experiment, group = Experiment ) )+
+                   ggplot(aes(x = ResultList[["dataFinal"]]$ExpCondition, y =ResultList[["dataFinal"]]$Ug,
+                                fill=ResultList[["dataFinal"]]$SampleName , group = ResultList[["dataFinal"]]$SampleName ))+
                    geom_bar(position = "dodge",stat = "identity")+
                    theme_bw()+
                    labs(x = "Time", col = "Experiments",
@@ -817,7 +817,38 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            } else {
              print("resplot non disponibile o non è un data.frame")
            }
+         },
+         "CYTOTOX" = {
+           wb <- createWorkbook("CYTOTOX")  
+           
+           if (!is.null(ResultList$Initdata) && is.data.frame(ResultList$Initdata)) {
+             addWorksheet(wb, "Raw Data")  
+             writeDataTable(wb, ResultList$Initdata, sheet = "Raw Data") 
+             print("Initdata scritto nel foglio Excel")
+           } else {
+             print("Errore: Initdata non disponibile")
+           }
+           
+           if (!is.null(ResultList$dataFinal) && is.data.frame(ResultList$dataFinal)) {
+             addWorksheet(wb, "Results Analysis")
+             writeDataTable(wb, ResultList$dataFinal, sheet = "Results Analysis")
+             print("dataFinal scritto nel foglio Excel")
+           } else {
+             print("dataFinal non disponibile o non è un data.frame")
+           }
+           if(!is.null(ResultList$resPlot) ) {
+             addWorksheet(wb, "Barplot")
+             print(ResultList$Barplot)
+             insertPlot(wb = wb,  sheet="Barplot",
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600,width = 8,height = 6)
+             print("Barplot scritto nel foglio Excel")
+           } else {
+             print("Barplot non disponibile o non è un data.frame")
+           }
          }
+         
   )
   
   saveWorkbook(wb, filename)  # Salva il workbook

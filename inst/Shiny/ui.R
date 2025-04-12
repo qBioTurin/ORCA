@@ -1327,18 +1327,9 @@ ui <- dashboardPage(
                     DTOutput("ELISAtables"),
                     fluidRow(
                       column(width = 1,offset = 9,
-                             downloadButton( label = "Download the RDs", 
-                                             outputId = "downloadButton_ELISA",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
-                      ),
-                      column(width = 1,offset = 7,
-                             downloadButton( label = "Download xlsx", 
-                                             outputId = "downloadButtonExcel_ELISA",
-                                             #href = "Results.RData",
-                                             #download = "Results.RData",
-                                             icon = icon("download") )
+                             downloadButton(label = "Download Analysis & Excel", 
+                                            outputId = "downloadELISAAnalysis",
+                                            icon = icon("download"))
                       )
                     )
                 )

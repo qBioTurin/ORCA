@@ -4151,20 +4151,26 @@ server <- function(input, output, session) {
                              AverageValuesWithoutBlank = AverageValues - BlankValues) %>%
             ungroup()
           
-          if( !is.null(Regression) ){  
-            elisamean = elisaTotAverage %>%
-              dplyr::mutate(Quantification =  Regression$fun(AverageValuesWithoutBlank) ) %>%
-              dplyr::rename(SampleName = exp,ExpCondition = time) 
-            
-            output$ELISAtables = renderDT(elisamean)
-            
-            elisaResult$dataQuant = elisamean
-            
-            elisameanNew = elisamean %>%
-              dplyr::select(SampleName,ExpCondition,Quantification) %>%
-              dplyr::rename(Ug = Quantification)
-            elisaResult$dataFinal = elisameanNew
-            output$ELISAtablesUG = renderDT(elisameanNew)
+          if( !is.null(Regression) ){ 
+            tryCatch({
+              Regression$fun = Regression$fun
+              elisamean = elisaTotAverage %>%
+                dplyr::mutate(Quantification =  Regression$fun(AverageValuesWithoutBlank) ) %>%
+                dplyr::rename(SampleName = exp,ExpCondition = time) 
+              
+              output$ELISAtables = renderDT(elisamean)
+              
+              elisaResult$dataQuant = elisamean
+              
+              elisameanNew = elisamean %>%
+                dplyr::select(SampleName,ExpCondition,Quantification) %>%
+                dplyr::rename(Ug = Quantification)
+              elisaResult$dataFinal = elisameanNew
+              output$ELISAtablesUG = renderDT(elisameanNew)
+              
+            }, error = function(e) {
+              showAlert("Error", "Error in regression calculation", "error", 5000)
+            })
             
           }else{
             output$ELISAtables = renderDT(data.frame(Error = "No linear model!"))
@@ -4203,8 +4209,13 @@ server <- function(input, output, session) {
   ## update table standCurve
   observeEvent(elisaResult$Tablestandcurve,{
     output$ELISA_Table_stdcurve <- DT::renderDataTable({
+      base_cols <- c("exp", "Concentrations","Measures")
+      optional_cols <- c("BlankValues", "MeasuresWithoutBlank")
+      existing_optional_cols <- optional_cols[optional_cols %in% colnames(elisaResult$Tablestandcurve)]
+      cols_to_select <- c(base_cols, existing_optional_cols)
+      
       DT::datatable( elisaResult$Tablestandcurve %>% 
-                       select(exp, Concentrations,  Measures,  BlankValues, MeasuresWithoutBlank) %>%
+                       select(all_of(cols_to_select)) %>%
                        rename(SampleName = exp),
                      selection = 'none',
                      # editable = list(target = "cell",
@@ -4294,6 +4305,7 @@ server <- function(input, output, session) {
           modelStancurve = NULL
           regressionPlot = ggplot()+ geom_text(data = data.frame(x = 1,y =1,text = paste0("Error: ",outNLreg$mess)),
                                                aes(x,y,label = text),color = "red")
+          fun= ""
         }else{
           modelStancurve = outNLreg
           coef = modelStancurve$m$getPars()
@@ -4325,6 +4337,7 @@ server <- function(input, output, session) {
       regressionPlot = ggplot()
     }
     output$ELISAregression <- renderPlot(regressionPlot)
+    output$ELISAplots <-  renderPlot(regressionPlot)
   })
   
   
@@ -5111,7 +5124,8 @@ server <- function(input, output, session) {
     CYTOTOXcell_REP = NULL,
     CYTOTOXcell_SN = NULL,
     CYTOTOXcell_COLOR = NULL,
-    MapBaseline = NULL)
+    MapBaseline = NULL,
+    resPlot = NULL)
   
   cytotoxResult0 = list(
     Initdata= NULL,
@@ -5585,7 +5599,7 @@ server <- function(input, output, session) {
         dplyr::filter(SN == baselines) %>%
         dplyr::rename(MeanBaseV = MeanV, Baseline = SN) 
       # if no exp conditions is used for the baseline then we repeat  exp given for the other SN
-      # in thius way the same baseline is used for each SN
+      # in this way the same baseline is used for each SN
       if(all(CYTOTOXcell_base$EXP == "") ) {
         CYTOTOXcell_base = do.call("rbind", lapply(unique(CYTOTOXcell$EXP), function(x) CYTOTOXcell_base %>% mutate(EXP = x) ) )
       }
@@ -5612,27 +5626,29 @@ server <- function(input, output, session) {
         )
       })
       
-      output$CYTOTOXplots = renderPlot({
-        pl1 = CYTOTOXcell %>%
-          group_by(EXP,SN) %>%
-          summarize(Mean = mean(MeanV),SD = sd(MeanV)) %>%
-          ggplot(aes(x = as.factor(EXP),y = Mean ,fill = SN, col = SN)) + 
-          geom_bar(stat="identity", color="black", position=position_dodge()) +
-          geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.2,
-                        position=position_dodge(.9)) +
-          theme_bw()+ 
-          theme(legend.position = "bottom")+
-          labs(title = "Sample Name mean values with standard deviation bars",
-               col="Sample Name",fill="Sample Name",
-               x = "Experimental condition", y= "Mean Values")
-        
-        pl2 = CYTOTOXcell %>% ggplot() +
-          geom_boxplot(aes(x = as.factor(EXP),y = Res,fill = SN, col = SN),alpha = 0.4) +
-          theme_bw() + theme(legend.position = "bottom") +
-          labs(x = "Experimental condition", y= "% Values w.r.t \nthe baseline cell death",
-               col="Sample Name",fill="Sample Name")
-        pl1+pl2
-      })
+      pl1 = CYTOTOXcell %>%
+        group_by(EXP,SN) %>%
+        summarize(Mean = mean(MeanV),SD = sd(MeanV)) %>%
+        ggplot(aes(x = as.factor(EXP),y = Mean ,fill = SN, col = SN)) + 
+        geom_bar(stat="identity", color="black", position=position_dodge()) +
+        geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.2,
+                      position=position_dodge(.9)) +
+        theme_bw()+ 
+        theme(legend.position = "bottom")+
+        labs(title = "Sample Name mean values with standard deviation bars",
+             col="Sample Name",fill="Sample Name",
+             x = "Experimental condition", y= "Mean Values")
+      
+      pl2 = CYTOTOXcell %>% ggplot() +
+        geom_boxplot(aes(x = as.factor(EXP),y = Res,fill = SN, col = SN),alpha = 0.4) +
+        theme_bw() + theme(legend.position = "bottom") +
+        labs(x = "Experimental condition", y= "% Values w.r.t \nthe baseline cell death",
+             col="Sample Name",fill="Sample Name")
+      
+      cytotoxResult$resPlot = pl1 + pl2
+      
+      output$CYTOTOXplots = renderPlot({cytotoxResult$resPlot})
+      
       
     }
   })
