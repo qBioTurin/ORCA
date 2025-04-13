@@ -4394,7 +4394,8 @@ server <- function(input, output, session) {
     ENDOCcell_COLOR = NULL,
     ENDOCcell_EXP = NULL,
     MapBaseline = NULL,
-    MapBlank = NULL)
+    MapBlank = NULL,
+    resPlot=NULL)
   
   endocResult0 = list(
     Initdata= NULL,
@@ -4405,7 +4406,8 @@ server <- function(input, output, session) {
     ENDOCcell_COLOR = NULL,
     ENDOCcell_EXP = NULL,
     MapBaseline = NULL,
-    MapBlank = NULL)
+    MapBlank = NULL,
+    resPlot=NULL)
   
   ENDOCresultListen <- reactive({
     reactiveValuesToList(endocResult)
@@ -4961,30 +4963,28 @@ server <- function(input, output, session) {
           
           endocResult$dataFinal = endocmean
           
-          output$ENDOCplots = renderPlot(
-            {
-              pl1 = endocmean %>%
-                ggplot( aes(x = Time, y = MeanBaseline,
-                            col= Baseline, group = Experiment ) )+
-                geom_point( )+
-                geom_line()+
-                theme_bw()+
-                labs(x = "Time", col = "Baselines selected",
-                     y = "Average Baseline\n quantifications")
-              
-              pl2 = endocmean %>%
-                mutate(ExperimentBaseline = paste0(Experiment,"/",Baseline)) %>%
-                ggplot( aes(x = Time, y = Quantification,
-                            col= ExperimentBaseline, group = Experiment ) )+
-                geom_point()+
-                geom_line()+
-                theme_bw()+
-                labs(x = "Time", col = "Ratio\n Experiment / Baseline",
-                     y = "Ratio of the average quantifications\n (as %)")
-              
-              pl2/pl1
-            }
-          )
+          pl1 = endocmean %>%
+            ggplot( aes(x = Time, y = MeanBaseline,
+                        col= Baseline, group = Experiment ) )+
+            geom_point( )+
+            geom_line()+
+            theme_bw()+
+            labs(x = "Time", col = "Baselines selected",
+                 y = "Average Baseline\n quantifications")
+          
+          pl2 = endocmean %>%
+            mutate(ExperimentBaseline = paste0(Experiment,"/",Baseline)) %>%
+            ggplot( aes(x = Time, y = Quantification,
+                        col= ExperimentBaseline, group = Experiment ) )+
+            geom_point()+
+            geom_line()+
+            theme_bw()+
+            labs(x = "Time", col = "Ratio\n Experiment / Baseline",
+                 y = "Ratio of the average quantifications\n (as %)")
+          
+          endocResult$resPlot <- pl2/pl1
+          
+          output$ENDOCplots = renderPlot({endocResult$resPlot})
         }else{
           output$ENDOCtables = renderDT(data.frame(Error = "No baseline is associated with the experiment replicants!"))
         }        
@@ -5150,7 +5150,8 @@ server <- function(input, output, session) {
     ColorCode=NULL,
     Values=NULL,
     ExperimentalCondition=NULL,
-    SampleName=NULL
+    SampleName=NULL,
+    Replicate=NULL
   )
   
   existingTablesCYTOTOX <- reactiveVal(character(0))
@@ -5391,6 +5392,7 @@ server <- function(input, output, session) {
       color_tables_cytotox$Values <- tables_data$Values
       color_tables_cytotox$ExperimentalCondition <- tables_data$'Experimental condition'
       color_tables_cytotox$SampleName <- tables_data$'Sample Name'
+      color_tables_cytotox$Replicate <- tables_data$'ReplicateNumber'
       color_codes -> FlagsCYTOTOX$EXPcol
     })
   })
@@ -5403,16 +5405,25 @@ server <- function(input, output, session) {
       color <- color_tables_cytotox$ColorCode[i]
       value_string <- color_tables_cytotox$Values[i]
       
-      current_condition <- strsplit(color_tables_cytotox$ExperimentalCondition[i], " - ")[[1]]
+      current_condition_exp <- strsplit(color_tables_cytotox$ExperimentalCondition[i], " - ")[[1]]
+      current_condition_replicate <- strsplit(color_tables_cytotox$Replicate[i], " - ")[[1]]
       
       table_data <- data.frame(
         Value = strsplit(value_string, " - ")[[1]],
         ExperimentalCondition = {
           value_split <- strsplit(value_string, " - ")[[1]]
-          if (length(current_condition) < length(value_split)) {
-            c(current_condition, rep("", length(value_split) - length(current_condition)))
+          if (length(current_condition_exp) < length(value_split)) {
+            c(current_condition_exp, rep("", length(value_split) - length(current_condition_exp)))
           } else {
-            current_condition
+            current_condition_exp
+          }
+        },
+        Replicate = {
+          value_split <- strsplit(value_string, " - ")[[1]]
+          if (length(current_condition_replicate) < length(value_split)) {
+            c(current_condition_replicate, rep("", length(value_split) - length(current_condition_replicate)))
+          } else {
+            current_condition_replicate
           }
         },
         stringsAsFactors = FALSE
@@ -5504,7 +5515,8 @@ server <- function(input, output, session) {
   })
   
   ## exp condition update from bottom
-  CYTOTOX_editSubTables = reactive({
+  
+  CYTOTOX_editSubTables_exp = reactive({
     selectSubTables = grep(pattern = "^CYTOTOXtable_.*_cell_edit$", names(input),value = T)
     if(length(selectSubTables) > 0 ){
       ListExpCond = lapply(selectSubTables, function(i) input[[i]])
@@ -5514,7 +5526,7 @@ server <- function(input, output, session) {
   })
   
   observe({
-    editSub<-req(CYTOTOX_editSubTables())
+    editSub<-req(CYTOTOX_editSubTables_exp())
     isolate({
       lapply(names(editSub), function(color) {
         info <- input[[color]]
@@ -5527,19 +5539,72 @@ server <- function(input, output, session) {
         value <- info$value
         
         index <- which(color_tables_cytotox$ColorCode == color)
-        condition_split <- strsplit(color_tables_cytotox$ExperimentalCondition[index], " - ")[[1]]
-        
-        if (length(condition_split) < row) {
-          condition_split <- c(condition_split, rep("", row - length(condition_split)))
+        if(col==1){
+          condition_split <- strsplit(color_tables_cytotox$ExperimentalCondition[index], " - ")[[1]]
+          
+          if (length(condition_split) < row) {
+            condition_split <- c(condition_split, rep("", row - length(condition_split)))
+          }
+          condition_split[row] <- value
+          color_tables_cytotox$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
+          info$col<-5
+          updatedText <- updateTable("CYTOTOX", info, color, cytotoxResult, FlagsCYTOTOX, session)
+          output$CYTOTOXSelectedValues <- renderText(updatedText)
         }
-        condition_split[row] <- value
-        color_tables_cytotox$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
-        info$col<-5
-        updatedText <- updateTable("CYTOTOX", info, color, cytotoxResult, FlagsCYTOTOX, session)
-        output$CYTOTOXSelectedValues <- renderText(updatedText)
+        else if(col==2){
+          condition_split <- strsplit(color_tables_cytotox$Replicate[index], " - ")[[1]]
+          
+          if (length(condition_split) < row) {
+            condition_split <- c(condition_split, rep("", row - length(condition_split)))
+          }
+          condition_split[row] <- value
+          color_tables_cytotox$Replicate[index] <- paste(condition_split, collapse = " - ")
+          info$col<-6
+          updatedText <- updateTable("CYTOTOX", info, color, cytotoxResult, FlagsCYTOTOX, session)
+          output$CYTOTOXSelectedValues <- renderText(updatedText)
+        }
       })
     })
   })
+  
+  ## replicate update from bottom
+  
+  # CYTOTOX_editSubTables_rep = reactive({
+  #   selectSubTables = grep(pattern = "^CYTOTOXtable_.*_cell_edit$", names(input),value = T)
+  #   if(length(selectSubTables) > 0 ){
+  #     ListReplicates = lapply(selectSubTables, function(i) input[[i]])
+  #     names(ListReplicates) = selectSubTables
+  #     ListReplicates
+  #   }else NULL
+  # })
+  # 
+  # observe({
+  #   editSub<-req(CYTOTOX_editSubTables_rep())
+  #   isolate({
+  #     lapply(names(editSub), function(color) {
+  #       info <- input[[color]]
+  #       color<-gsub(x=color,pattern = "CYTOTOXtable_|_cell_edit",replacement = "")
+  #       
+  #       req(info)
+  #       
+  #       row <- info$row
+  #       col <- info$col
+  #       value <- info$value
+  #       
+  #       index <- which(color_tables_cytotox$ColorCode == color)
+        # condition_split <- strsplit(color_tables_cytotox$Replicate[index], " - ")[[1]]
+        # 
+        # if (length(condition_split) < row) {
+        #   condition_split <- c(condition_split, rep("", row - length(condition_split)))
+        # }
+        # condition_split[row] <- value
+        # color_tables_cytotox$Replicate[index] <- paste(condition_split, collapse = " - ")
+        # info$col<-6
+        # updatedText <- updateTable("CYTOTOX", info, color, cytotoxResult, FlagsCYTOTOX, session)
+        # output$CYTOTOXSelectedValues <- renderText(updatedText)
+  #     })
+  #   })
+  # })
   
   ## update Baselines checkBox
   observeEvent(FlagsCYTOTOX$AllExp,{

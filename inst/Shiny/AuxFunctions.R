@@ -662,6 +662,18 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            } else {
              print("dataFinal non disponibile o non è un data.frame")
            }
+           
+           if(!is.null(ResultList$resPlot) ) {
+             addWorksheet(wb, "PointPlot")
+             print(ResultList$resPlot)
+             insertPlot(wb = wb,  sheet="PointPlot",
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600,width = 8,height = 6)
+             print("PointPlot scritto nel foglio Excel")
+           } else {
+             print("PointPlot non disponibile o non è un data.frame")
+           }
          },
          "ELISA" = {
            ## Create a new workbook
@@ -1041,6 +1053,7 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
           val <- result$CYTOTOXcell_REP[idx["row"], idx["col"]]
           if (!is.na(val) && !is.null(val) && val != "") val else ""
         })
+        rep_output <- paste(unlist(rep_values), collapse = " - ")
       }
       
       time_output <- paste(unlist(time_values), collapse = " - ")
@@ -1054,17 +1067,30 @@ get_formatted_data <- function(colors, color_names, result, singleValue, analysi
       } else {
         exp_condition <- "No matching between values"
       }
-      
-      formatted_data[[i]] <- setNames(
-        data.frame(
-          ColorCode = color_names[i],
-          Color = sprintf("<div style='background-color: %s; padding: 10px; margin-right:20px;'></div>", colors[i]),
-          Values = formatted_output,
-          exp_condition,
-          time_output
-        ),
-        c("ColorCode", "Color", "Values", value1, value2)
-      )
+      if (analysis != "CYTOTOX") {
+        formatted_data[[i]] <- setNames(
+          data.frame(
+            ColorCode = color_names[i],
+            Color = sprintf("<div style='background-color: %s; padding: 10px; margin-right:20px;'></div>", colors[i]),
+            Values = formatted_output,
+            exp_condition,
+            time_output
+          ),
+          c("ColorCode", "Color", "Values", value1, value2)
+        )
+      } else{
+        formatted_data[[i]] <- setNames(
+          data.frame(
+            ColorCode = color_names[i],
+            Color = sprintf("<div style='background-color: %s; padding: 10px; margin-right:20px;'></div>", colors[i]),
+            Values = formatted_output,
+            exp_condition,
+            time_output,
+            rep_output
+          ),
+          c("ColorCode", "Color", "Values", value1, value2, "ReplicateNumber")
+        )
+      }
     } else {
       formatted_data[[i]] <- setNames(
         data.frame(
@@ -1256,6 +1282,26 @@ updateTable <- function(analysis, info, color_code, result, flag, session) {
           if (analysis == "ELISA"||analysis == "BCA"||analysis=="CYTOTOX"||analysis=="ENDOC") {
             result[[paste0(analysis, "cell_EXP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
           }
+        }
+      }
+      assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
+    }
+  } else if (selected_col == 6) {
+    req(color_code != "", color_code != "white", color_code != "#FFFFFF")
+    
+    analysis_lower <- tolower(analysis)
+    matching_indices <- which(result[[paste0(analysis, "cell_COLOR")]] == color_code, arr.ind = TRUE)
+    num_matches <- nrow(matching_indices)
+    new_values <- rep(NA_character_, num_matches)
+    new_values[selected_row] <- new_value
+    
+    if (length(new_values) != num_matches) {
+      session$sendCustomMessage(type = "errorNotification",
+                                message = "Number of values does not match the number of matches.")
+    } else {
+      for (i in seq_along(matching_indices[, "row"])) {
+        if (!is.na(new_values[i]) && new_values[i] != "" && new_values[i] != "NA") {
+          result[[paste0(analysis, "cell_REP")]][matching_indices[i, "row"], matching_indices[i, "col"]] <- new_values[i]
         }
       }
       assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
