@@ -4144,6 +4144,7 @@ server <- function(input, output, session) {
           
           elisaTotAverage = elisaTot %>%
             dplyr::filter(exp != stcd) %>%
+            dplyr::filter(exp != "") %>%
             #mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
             group_by(time, exp) %>%
             dplyr::summarize(AverageValues = mean(values), 
@@ -4545,7 +4546,7 @@ server <- function(input, output, session) {
           
           selectizeInput(
             inputId = paste0("ENDOC_sample_name_", color_name),
-            label = "Update Sample Name:",
+            label = "Update Experimental condition:",
             choices = c("",color_names_showed), 
             selected = ifelse(grepl(pattern = "Color ", x = color_name),
                               "", color_name),
@@ -4659,7 +4660,7 @@ server <- function(input, output, session) {
       
       table_data <- data.frame(
         Value = strsplit(value_string, " - ")[[1]],
-        ExperimentalCondition = {
+        Time = {
           value_split <- strsplit(value_string, " - ")[[1]]
           if (length(current_condition) < length(value_split)) {
             c(current_condition, rep("", length(value_split) - length(current_condition)))
@@ -4779,16 +4780,18 @@ server <- function(input, output, session) {
         value <- info$value
         
         index <- which(color_tables_endoc$ColorCode == color)
-        condition_split <- strsplit(color_tables_endoc$ExperimentalCondition[index], " - ")[[1]]
-        
-        if (length(condition_split) < row) {
-          condition_split <- c(condition_split, rep("", row - length(condition_split)))
+        if(length(index) != 0 && !is.null(index)) {
+          condition_split <- strsplit(color_tables_endoc$ExperimentalCondition[index], " - ")[[1]]
+          
+          if (length(condition_split) < row) {
+            condition_split <- c(condition_split, rep("", row - length(condition_split)))
+          }
+          condition_split[row] <- value
+          color_tables_endoc$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
+          info$col<-5
+          updatedText <- updateTable("ENDOC", info, color, endocResult, FlagsENDOC, session)
+          output$ENDOCSelectedValues <- renderText(updatedText)
         }
-        condition_split[row] <- value
-        color_tables_endoc$ExperimentalCondition[index] <- paste(condition_split, collapse = " - ")
-        info$col<-5
-        updatedText <- updateTable("ENDOC", info, color, endocResult, FlagsENDOC, session)
-        output$ENDOCSelectedValues <- renderText(updatedText)
       })
     })
   })

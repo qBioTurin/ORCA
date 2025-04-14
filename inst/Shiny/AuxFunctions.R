@@ -700,12 +700,12 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            addWorksheet(wb,"Analysis")
            writeDataTable(wb,ResultList[["dataFinal"]], sheet="Analysis")
            print(ResultList[["dataFinal"]] %>%
-                   ggplot(aes(x = ResultList[["dataFinal"]]$ExpCondition, y =ResultList[["dataFinal"]]$Ug,
-                                fill=ResultList[["dataFinal"]]$SampleName , group = ResultList[["dataFinal"]]$SampleName ))+
-                   geom_bar(position = "dodge",stat = "identity")+
-                   theme_bw()+
-                   labs(x = "Time", col = "Experiments",
-                        y = "Average quantifications obtained\n from the lm "))
+                   ggplot(aes(x = ExpCondition, y = Ug,
+                              fill = SampleName, group = SampleName)) +
+                   geom_bar(position = "dodge", stat = "identity") +
+                   theme_bw() +
+                   labs(x = "Time", fill = "SampleName",  
+                        y = "Average quantifications obtained\n from the lm"))
            insertPlot(wb = wb,  sheet="Analysis",
                       startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
                       fileType = "tiff",
