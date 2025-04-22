@@ -1324,6 +1324,9 @@ ui <- dashboardPage(
                     collapsible = TRUE,
                     collapsed = TRUE,
                     plotOutput("ELISAplots"),
+                    plotOutput("ELISAbarPlot"),
+                    actionButton("Customize_plot_ELISA", "Customize or Download Bar Plot"),
+                    tags$div(style = "margin-top: 20px;"),
                     DTOutput("ELISAtables"),
                     fluidRow(
                       column(width = 1,offset = 9,

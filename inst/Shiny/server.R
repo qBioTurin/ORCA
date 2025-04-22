@@ -3648,7 +3648,8 @@ server <- function(input, output, session) {
     MapBaseline = NULL,
     MapBlank = NULL,
     Tablestandcurve = NULL,
-    Regression = NULL)
+    Regression = NULL,
+    resPlot= NULL)
   
   elisaResult0 = list(
     Initdata= NULL,
@@ -3661,7 +3662,8 @@ server <- function(input, output, session) {
     MapBaseline = NULL,
     MapBlank = NULL,
     Tablestandcurve = NULL,
-    Regression = NULL)
+    Regression = NULL,
+    resPlot= NULL)
   
   color_tables_elisa<- reactiveValues(
     ColorCode=NULL,
@@ -4167,6 +4169,17 @@ server <- function(input, output, session) {
                 dplyr::select(SampleName,ExpCondition,Quantification) %>%
                 dplyr::rename(Ug = Quantification)
               elisaResult$dataFinal = elisameanNew
+              
+              elisaResult$resPlot<-elisaResult$dataFinal %>%
+                ggplot(aes(x = ExpCondition, y = Ug,
+                           fill = SampleName, group = SampleName)) +
+                geom_bar(position = "dodge", stat = "identity") +
+                theme_bw() +
+                labs(x = "Time", fill = "SampleName",  
+                     y = "Average quantifications obtained\n from the lm")
+              
+              output$ELISAbarPlot <- renderPlot({elisaResult$resPlot})
+              
               output$ELISAtablesUG = renderDT(elisameanNew)
               
             }, error = function(e) {
@@ -4180,6 +4193,64 @@ server <- function(input, output, session) {
       })
     }
   })
+  
+  #Customize Plot 
+  
+  observeEvent(input$Customize_plot_ELISA, {
+    layer_tabs <- generateLayerParameters(elisaResult$resPlot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          # Dynamically generate inputs for each layer
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          generatePlotParameters(elisaResult$resPlot)
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
+        )
+      ),
+      footer = tagList(
+        actionButton("applyChangesElisa", "Apply Changes"),
+        downloadButton("downloadPlotButtonELISA", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  
+  
+  output$downloadPlotButtonELISA <- downloadHandler(
+    filename = function() {
+      paste0("plot_ELISA_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      savePlotAsPNG(elisaResult$resPlot, file, width, height, dpi)
+      manageSpinner(FALSE)
+    }
+  )
+  
+  
+  observeEvent(input$applyChangesElisa, {
+    updatedPlot<-customizePlot(elisaResult$resPlot,input)
+    elisaResult$resPlot<- updatedPlot
+    output$ELISAbarPlot <- renderPlot({updatedPlot})
+    removeModal()
+  })
+  
+  
+  
+  
   
   observe({
     input$ELISA_standcurve -> ELISA_standcurve
@@ -4339,6 +4410,7 @@ server <- function(input, output, session) {
     }
     output$ELISAregression <- renderPlot(regressionPlot)
     output$ELISAplots <-  renderPlot(regressionPlot)
+    
   })
   
   
@@ -5570,44 +5642,6 @@ server <- function(input, output, session) {
     })
   })
   
-  ## replicate update from bottom
-  
-  # CYTOTOX_editSubTables_rep = reactive({
-  #   selectSubTables = grep(pattern = "^CYTOTOXtable_.*_cell_edit$", names(input),value = T)
-  #   if(length(selectSubTables) > 0 ){
-  #     ListReplicates = lapply(selectSubTables, function(i) input[[i]])
-  #     names(ListReplicates) = selectSubTables
-  #     ListReplicates
-  #   }else NULL
-  # })
-  # 
-  # observe({
-  #   editSub<-req(CYTOTOX_editSubTables_rep())
-  #   isolate({
-  #     lapply(names(editSub), function(color) {
-  #       info <- input[[color]]
-  #       color<-gsub(x=color,pattern = "CYTOTOXtable_|_cell_edit",replacement = "")
-  #       
-  #       req(info)
-  #       
-  #       row <- info$row
-  #       col <- info$col
-  #       value <- info$value
-  #       
-  #       index <- which(color_tables_cytotox$ColorCode == color)
-        # condition_split <- strsplit(color_tables_cytotox$Replicate[index], " - ")[[1]]
-        # 
-        # if (length(condition_split) < row) {
-        #   condition_split <- c(condition_split, rep("", row - length(condition_split)))
-        # }
-        # condition_split[row] <- value
-        # color_tables_cytotox$Replicate[index] <- paste(condition_split, collapse = " - ")
-        # info$col<-6
-        # updatedText <- updateTable("CYTOTOX", info, color, cytotoxResult, FlagsCYTOTOX, session)
-        # output$CYTOTOXSelectedValues <- renderText(updatedText)
-  #     })
-  #   })
-  # })
   
   ## update Baselines checkBox
   observeEvent(FlagsCYTOTOX$AllExp,{
@@ -5672,7 +5706,7 @@ server <- function(input, output, session) {
         CYTOTOXcell_base = do.call("rbind", lapply(unique(CYTOTOXcell$EXP), function(x) CYTOTOXcell_base %>% mutate(EXP = x) ) )
       }
       
-      CYTOTOXcell = CYTOTOXcell %>%  filter(SN != baselines)
+      CYTOTOXcell = CYTOTOXcell %>%  dplyr::filter(SN != baselines)
       CYTOTOXcell = merge(CYTOTOXcell_base,CYTOTOXcell,by= c("REP","EXP"),all.y = T)
       CYTOTOXcell = CYTOTOXcell %>% mutate(Res = (MeanV-MeanBaseV)/(100-MeanBaseV)*100)
       

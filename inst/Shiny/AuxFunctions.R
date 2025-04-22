@@ -615,12 +615,20 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              addWorksheet(wb,paste0("Gene ", j) )
              writeDataTable(wb,ResultList[["plotPCR"]][[i]]$table, sheet=paste0("Gene ", j))
              
-             print(ResultList[["plotPCR"]][[i]]$plot + labs(title = i))
-             insertPlot(wb = wb,  sheet=paste0("Gene ", j),
-                        startCol=dim(ResultList[["plotPCR"]][[i]]$table)[2]+ 2,
-                        fileType = "tiff",
-                        units = "in",
-                        dpi = 600,width = 20, height = 6)
+             #print(ResultList[["plotPCR"]][[i]]$plot + labs(title = i))
+             
+             plot_list <- ResultList[["plotPCR"]][[i]]$plot
+             k=0
+             for (plot_name in names(plot_list)) {
+               print(plot_list[[plot_name]] + labs(title = paste(i, "-", plot_name)))
+               insertPlot(wb = wb,  sheet=paste0("Gene ", j),
+                          startCol=dim(ResultList[["plotPCR"]][[i]]$table)[2]+ 2+ k,
+                          fileType = "tiff",
+                          units = "in",
+                          dpi = 600,width = 20, height = 6)
+               k=k+5
+             }
+             
              
            }
            
@@ -699,18 +707,14 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            ## Analysis
            addWorksheet(wb,"Analysis")
            writeDataTable(wb,ResultList[["dataFinal"]], sheet="Analysis")
-           print(ResultList[["dataFinal"]] %>%
-                   ggplot(aes(x = ExpCondition, y = Ug,
-                              fill = SampleName, group = SampleName)) +
-                   geom_bar(position = "dodge", stat = "identity") +
-                   theme_bw() +
-                   labs(x = "Time", fill = "SampleName",  
-                        y = "Average quantifications obtained\n from the lm"))
-           insertPlot(wb = wb,  sheet="Analysis",
-                      startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
-                      fileType = "tiff",
-                      units = "in",
-                      dpi = 600)
+           if(!is.null(ResultList$resPlot)){
+             print(ResultList$resPlot)
+             insertPlot(wb = wb,  sheet="Analysis",
+                        startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600)
+           }
          },
          "FACS" = {
            wb <- createWorkbook("FACS")
@@ -949,7 +953,7 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
          }, 
          
          "Update" =  {
-           if(!is.null(inputVal)||!inputVal==""){
+           if(!is.null(inputVal)&&!inputVal==""){
              ColorsSN = rainbow(n = 50, alpha = 0.5)[sample(50, size = 50, replace = FALSE)]
              if(is.null(FlagsExp$EXPcol)) {
                print("No existing color mapping found. Creating new one.")
