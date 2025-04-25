@@ -3428,7 +3428,6 @@ server <- function(input, output, session) {
         table = FlagsPCR$singleGeneInfo$Table
         
         if(is.null(plotList[[paste0(gene,"_H",Hgene)]])){
-          
           plotList[[paste0(gene,"_H",Hgene)]] = list(plot = ggplot(),
                                                      table = NULL)
           
@@ -3437,7 +3436,6 @@ server <- function(input, output, session) {
               plotOutput(paste0("PCRplot_", i), width = "100%" )
             })
             do.call(tagList, list(plot_output_list))
-            #pcrResult$savePlot <- plot_output_list
           })
           PCRtableUI =  renderUI({
             plot_output_list <- lapply(names(plotList), function(i) {
@@ -3446,13 +3444,11 @@ server <- function(input, output, session) {
             })
             do.call(tagList, list(plot_output_list))
           })
+          # Dynamically generate plot output UI
+          output$PCRplot <- renderUI({PCRplotUI})
           
+          output$PCRtables <- renderUI({PCRtableUI})
         }
-        
-        # Dynamically generate plot output UI
-        output$PCRplot <- renderUI({PCRplotUI})
-        
-        output$PCRtables <- renderUI({PCRtableUI})
         
         plotList[[paste0(gene,"_H",Hgene)]]$plot = plot
         plotList[[paste0(gene,"_H",Hgene)]]$table = table

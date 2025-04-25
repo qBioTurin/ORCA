@@ -1449,7 +1449,7 @@ UploadRDs = function(Flag, session, output,
     updateTabsetPanel(session = session, "SideTabs",
                       selected = "quantification")
     
-  }else if(Flag == "PRCC"){
+  }else if(Flag == "PCR"){
     
     for(nameList in names(DataAnalysisModule$pcrResult)) 
       Result[[nameList]] <- DataAnalysisModule$pcrResult[[nameList]]
@@ -1480,6 +1480,10 @@ UploadRDs = function(Flag, session, output,
                       choices = choices,
                       selected = selected[3]
     )
+    updateSelectInput(session = session,"PCR_time",
+                      choices = choices,
+                      selected = selected[4]
+    )
     
     
     if(!is.null(Result$PCRnorm))
@@ -1492,7 +1496,46 @@ UploadRDs = function(Flag, session, output,
     updateTabsetPanel(session = session, "SideTabs",
                       selected = "uploadPCR")
     
+    if(!is.null(DataAnalysisModule$pcrResult$PointPlot)){
+      output$PointGenePlot <- renderPlot({
+        DataAnalysisModule$pcrResult$PointPlot
+      })
+    }
+    if(!is.null(DataAnalysisModule$pcrResult$AllGenesFoldChangePlot)){
+      output$FoldchangeAllGenesPlot<-plotly::renderPlotly({   plotly::ggplotly(DataAnalysisModule$pcrResult$AllGenesFoldChangePlot, tooltip = "text") })
+    }
     
+    if(!is.null(DataAnalysisModule$pcrResult$AllGenesFoldChangeTable)){
+      housekeeping_genes = DataAnalysisModule$pcrResult$PCRnorm
+      output$AllGenesTable <- renderUI({
+        lapply(housekeeping_genes, function(hg) {
+          div(
+            h3(paste("Table for Housekeeping Gene:", hg)),
+            tableOutput(paste0("PCR_GeneTable_", hg))
+          )
+        })
+      })
+      
+      lapply(housekeeping_genes, function(hg) {
+        output[[paste0("PCR_GeneTable_", hg)]] <- renderTable({
+          DataAnalysisModule$pcrResult$AllGenesFoldChangeTable[[hg]]
+        })
+      })
+    }
+    if(!is.null(DataAnalysisModule$pcrResult$PCRnorm)){
+      updateCheckboxGroupInput(session = session,
+                             inputId = "PCRnorm",
+                             selected = unique(DataAnalysisModule$pcrResult$PCRnorm)
+      )
+    }
+    if(!is.null(DataAnalysisModule$pcrResult$BaselineExp)){
+      updateCheckboxGroupInput(session = session,
+                             inputId = "PCRbaseline",
+                             selected = unique(DataAnalysisModule$pcrResult$BaselineExp)
+      )
+    }
+    
+
   }
   else if(Flag == "ENDOC"){
     
