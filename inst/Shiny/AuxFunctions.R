@@ -1738,6 +1738,7 @@ UploadRDs = function(Flag, session, output,
         
         FlagsExp$STDCselected= unique(Result$Tablestandcurve$exp)
       }
+      
     }
     
     ### updating check boxes
@@ -1775,6 +1776,9 @@ UploadRDs = function(Flag, session, output,
       output$ELISAregression <- renderPlot(
         Result$Regression$plot
       )
+      output$ELISAplots <- renderPlot({
+        Result$Regression$plot
+      })
     }
     
     # change pannel

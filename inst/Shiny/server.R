@@ -3420,14 +3420,15 @@ server <- function(input, output, session) {
     isolate({
       if(Hgene != "" && gene != ""){
         
-        plotList = pcrResult$plotPCR 
+        #plotList = pcrResult$plotPCR 
         
-        if(is.null(plotList)) plotList = list()
+        #if(is.null(plotList)) plotList = list()
         
+        plotList = list()
         plot = FlagsPCR$singleGeneInfo$Plot
         table = FlagsPCR$singleGeneInfo$Table
         
-        if(is.null(plotList[[paste0(gene,"_H",Hgene)]])){
+        #if(is.null(plotList[[paste0(gene,"_H",Hgene)]])){
           plotList[[paste0(gene,"_H",Hgene)]] = list(plot = ggplot(),
                                                      table = NULL)
           
@@ -3448,7 +3449,7 @@ server <- function(input, output, session) {
           output$PCRplot <- renderUI({PCRplotUI})
           
           output$PCRtables <- renderUI({PCRtableUI})
-        }
+        #}
         
         plotList[[paste0(gene,"_H",Hgene)]]$plot = plot
         plotList[[paste0(gene,"_H",Hgene)]]$table = table
@@ -3459,7 +3460,6 @@ server <- function(input, output, session) {
         })
         output[[paste0("PCRtable_", gene,"_H",Hgene)]] <- renderTable({ plotList[[paste0(gene,"_H",Hgene)]]$table})
         
-        #pcrResult$SavePlot <- plotList[[paste0(gene,"_H",Hgene)]]$plot$Plot2
         pcrResult$plotPCR <- plotList
         
         df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(Sample != input$PCRbaseline)
@@ -3645,7 +3645,8 @@ server <- function(input, output, session) {
     MapBlank = NULL,
     Tablestandcurve = NULL,
     Regression = NULL,
-    resPlot= NULL)
+    resPlot= NULL,
+    dataQuant= NULL)
   
   elisaResult0 = list(
     Initdata= NULL,
@@ -3659,7 +3660,8 @@ server <- function(input, output, session) {
     MapBlank = NULL,
     Tablestandcurve = NULL,
     Regression = NULL,
-    resPlot= NULL)
+    resPlot= NULL,
+    dataQuant = NULL)
   
   color_tables_elisa<- reactiveValues(
     ColorCode=NULL,
@@ -3880,7 +3882,7 @@ server <- function(input, output, session) {
   
   # salvano e gesticono i cambiametni nell Main table di SN e EXP
   observeEvent(input$ELISAcell_SN, {
-    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
+    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(FlagsELISA$cellCoo[1]) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
       ELISAtb <- elisaResult$TablePlot
       cellCoo <- FlagsELISA$cellCoo
       
@@ -3902,7 +3904,7 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   
   observeEvent(input$ELISAcell_EXP, {
-    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
+    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(FlagsELISA$cellCoo[1]) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
       ELISAtb <- elisaResult$TablePlot
       cellCoo <- FlagsELISA$cellCoo
       
