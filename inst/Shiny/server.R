@@ -1221,7 +1221,11 @@ server <- function(input, output, session) {
   # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
   observe({
     color_codes <- FlagsBCA$EXPcol[names(FlagsBCA$EXPcol)!=""]
+    exp_conditions <- bcaResult$BCAcell_EXP
     isolate({
+      present_colors <- unique(unlist(bcaResult$TablePlot$x$data))
+      present_colors <- present_colors[!is.na(present_colors) & present_colors != ""]
+      color_codes <- color_codes[names(color_codes) %in% present_colors]
       color_names <- names(color_codes)
       valid_colors <- color_codes != "white"
       color_codes <- color_codes[valid_colors]
@@ -1234,9 +1238,9 @@ server <- function(input, output, session) {
       color_codes -> FlagsBCA$EXPcol
     })
   })
-  # aggiorno le subtables ogni volta che il vettore dei colori cambia
+  # aggiorno le subtables ogni volta che il vettore dei colori o exp condition cambia
   observe({
-    req(color_tables_bca$ColorCode)
+    req(color_tables_bca$ColorCode,color_tables_bca$ExperimentalCondition)
     
     for (i in seq_along(color_tables_bca$ColorCode)) {
       color <- color_tables_bca$ColorCode[i]
@@ -1708,7 +1712,9 @@ server <- function(input, output, session) {
     FinalData = NULL,
     SubStatData = NULL,
     resplot = NULL,
-    TTestData = NULL
+    TTestData = NULL,
+    IF_expcond = NULL,
+    IF_TTestvariable = NULL
   )
   ifResult0 = reactiveValues(
     Initdata = NULL,
@@ -1718,8 +1724,10 @@ server <- function(input, output, session) {
     FinalData = NULL,
     SubStatData = NULL,
     resplot = NULL,
-    TTestData = NULL
-  )
+    TTestData = NULL,
+    IF_expcond = NULL,
+    IF_TTestvariable = NULL
+    )
   
   # save everytime there is a change in the results
   IFresultListen <- reactive({
@@ -1741,7 +1749,9 @@ server <- function(input, output, session) {
   })
   
   FlagsIF <- reactiveValues(norm=F, 
-                            baseline = F)
+                            baseline = F,
+                            IF_expcond = NULL,
+                            IF_TTestvariable = NULL)
   
   
   observeEvent(input$LoadIF_Button,{
@@ -1833,31 +1843,33 @@ server <- function(input, output, session) {
         
         updateSelectInput("IF_TTestvariable",session = session, choices = unique(IFdataCalc$Vars))
         
-        output$IFtable = renderDT({
-          DT::datatable( IFinalData,
-                         selection = 'none',
-                         # editable = list(target = "cell",
-                         #                 disable = list(columns = 0:2) ),
-                         rownames= FALSE,
-                         options = list(scrollX = TRUE,
-                                        searching = FALSE,
-                                        dom = 't' # Only display the table
-                         )
-          )
-        })
+        output$IFtable = renderDT({DT::datatable( IFinalData,
+                                                  selection = 'none',
+                                                  # editable = list(target = "cell",
+                                                  #                 disable = list(columns = 0:2) ),
+                                                  rownames= FALSE,
+                                                  options = list(scrollX = TRUE,
+                                                                 searching = FALSE,
+                                                                 dom = 't' # Only display the table
+                                                  )
+                                  )
+                            })
         
-        output$IFtable_stat = renderDT({
-          DT::datatable(statisticData,
-                        selection = 'none',
-                        # editable = list(target = "cell",
-                        #                 disable = list(columns = 0:2) ),
-                        rownames= FALSE,
-                        options = list(scrollX = TRUE,
-                                       searching = FALSE,
-                                       dom = 't' # Only display the table
-                        )
-          )
-        })
+
+        output$IFtable_stat = renderDT({DT::datatable( statisticData,
+                                                       selection = 'none',
+                                                       # editable = list(target = "cell",
+                                                       #                 disable = list(columns = 0:2) ),
+                                                       rownames= FALSE,
+                                                       options = list(scrollX = TRUE,
+                                                                      searching = FALSE,
+                                                                      dom = 't' # Only display the table
+                                                       )
+                                            )
+                                      })
+        
+        ifResult$IF_expcond = selectIFcolumns
+        ifResult$IF_TTestvariable = unique(IFdataCalc$Vars)
       }
       else{
         
@@ -1947,7 +1959,7 @@ server <- function(input, output, session) {
       
       
       output$IFsummarise_plot = renderPlot({resplot})
-      
+
       output$IFsummariseMean = renderDT({
         DT::datatable(SubDataStat,
                       selection = 'none',
@@ -3928,7 +3940,11 @@ server <- function(input, output, session) {
   # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
   observe({
     color_codes <- FlagsELISA$EXPcol[names(FlagsELISA$EXPcol)!=""]
+    exp_condition <- elisaResult$ELISAcell_EXP
     isolate({
+      present_colors <- unique(unlist(elisaResult$TablePlot$x$data))
+      present_colors <- present_colors[!is.na(present_colors) & present_colors != ""]
+      color_codes <- color_codes[names(color_codes) %in% present_colors]
       color_names <- names(color_codes)
       valid_colors <- color_codes != "white"
       color_codes <- color_codes[valid_colors]
@@ -3944,7 +3960,7 @@ server <- function(input, output, session) {
   
   # aggiorno le subtables ogni volta che il vettore dei colori cambia
   observe({
-    req(color_tables_elisa$ColorCode)
+    req(color_tables_elisa$ColorCode, color_tables_elisa$ExperimentalCondition)
     
     for (i in seq_along(color_tables_elisa$ColorCode)) {
       color <- color_tables_elisa$ColorCode[i]
@@ -5385,7 +5401,7 @@ server <- function(input, output, session) {
   
   # salvano e gesticono i cambiametni nell Main table di SN e EXP
   observeEvent(input$CYTOTOXcell_SN, {
-    if (!is.null(cytotoxResult$CYTOTOXcell_EXP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo) && !is.na(cytotoxResult$TablePlot$x$data[FlagsCYTOTOX$cellCoo[1],FlagsCYTOTOX$cellCoo[2]])) {
+    if (!is.null(cytotoxResult$CYTOTOXcell_EXP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo) && !is.na(FlagsCYTOTOX$cellCoo[1]) && !is.na(cytotoxResult$TablePlot$x$data[FlagsCYTOTOX$cellCoo[1],FlagsCYTOTOX$cellCoo[2]])) {
       CYTOTOXtb <- cytotoxResult$TablePlot
       cellCoo <- FlagsCYTOTOX$cellCoo
       
@@ -5407,7 +5423,7 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   
   observeEvent(input$CYTOTOXcell_EXP, {
-    if (!is.null(cytotoxResult$CYTOTOXcell_EXP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo) && !is.na(cytotoxResult$TablePlot$x$data[FlagsCYTOTOX$cellCoo[1],FlagsCYTOTOX$cellCoo[2]])) {
+    if (!is.null(cytotoxResult$CYTOTOXcell_EXP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo) && !is.na(FlagsCYTOTOX$cellCoo[1]) && !is.na(cytotoxResult$TablePlot$x$data[FlagsCYTOTOX$cellCoo[1],FlagsCYTOTOX$cellCoo[2]])) {
       CYTOTOXtb <- cytotoxResult$TablePlot
       cellCoo <- FlagsCYTOTOX$cellCoo
       
@@ -5429,7 +5445,7 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   
   observeEvent(input$CYTOTOXcell_REP,{
-    if (!is.null(cytotoxResult$CYTOTOXcell_REP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo)) {
+    if (!is.null(cytotoxResult$CYTOTOXcell_REP) && !is.null(FlagsCYTOTOX$cellCoo) && !anyNA(FlagsCYTOTOX$cellCoo) && !is.na(FlagsCYTOTOX$cellCoo[1])) {
       CYTOTOXtb = cytotoxResult$TablePlot
       cellCoo = FlagsCYTOTOX$cellCoo
       
@@ -5455,7 +5471,11 @@ server <- function(input, output, session) {
   # qua quando modificihiama affianco alla matrice colorata per poi aggiornare le tabele sotto
   observe({
     color_codes <- FlagsCYTOTOX$EXPcol[names(FlagsCYTOTOX$EXPcol)!=""]
+    exp_condition <- cytotoxResult$CYTOTOXcell_EXP
     isolate({
+      present_colors <- unique(unlist(cytotoxResult$TablePlot$x$data))
+      present_colors <- present_colors[!is.na(present_colors) & present_colors != ""]
+      color_codes <- color_codes[names(color_codes) %in% present_colors]
       color_names <- names(color_codes)
       valid_colors <- color_codes != "white"
       color_codes <- color_codes[valid_colors]
@@ -5472,7 +5492,7 @@ server <- function(input, output, session) {
   
   # aggiorno le subtables ogni volta che il vettore dei colori cambia
   observe({
-    req(color_tables_cytotox$ColorCode)
+    req(color_tables_cytotox$ColorCode, color_tables_cytotox$ExperimentalCondition)
     
     for (i in seq_along(color_tables_cytotox$ColorCode)) {
       color <- color_tables_cytotox$ColorCode[i]
@@ -7137,7 +7157,7 @@ server <- function(input, output, session) {
     
     #Control dependencies for DT
     if(!is.null(mess$TablePlot)){
-      mess$TablePlot$dependencies[[2]]$src$file <- path.package("DT")
+      mess$TablePlot$dependencies[[2]]$src$file <- paste0(path.package("DT"),"/htmlwidgets/lib/datatables")
     }
     
     messNames = names(mess)
