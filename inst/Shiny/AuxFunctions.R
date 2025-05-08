@@ -1860,6 +1860,43 @@ UploadRDs = function(Flag, session, output,
     for(nameList in names(DataAnalysisModule$ifResult$Flags)) 
       FlagsExp[[nameList]] <- DataAnalysisModule$ifResult$Flags[[nameList]]
     
+    if(!is.null(Result$FinalData)){
+      output$IFtable = renderDT({DT::datatable( Result$FinalData,
+                                                selection = 'none',
+                                                # editable = list(target = "cell",
+                                                #                 disable = list(columns = 0:2) ),
+                                                rownames= FALSE,
+                                                options = list(scrollX = TRUE,
+                                                               searching = FALSE,
+                                                               dom = 't' # Only display the table
+                                                ))
+      })
+    }
+    
+    if(!is.null(Result$StatData)){
+      output$IFtable_stat = renderDT({DT::datatable( Result$StatData,
+                                                     selection = 'none',
+                                                     # editable = list(target = "cell",
+                                                     #                 disable = list(columns = 0:2) ),
+                                                     rownames= FALSE,
+                                                     options = list(scrollX = TRUE,
+                                                                    searching = FALSE,
+                                                                    dom = 't' # Only display the table
+                                                     ))
+        })
+    }
+    
+    if(!is.null(Result$IF_expcond)){
+      updateSelectizeInput(inputId = "IF_expcond",
+                           session = session,
+                           choices = c("", colnames(Result$Initdata)),
+                           selected = Result$IF_expcond
+      )
+    }
+    if(!is.null(Result$IF_TTestvariable)){
+      updateSelectInput("IF_TTestvariable",session = session, choices = unique(Result$IF_TTestvariable))
+    }
+    
     
     # change pannel
     
