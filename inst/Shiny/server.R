@@ -7137,7 +7137,7 @@ server <- function(input, output, session) {
     
     #Control dependencies for DT
     if(!is.null(mess$TablePlot)){
-      mess$TablePlot$dependencies[[2]]$src$file <- path.package("DT")
+      mess$TablePlot$dependencies[[2]]$src$file <- paste0(path.package("DT"),"/htmlwidgets/lib/datatables")
     }
     
     messNames = names(mess)
