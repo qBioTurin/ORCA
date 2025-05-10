@@ -1565,6 +1565,47 @@ UploadRDs = function(Flag, session, output,
       FlagsExp$AllExp = unique(c(Result$ENDOCcell_SN))
     }
     
+    if(!is.null(Result$MapBlank)){
+      updateSelectizeInput(inputId = "ENDOC_blanks",session = session,
+                           selected = unique(Result$MapBlank$Blank)
+      )
+    }
+    
+    if(!is.null(Result$MapBaseline)){
+      updateCheckboxGroupInput(session = session,
+                               inputId = "ENDOC_baselines",
+                               selected = Result$MapBaseline$Baseline
+      )
+      FlagsExp$EXPselected = unique(Result$MapBaseline$Exp)
+      FlagsExp$BASEselected = Result$MapBaseline$Baseline
+      expToselect = FlagsExp$EXPselected
+      baselines =  FlagsExp$BASEselected
+      lapply(expToselect[! expToselect %in% baselines],function(i){
+        updateSelectInput(session = session,
+                       inputId = paste0("Exp",i),
+                       label = i,
+                       choices = c("",baselines),
+                       selected = Result$MapBaseline$Baseline[Result$MapBaseline$Exp == i])
+      })
+      # expToselect = FlagsExp$EXPselected
+      # baselines =  FlagsExp$BASEselected
+      # 
+      # output$EndocBaselineSelection <- renderUI({
+      #   select_output_list <- lapply(expToselect[! expToselect %in% baselines],
+      #                                function(i) {
+      #                                  selectInput(inputId = paste0("Exp",i),
+      #                                              label = i,
+      #                                              choices = c("",baselines),
+      #                                              selected = Result$MapBaseline$Baseline[Result$MapBaseline$Exp == i])
+      #                                })
+      #   do.call(tagList, select_output_list)
+      # })
+    }
+    
+    if(!is.null(Result$MapBlank)){
+      FlagsExp$BLANCHEselected = unique(Result$MapBlank$Blank)
+    }
+    
     # change pannel
     updateTabsetPanel(session = session, "SideTabs",
                       selected = "uploadENDOC")

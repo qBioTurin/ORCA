@@ -4540,7 +4540,7 @@ server <- function(input, output, session) {
     if (input$shinyalert && alert$alertContext == "ENDOC-reset") {  
       resetPanel("ENDOC", flags = FlagsENDOC, result = endocResult)
       updateCheckboxGroupInput(session, "ENDOC_baselines", choices = list(), selected = character(0))
-      updateCheckboxGroupInput(session, "ENDOC_blanks", choices = list(), selected = character(0))
+      updateSelectizeInput(session, "ENDOC_blanks", choices = list(), selected = character(0))
       
       updateSelectizeInput(session, "ENDOCcell_SN", choices = character(0), selected = character(0))
       updateSelectizeInput(session, "ENDOCcell_EXP", choices = character(0), selected = character(0))
@@ -4912,9 +4912,10 @@ server <- function(input, output, session) {
       
       exp_selec = input$ENDOC_blanks
       
-      updateCheckboxGroupInput(session,"ENDOC_blanks",
-                               choices = exp,
-                               selected = exp_selec )
+      
+      updateSelectizeInput(session,"ENDOC_blanks",
+                           choices = exp,
+                           selected = exp_selec )
       
       FlagsENDOC$EXPselected = exp
     }
@@ -5081,47 +5082,42 @@ server <- function(input, output, session) {
     }
   })
   
-  # here the Exp boxes are updated every time a new experiment is added 
-  observeEvent(FlagsENDOC$EXPselected,{
-    expToselect = FlagsENDOC$EXPselected
-    baselines =  FlagsENDOC$BASEselected
-    blanks = FlagsENDOC$BLANCHEselected
+  updateENDOCdynamicInputs <- function() {
+    expToselect <- FlagsENDOC$EXPselected
+    baselines <- FlagsENDOC$BASEselected
+    blanks <- FlagsENDOC$BLANCHEselected
     
-    expToselect = expToselect[expToselect != ""]
+    expToselect <- expToselect[expToselect != ""]
     
-    # baselines updating
+    # Baselines
     output$EndocBaselineSelection <- renderUI({
       select_output_list <- lapply(expToselect[! expToselect %in% baselines],
                                    function(i) {
-                                     if(length(input[[paste0("Exp",i)]])>0)
-                                       expsel = input[[paste0("Exp",i)]]
-                                     else 
-                                       expsel = ""
-                                     
-                                     selectInput(inputId = paste0("Exp",i),
+                                     expsel <- isolate(input[[paste0("Exp", i)]])
+                                     if (is.null(expsel)) expsel <- ""
+                                     selectInput(inputId = paste0("Exp", i),
                                                  label = i,
-                                                 choices = c("",baselines),
+                                                 choices = c("", baselines),
                                                  selected = expsel)
                                    })
       do.call(tagList, select_output_list)
     })
     
-    # blanks updating
+    # Blanks
     output$EndocBlankSelection <- renderUI({
-      select_output_list <- lapply(unique(c(expToselect,baselines)), function(i) {
-        
-        if(length(input[[paste0("blExp",i)]])>0)
-          expsel = input[[paste0("blExp",i)]]
-        else 
-          expsel = ""
-        
-        selectInput(inputId = paste0("blExp",i),
+      select_output_list <- lapply(unique(c(expToselect, baselines)), function(i) {
+        selectInput(inputId = paste0("blExp", i),
                     label = i,
-                    choices = c("",blanks),
-                    selected = expsel)
+                    choices = c("", blanks),
+                    selected = blanks)
       })
       do.call(tagList, select_output_list)
     })
+  }
+  
+  # here the Exp boxes are updated every time a new experiment is added 
+  observeEvent(FlagsENDOC$EXPselected,{
+    updateENDOCdynamicInputs()
   })
   
   observeEvent(endocResult$TablePlot, {
@@ -7251,12 +7247,14 @@ server <- function(input, output, session) {
                   FlagsExp = FlagsPCR)
       }
       else if(UploadDataAnalysisModule$FlagENDOC || UploadDataAnalysisModule$FlagALL){
+        updateENDOCdynamicInputs()
         UploadRDs(Flag = "ENDOC",
                   session = session,
                   output = output,
                   DataAnalysisModule = DataAnalysisModule,
                   Result = endocResult, 
                   FlagsExp = FlagsENDOC)
+        updateENDOCdynamicInputs()
       }
       else if(UploadDataAnalysisModule$FlagELISA || UploadDataAnalysisModule$FlagALL){
         UploadRDs(Flag = "ELISA",
