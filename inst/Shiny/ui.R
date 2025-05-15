@@ -1400,8 +1400,9 @@ ui <- dashboardPage(
                                                  "Select baselines:")
                        ),
                        column(4, offset = 1,
-                              checkboxGroupInput(inputId = "ENDOC_blanks",
-                                                 "Select blank:")
+                              selectizeInput(inputId = "ENDOC_blanks",
+                                             label = "Select black:",
+                                             choices = NULL)
                        )
                      ),
                      fluidRow(
@@ -1434,11 +1435,9 @@ ui <- dashboardPage(
               h2("Quantification"),
               fluidRow(
                 box(width= 12,
-                    title = "Select a blank for the following experimental conditions",
+                    title = "Selected blank for the experimental conditions",
                     collapsible = TRUE,
-                    collapsed = FALSE,
-                    h4("If time information is associated with the experimental conditions
-                       defined as blank, then it will be lost during the averaging of its values."),
+                    collapsed = TRUE,
                     uiOutput("EndocBlankSelection")
                 ),
                 box(width= 12,
