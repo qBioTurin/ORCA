@@ -1173,14 +1173,16 @@ server <- function(input, output, session) {
     }
   })
   
+
   # salvano e gesticono i cambiametni nell Main table di SN e EXP
   observeEvent(input$BCAcell_SN, {
-    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo) && !is.na(bcaResult$TablePlot$x$data[FlagsBCA$cellCoo[1],FlagsBCA$cellCoo[2]])) {
+    if (!is.null(bcaResult$BCAcell_SN) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo) && !is.na(FlagsBCA$cellCoo[1]) && !is.na(bcaResult$TablePlot$x$data[FlagsBCA$cellCoo[1],FlagsBCA$cellCoo[2]])) {
       BCAtb <- bcaResult$TablePlot
       cellCoo <- FlagsBCA$cellCoo
       
       value.bef <- bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] 
       value.now <- input$BCAcell_SN
+      value.now <- gsub(" ", "_", value.now)
       
       if (value.now != "" && value.now != value.bef) {
         bcaResult$BCAcell_COLOR[cellCoo[1], cellCoo[2]] <- value.now
@@ -1197,7 +1199,7 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   
   observeEvent(input$BCAcell_EXP, {
-    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo) && !is.na(bcaResult$TablePlot$x$data[FlagsBCA$cellCoo[1],FlagsBCA$cellCoo[2]])) {
+    if (!is.null(bcaResult$BCAcell_EXP) && !is.null(FlagsBCA$cellCoo) && !anyNA(FlagsBCA$cellCoo) && !is.na(FlagsBCA$cellCoo[1]) && !is.na(bcaResult$TablePlot$x$data[FlagsBCA$cellCoo[1],FlagsBCA$cellCoo[2]])) {
       BCAtb <- bcaResult$TablePlot
       cellCoo <- FlagsBCA$cellCoo
       
@@ -1323,6 +1325,7 @@ server <- function(input, output, session) {
     isolate({
       if(length(PrevColorBCA$IndexChang) > 0 ){    
         info <- input[[names(PrevColorBCA$IndexChang)]]
+        info <- gsub(" ", "_", info)
         if (!is.null(info)) {
           color = gsub(x=names(PrevColorBCA$IndexChang),pattern = "BCA_sample_name_",replacement = "")
           index <- which(color_tables_bca$ColorCode == color)
@@ -3894,7 +3897,7 @@ server <- function(input, output, session) {
   
   # salvano e gesticono i cambiametni nell Main table di SN e EXP
   observeEvent(input$ELISAcell_SN, {
-    if (!is.null(elisaResult$ELISAcell_EXP) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(FlagsELISA$cellCoo[1]) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
+    if (!is.null(elisaResult$ELISAcell_SN) && !is.null(FlagsELISA$cellCoo) && !anyNA(FlagsELISA$cellCoo) && !is.na(FlagsELISA$cellCoo[1]) && !is.na(elisaResult$TablePlot$x$data[FlagsELISA$cellCoo[1],FlagsELISA$cellCoo[2]])) {
       ELISAtb <- elisaResult$TablePlot
       cellCoo <- FlagsELISA$cellCoo
       
@@ -5093,8 +5096,10 @@ server <- function(input, output, session) {
     output$EndocBaselineSelection <- renderUI({
       select_output_list <- lapply(expToselect[! expToselect %in% baselines],
                                    function(i) {
-                                     expsel <- isolate(input[[paste0("Exp", i)]])
-                                     if (is.null(expsel)) expsel <- ""
+                                     if(length(input[[paste0("Exp", i)]])>0)
+                                       expsel <- input[[paste0("Exp", i)]]
+                                     else
+                                       expsel <- ""
                                      selectInput(inputId = paste0("Exp", i),
                                                  label = i,
                                                  choices = c("", baselines),
@@ -5116,8 +5121,11 @@ server <- function(input, output, session) {
   }
   
   # here the Exp boxes are updated every time a new experiment is added 
-  observeEvent(FlagsENDOC$EXPselected,{
-    updateENDOCdynamicInputs()
+  observe({
+    req(FlagsENDOC$EXPselected)
+    isolate({
+      updateENDOCdynamicInputs()
+    })
   })
   
   observeEvent(endocResult$TablePlot, {
@@ -7254,7 +7262,6 @@ server <- function(input, output, session) {
                   DataAnalysisModule = DataAnalysisModule,
                   Result = endocResult, 
                   FlagsExp = FlagsENDOC)
-        updateENDOCdynamicInputs()
       }
       else if(UploadDataAnalysisModule$FlagELISA || UploadDataAnalysisModule$FlagALL){
         UploadRDs(Flag = "ELISA",
