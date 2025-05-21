@@ -3130,6 +3130,8 @@ server <- function(input, output, session) {
       }else if(length(selectPCRcolumns)==4 ){
         tmp = PCR[,selectPCRcolumns]
         colnames(tmp) = c("Gene", "Sample", "Value","Time")
+        if(is.na(tmp$Time))
+          tmp$Time = ""
         pcrResult$data = tmp
         pcrResult$selectPCRcolumns = selectPCRcolumns
       }else{
@@ -3342,15 +3344,21 @@ server <- function(input, output, session) {
       lapply(housekeeping_genes, function(hg) {
         div(
           h3(paste("Table for Housekeeping Gene:", hg)),
-          tableOutput(paste0("PCR_GeneTable_", hg))
+          DT::dataTableOutput(paste0("PCR_GeneTable_", hg)),
+          style = "margin-bottom: 30px;"
         )
       })
     })
     
     lapply(housekeeping_genes, function(hg) {
-      output[[paste0("PCR_GeneTable_", hg)]] <- renderTable({
+      output[[paste0("PCR_GeneTable_", hg)]] <- DT::renderDataTable({
         tables[[hg]]
-      })
+      }, options = list(
+        scrollY = "600px",    
+        scrollCollapse = TRUE,
+        paging = FALSE,       
+        dom = 't'             
+      ))
     })
     
     pcrResult$AllGenesFoldChangeTable = tables
