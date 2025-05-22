@@ -3130,7 +3130,7 @@ server <- function(input, output, session) {
       }else if(length(selectPCRcolumns)==4 ){
         tmp = PCR[,selectPCRcolumns]
         colnames(tmp) = c("Gene", "Sample", "Value","Time")
-        if(is.na(tmp$Time))
+        if(all(is.na(tmp$Time)))
           tmp$Time = ""
         pcrResult$data = tmp
         pcrResult$selectPCRcolumns = selectPCRcolumns
@@ -3370,6 +3370,7 @@ server <- function(input, output, session) {
   observe({
     input$Gene_plot -> gene
     input$HousKgene_plot -> Hgene
+    input$PCR_plot_y -> y_axis
     plot_type <- req(input$PCR_plot_type)
     
     isolate({
@@ -3388,22 +3389,31 @@ server <- function(input, output, session) {
             labs(x = "Time", y = "2^(-DDCT)")
         }else{
           plot1 = 
-            ggplot(data = PCRstep5)+
+            ggplot(data = PCRstep5, aes(x = Gene, y = ddCt))+
             labs(x = "Sample", y = "DDCT")
-          plot2 = ggplot(data = PCRstep5)+
+          plot2 = ggplot(data = PCRstep5, aes(x =Gene, y = Q ))+
             labs(x = "Sample", y = "2^(-DDCT)")
         }
         
         if (plot_type == "point") {
-          plot1 <- plot1 + geom_point(aes(shape=Time, color = Sample,
-                                          text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
-          plot2 <- plot2 + geom_point(aes(shape=Time, color = Sample,
-                                          text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+          if(length(unique(PCRstep5$Time)) >1){
+            plot1 <- plot1 + geom_jitter(aes(shape=Time, color = Sample,
+                                            text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+            plot2 <- plot2 + geom_jitter(aes(shape=Time, color = Sample,
+                                            text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+          }
+          else{
+            plot1 <- plot1 + geom_point(aes(color = Sample,
+                                            text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+            plot2 <- plot2 + geom_point(aes(color = Sample,
+                                            text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+          }
+
         } else if (plot_type == "bar") {
-          plot1 <- plot1 + geom_bar(aes(x= as.factor(Sample), y = ddCt, col = Sample,fill = Sample,
-                                        text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
-          plot2 <- plot2 + geom_bar(aes(x= as.factor(Sample), y = Q, col = Sample,fill = Sample,
-                                        text = paste("Gene:", gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
+          plot1 <- plot1 + geom_bar(aes(col = Sample,fill = Sample,
+                                        text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
+          plot2 <- plot2 + geom_bar(aes(col = Sample,fill = Sample,
+                                        text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
         }
         
         plot1 = plot1  + 
@@ -3422,15 +3432,18 @@ server <- function(input, output, session) {
         )
         
         # Render del plot con Plotly
-        output$SingleGenePlot = plotly::renderPlotly({
-          p1<-plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text") %>%
-            plotly::layout(showlegend = TRUE)
-          
-          p2 <- plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text") %>%
+        if(y_axis=="ddCt"){
+          output$SingleGenePlot = plotly::renderPlotly({
+            plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text") %>%
             plotly::layout(showlegend = FALSE)
-          
-          plotly::subplot(p1, p2, nrows = 1, shareX = TRUE, titleX = TRUE)
-        })
+          })
+        }
+        else{
+          output$SingleGenePlot = plotly::renderPlotly({
+          plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text") %>%
+          plotly::layout(showlegend = FALSE)
+          })
+        }
         
         output$SingleGeneTable = renderTable({FlagsPCR$singleGeneInfo$Table })
       }

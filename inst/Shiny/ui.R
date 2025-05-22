@@ -969,8 +969,12 @@ ui <- dashboardPage(
                       )
                     ),
                     column(
-                      width = 3,
+                      width = 2,
                       radioButtons("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "point")
+                    ),
+                    column(
+                      width = 2,
+                      radioButtons("PCR_plot_y", "Visualization: ", choices = c("DDCT" = "ddCt", "2^(-DDCT)" = "Q"), selected = "ddCt")
                     ),
                     fluidRow(
                       column(width = 12,
