@@ -1612,11 +1612,15 @@ UploadRDs = function(Flag, session, output,
     
   } 
   else if(Flag == "BCA"){
+    #DataAnalysisModule$bcaResult$BCAcell_EXP <- gsub(" ", "_", DataAnalysisModule$bcaResult$BCAcell_EXP)
+    #DataAnalysisModule$bcaResult$BCAcell_SN <- gsub(" ", "_", DataAnalysisModule$bcaResult$BCAcell_SN)
+    #DataAnalysisModule$bcaResult$BCAcell_COLOR <- gsub(" ", "_", DataAnalysisModule$bcaResult$BCAcell_COLOR)
     
-    for(nameList in names(DataAnalysisModule$bcaResult)) 
+    for(nameList in names(DataAnalysisModule$bcaResult))
       Result[[nameList]] <- DataAnalysisModule$bcaResult[[nameList]]
     
-    for(nameList in names(DataAnalysisModule$bcaResult$Flags)) 
+    
+    for(nameList in names(DataAnalysisModule$bcaResult$Flags))
       FlagsExp[[nameList]] <- DataAnalysisModule$bcaResult$Flags[[nameList]]
     
     if(!is.null(Result$TablePlot)){
@@ -1630,22 +1634,20 @@ UploadRDs = function(Flag, session, output,
       
       updateSelectizeInput(inputId = "BCAcell_EXP",
                            session = session,
-                           choices = c("",unique(c(Result$BCAcell_EXP)) ),
-                           selected = ""
+                           choices = unique(c(Result$BCAcell_EXP))
       )
       
       updateSelectizeInput(inputId = "BCAcell_SN",
                            session =session,
-                           choices = c("",unique(c(Result$BCAcell_SN)) ),
-                           selected = ""
+                           choices = unique(c(Result$BCAcell_SN))
       )
       
       FlagsExp$AllExp = unique(c(Result$BCAcell_SN))
     }
-    if(!is.null(Result$MapBaseline)){
+    if(!is.null(Result$MapBaseline)&& length(Result$MapBaseline) > 0){
       FlagsExp$BASEselected = unique(Result$MapBaseline$Baseline)
     }
-    if(!is.null(Result$MapBlanche)){
+    if(!is.null(Result$MapBlanche) && length(Result$MapBlanche) > 0){
       FlagsExp$BLANCHEselected = unique(Result$MapBlanche$Blanche)
     }
     if(!is.null(Result$Tablestandcurve)){
