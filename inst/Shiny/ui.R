@@ -116,9 +116,9 @@ ui <- dashboardPage(
                                   menuSubItem("Upload data", tabName = "uploadIF"),
                                   menuSubItem("Quantification", tabName = "tablesIF")),
                          menuItem('Flow Cytometry analysis', tabName = 'facs',
-                                  menuItem("Raw data", tabName = "RawFACS",
-                                           menuSubItem("Uppload data", tabName = "uploadRawFACS"),
-                                           menuSubItem("Raw data", tabName = "plotRawFACS")),
+                                  #menuItem("Raw data", tabName = "RawFACS",
+                                  #         menuSubItem("Uppload data", tabName = "uploadRawFACS"),
+                                  #         menuSubItem("Raw data", tabName = "plotRawFACS")),
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
                                   menuSubItem("Hierarchical gating", tabName = "tablesFACS"),
                                   menuSubItem("Statistics", tabName = "statFACS")) 
