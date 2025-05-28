@@ -88,6 +88,11 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            result$BaselineExp <- NULL
            result$plotPRC <- NULL
            result$NewPCR <- NULL
+           result$AllGenesFoldChangePlot = NULL
+           result$AllGenesFoldChangeTable = NULL
+           result$PointPlot = NULL
+           result$CustomGene=NULL
+           result$CustomHgene=NULL
          },
          "ENDOC" = {
            result$Initdata <- NULL

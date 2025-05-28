@@ -799,6 +799,7 @@ ui <- dashboardPage(
                 box(
                   width = 12,
                   title = "Experimental Setup:",
+                  fluidRow(
                   column(
                     width = 6,
                     h2("Select the columns to assign"),
@@ -836,14 +837,13 @@ ui <- dashboardPage(
                         )
                       )
                     ),
-                    tableOutput("PCRpreview")
+                    DTOutput("PCRpreview")
                   ),
                   column(
                     width = 3,
-                    checkboxGroupInput(
-                      inputId = "PCRnorm",
-                      "Select housekeeping genes:"
-                    )
+                    selectizeInput(
+                      inputId = "PCRnorm", multiple = T, choices = "",
+                      label = "Select housekeeping genes:")
                   ),
                   column(
                     width = 3,
@@ -852,7 +852,10 @@ ui <- dashboardPage(
                       label = "Select baseline sample:",
                       choices = "ID"
                     )
+                  )
                   ),
+                  br(),
+                  fluidRow(
                   column(
                     width = 12,
                     actionButton("toggleTimePatterns", "Define Time Patterns", icon = icon("caret-down")),
@@ -872,8 +875,8 @@ ui <- dashboardPage(
                             width = 6,
                             textInput(
                               inputId = "PCR_time_colname",
-                              label = "Enter name for the time column:",
-                              placeholder = "e.g. Time1"
+                              label = "Column name for saving the timings:",
+                              placeholder = "e.g. Time"
                             )
                           )
                         ),
@@ -882,7 +885,7 @@ ui <- dashboardPage(
                             width = 6,
                             selectInput(
                               inputId = "PCR_sample_colname",
-                              label = "Enter name for the sample column:",
+                              label = "Column name where searching the timings:",
                               choices = ""
                             )
                           )
@@ -894,6 +897,7 @@ ui <- dashboardPage(
                         )
                       )
                     )
+                  )
                   ),
                   column(
                     width = 3,
@@ -970,7 +974,7 @@ ui <- dashboardPage(
                     ),
                     column(
                       width = 2,
-                      radioButtons("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "point")
+                      radioButtons("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "bar")
                     ),
                     column(
                       width = 2,
@@ -987,7 +991,7 @@ ui <- dashboardPage(
                       )
                     ),
                     fluidRow(
-                      column(width = 3, offset = 7, 
+                      column(width = 3, offset = 9, 
                              actionButton(
                                inputId = "SavePCRplot",
                                label = 'Save the specific analysis',
@@ -1003,6 +1007,7 @@ ui <- dashboardPage(
                     title = "Saved Normalization",
                     collapsible = TRUE,
                     collapsed = TRUE,
+                    h3("Plot with all the saved genes:"),
                     fluidRow(
                       column(width = 12,
                              plotOutput("PointGenePlot"),
@@ -1010,9 +1015,13 @@ ui <- dashboardPage(
                              actionButton("Customize_PCR_Button_1", "Customize or Download Plot")
                       )
                     ),
+                    br(),br(),
                     fluidRow(
                       column(width = 12,
-                             uiOutput("PCRplot"),
+                             fluidRow(
+                               uiOutput("PCRplot")
+                               ),
+                             h3("Select the plot to customize:"),
                              fluidRow(
                                column(
                                  width = 3,
@@ -1024,7 +1033,7 @@ ui <- dashboardPage(
                                  )
                                ),
                                column(
-                                 width = 3,
+                                 width = 4,
                                  selectizeInput(
                                    inputId = "Select_Customize_HousKgene_plot",
                                    "Select housekeeping gene for customization:", 
@@ -1038,7 +1047,8 @@ ui <- dashboardPage(
                                )
                              )
                       )
-                    ),
+                    ), 
+                    br(),
                     fluidRow(
                       column(width = 12,
                              uiOutput("PCRtables")

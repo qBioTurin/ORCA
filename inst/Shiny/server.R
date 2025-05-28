@@ -3016,9 +3016,21 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(input$LoadPCR_Button, {
-    loadExcelFilePCR()
+
+  observeEvent(input$LoadPCR_Button,{
+    alert$alertContext <- "PCR-reset"
+    if( !is.null(pcrResult$Initdata) ) {
+      shinyalert(
+        title = "Important message",
+        text = "Do you want to update the PCR data already present, by resetting the previous analysis?",
+        type = "warning",
+        showCancelButton = TRUE,
+        confirmButtonText = "Update",
+        cancelButtonText = "Cancel",
+      )
+    } else loadExcelFilePCR()
   })
+  
   
   observeEvent(input$ApplyTimePatterns, {
     applyTimePatterns()
@@ -3046,6 +3058,10 @@ server <- function(input, output, session) {
       showAlert("Error", mess$message, "error", 5000)
       return()
     }
+    
+    # Check if multiple dataset are present in the same file
+    idx <- which(apply(mess, 1, function(row) all(row == colnames(mess))))
+    if(length(idx)>0) mess = mess[-idx,]
     
     pcrResult$Initdata <- mess
     
@@ -3091,6 +3107,7 @@ server <- function(input, output, session) {
           pcrResult$Initdata[Sample] <- gsub(pattern, "", pcrResult$Initdata[[Sample]], ignore.case = TRUE)
         }
         
+        pcrResult$Initdata[Time] <- factor(x = pcrResult$Initdata[[Time]] , levels = time_patterns)
         
         pcrResult$Initdata[Sample] <- trimws(pcrResult$Initdata[[Sample]])
         updateSelectInput(session, "PCR_time",
@@ -3103,7 +3120,6 @@ server <- function(input, output, session) {
     }
   }
   
-  
   observeEvent(list(input$PCR_value,input$PCR_gene,input$PCR_sample,input$PCR_time),{
     if( !is.null(pcrResult$Initdata) ){
       selectPCRcolumns = c(input$PCR_gene,input$PCR_sample,input$PCR_value,input$PCR_time)
@@ -3111,11 +3127,19 @@ server <- function(input, output, session) {
       
       PCR = pcrResult$Initdata
       colNames = colnames(PCR)
-      output$PCRpreview = renderTable({
+      output$PCRpreview <- renderDT({
         if(length(selectPCRcolumns)!=0 ){
           tmp = PCR[,selectPCRcolumns]
           #colnames(tmp) = c("Gene", "Sample", "Value")[1:length(colnames(tmp))]
-          head(tmp) 
+          datatable(
+            tmp,
+            options = list(
+              scrollY = "200px",   # Vertical scroll area height
+              paging = FALSE,      # Turn off pagination (optional)
+              searching = TRUE     # Enable search box
+            ),
+            rownames = FALSE
+          )
         }
         else
           NULL
@@ -3132,7 +3156,7 @@ server <- function(input, output, session) {
         colnames(tmp) = c("Gene", "Sample", "Value","Time")
         if(all(is.na(tmp$Time)))
           tmp$Time = ""
-        pcrResult$data = tmp
+        pcrResult$data = tmp %>% mutate(Value = as.numeric(Value))
         pcrResult$selectPCRcolumns = selectPCRcolumns
       }else{
         pcrResult$data = NULL
@@ -3151,7 +3175,7 @@ server <- function(input, output, session) {
       
       updateSelectInput(session, "PCRbaseline",
                         choices = Exp )
-      updateCheckboxGroupInput(session,"PCRnorm",
+      updateSelectizeInput(session,"PCRnorm",
                                choices = AllGenes )
       
     }else{
@@ -3178,9 +3202,9 @@ server <- function(input, output, session) {
       pcrResult$PCRnorm -> PCRnorm
       pcrResult$data -> PCR
       
-      NewPCR = PCR %>% 
-        na.omit()%>%
-        group_by(Sample,Gene,Time) %>% mutate(Value = as.numeric(Value)) %>%
+      NewPCR = PCR  %>% mutate(Value = as.numeric(Value)) %>% 
+        na.omit() %>%
+        group_by(Sample,Gene,Time) %>%
         dplyr::summarise(Mean = mean(Value),
                          Sd = sd(Value)) %>%
         ungroup()
@@ -3258,20 +3282,7 @@ server <- function(input, output, session) {
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
-      
-      pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
-        geom_point(aes(shape=Time,color = Sample,
-                       alpha = ifelse(Cut == "Greater", 1, 0.5),
-                       text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene) ), size = 3) +
-        geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
-        facet_wrap(~HousekGene, ncol = 1)+
-        theme_bw()+
-        labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
-        theme(axis.text.x=element_blank(), 
-              axis.ticks.x=element_blank(),
-              legend.position = "bottom")+
-        scale_color_brewer(palette = "Set1") +  
-        scale_alpha_identity()
+
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
@@ -3280,21 +3291,6 @@ server <- function(input, output, session) {
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt <= cut,  "Smaller", "Greater"))
-      
-      pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
-        geom_point(aes(shape=Time,color = Sample, 
-                       alpha = ifelse(Cut == "Smaller", 1, 0.5),
-                       text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
-        geom_hline(yintercept = cut, color = "red", linetype = "dashed")+
-        facet_wrap(~HousekGene, ncol = 1)+
-        theme_bw()+
-        labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
-        #scale_color_manual(values = c( "Greater" = "#56B4E9", "Smaller" = "#0072B2")) +
-        theme(axis.text.x=element_blank(), 
-              axis.ticks.x=element_blank(),
-              legend.position = "bottom")+
-        scale_color_brewer(palette = "Set1") +  
-        scale_alpha_identity()
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter(-DDCT <= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
@@ -3306,28 +3302,35 @@ server <- function(input, output, session) {
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , "Outside interval", "Inside interval"))
-      
-      pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
-        geom_point(aes(shape=Time,color = Sample, 
-                       alpha = ifelse(Cut == "Outside interval", 1, 0.5),
-                       text = paste("Gene:", Gene, "<br>-ddCt:", -ddCt,"<br>Housekeeping Gene: ",HousekGene)), size = 3) +
-        geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")+
-        geom_hline(yintercept = min(cut), color = "red", linetype = "dashed")+
-        facet_wrap(~HousekGene, ncol = 1)+
-        theme_bw()+
-        labs(x="",y= "Log2(Q)", title = "", col = "Cut-Off")+
-        #scale_color_manual(values = c("Outside interval" = "#0072B2", "Inside interval" = "#56B4E9")) +
-        theme(axis.text.x=element_blank(), 
-              axis.ticks.x=element_blank(),
-              legend.position = "bottom")+
-        scale_color_brewer(palette = "Set1") +  
-        scale_alpha_identity()
+
       
       table  =  PCRstep5 %>% 
         dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter( -DDCT >= max(cut) | -DDCT <= min(cut),
                        !is.na(DDCT), Sample != pcrResult$BaselineExp ) %>%
         dplyr::select(-Cut)
+    }
+    
+    pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
+      geom_jitter(aes(shape=Time, color = Sample,
+                      alpha = ifelse(Cut == "Greater", 1, 0.5),
+                      text = paste("Gene:", Gene, "<br>-DDCT:", -ddCt,
+                                   "<br>Housekeeping Gene: ", HousekGene,
+                                   "<br>Sample: ", Sample) ),
+                  height = 0, size = 3) +
+      facet_wrap(~HousekGene, ncol = 1)+
+      theme_bw()+
+      labs(x="",y= "-DDCT", title = "", col = "Sample")+
+      theme(axis.text.x=element_blank(), 
+            axis.ticks.x=element_blank(),
+            legend.position = "bottom")+
+      scale_color_brewer(palette = "Set1") +  
+      guides(alpha = "none") + 
+      scale_alpha_identity()+
+      geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")
+    
+    if(PCR_cut_type == "Both"){
+      pl = pl + geom_hline(yintercept = min(cut), color = "red", linetype = "dashed")
     }
     
     pcrResult$AllGenesFoldChangePlot = pl
@@ -3365,7 +3368,9 @@ server <- function(input, output, session) {
     
   })
   
-  output$FoldchangeAllGenesPlot = plotly::renderPlotly({   plotly::ggplotly(pcrResult$AllGenesFoldChangePlot, tooltip = "text") })
+  output$FoldchangeAllGenesPlot = plotly::renderPlotly({ 
+    plotly::ggplotly(pcrResult$AllGenesFoldChangePlot, tooltip = "text") 
+    })
   
   observe({
     input$Gene_plot -> gene
@@ -3380,51 +3385,58 @@ server <- function(input, output, session) {
           dplyr::filter(HousekGene == Hgene, Gene == gene) %>%
           dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
         
-        if(length(unique(PCRstep5$Time)) >1 )
-        {
+        if(length(unique(PCRstep5$Time)) >1 ){
           plot1 = 
-            ggplot(data = PCRstep5,aes(x = paste(Time," ",Gene), y = ddCt))+
+            ggplot(data = PCRstep5,aes(x = Time, y = ddCt))+
             labs(x = "Time", y = "DDCT")
-          plot2 = ggplot(data = PCRstep5,aes(x = paste(Time," ",Gene), y = Q ))+
+          plot2 = ggplot(data = PCRstep5,aes(x = Time, y = Q ))+
             labs(x = "Time", y = "2^(-DDCT)")
         }else{
           plot1 = 
             ggplot(data = PCRstep5, aes(x = Gene, y = ddCt))+
-            labs(x = "Sample", y = "DDCT")
+            labs(x = "Gene", y = "DDCT")
           plot2 = ggplot(data = PCRstep5, aes(x =Gene, y = Q ))+
-            labs(x = "Sample", y = "2^(-DDCT)")
+            labs(x = "Gene", y = "2^(-DDCT)")
         }
         
-        if (plot_type == "point") {
+        if ("point" %in% plot_type ) {
           if(length(unique(PCRstep5$Time)) >1){
             plot1 <- plot1 + geom_jitter(aes(shape=Time, color = Sample,
-                                            text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+                                            text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,
+                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0, size = 3)
             plot2 <- plot2 + geom_jitter(aes(shape=Time, color = Sample,
-                                            text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+                                            text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,
+                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0, size = 3)
           }
           else{
-            plot1 <- plot1 + geom_point(aes(color = Sample,
-                                            text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene)),size = 3)
-            plot2 <- plot2 + geom_point(aes(color = Sample,
-                                            text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene)),size = 3)
+            plot1 <- plot1 + geom_jitter(aes(color = Sample,
+                                            text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,
+                                                         "<br>Sample: ", Sample)),size = 3)
+            plot2 <- plot2 + geom_jitter(aes(color = Sample,
+                                            text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,
+                                                         "<br>Sample: ", Sample)),size = 3)
           }
 
-        } else if (plot_type == "bar") {
+        } else if( "bar"  %in% plot_type) {
           plot1 <- plot1 + geom_bar(aes(col = Sample,fill = Sample,
-                                        text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
+                                        text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
           plot2 <- plot2 + geom_bar(aes(col = Sample,fill = Sample,
-                                        text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene)), stat = "identity", position = "dodge")
+                                        text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
         }
         
         plot1 = plot1  + 
           facet_wrap(~GeneH, ncol = 1) +
           theme_bw()+
-          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))
+          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))+
+          scale_color_brewer(palette = "Set1") +
+          scale_fill_brewer(palette = "Set1") 
         
         plot2 = plot2 + 
           facet_wrap(~GeneH, ncol = 1) +
           theme_bw()+
-          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))
+          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))+
+          scale_color_brewer(palette = "Set1") +
+          scale_fill_brewer(palette = "Set1") 
         
         FlagsPCR$singleGeneInfo = list(
           Plot= list(Plot1 = plot1,Plot2 = plot2),
@@ -3434,14 +3446,14 @@ server <- function(input, output, session) {
         # Render del plot con Plotly
         if(y_axis=="ddCt"){
           output$SingleGenePlot = plotly::renderPlotly({
-            plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text") %>%
-            plotly::layout(showlegend = FALSE)
+            plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text")
+            #plotly::layout(showlegend = FALSE)
           })
         }
         else{
           output$SingleGenePlot = plotly::renderPlotly({
-          plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text") %>%
-          plotly::layout(showlegend = FALSE)
+          plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text") 
+          #plotly::layout(showlegend = FALSE)
           })
         }
         
@@ -3501,14 +3513,16 @@ server <- function(input, output, session) {
         df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(Sample != input$PCRbaseline)
         
         pcrResult$PointPlot <- ggplot(df) + 
-          geom_point(aes(x = as.factor(Sample), y = -DDCT, col = Sample,shape=Time), size = 3) +  
+          geom_jitter(aes(x = Time, y = -DDCT, col = Sample,shape=Time),height = 0,  size = 3) +  
           facet_wrap(~HousekGene, ncol = 1) +
           theme_bw() +
-          labs(x = "", y = "Log2(Q)", title = "") +
-          theme(
-            axis.text.x = element_blank(), 
-            axis.ticks.x = element_blank()
-          )
+          labs(x = "", y = "-DDCT", title = "")+
+          scale_color_brewer(palette = "Set1") +
+          scale_fill_brewer(palette = "Set1") 
+          # theme(
+          #   axis.text.x = element_blank(), 
+          #   axis.ticks.x = element_blank()
+          # )
         
         output$PointGenePlot <- renderPlot({pcrResult$PointPlot})
         
