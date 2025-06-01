@@ -2795,83 +2795,92 @@ server <- function(input, output, session) {
     FlagsWBquant$BothUploaded
     input$AUC_WB_rows_selected
     input$AUC_WBnorm_rows_selected
-    
     input$IdLaneNorm_RelDens -> IdLaneNorm_RelDens
-    isolate({
-      table =  data.frame(SampleName = "-",
-                          Truncation = "-", 
-                          Truncation_Norm = "-",
-                          AUC = "-", 
-                          RelDens = "-",
-                          AUC_Norm = "-",
-                          RelDens_Norm = "-")
-      tableAdjRel = data.frame(SampleName = "-",
-                               AdjRelDensity = "-")
-      barPlotAdjRelDens = ggplot()
-      if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered) &&
-         IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected"){
-        IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
+    
+      isolate({
         
-        tbWBnormDen = wbquantResult$NormWBanalysis_filtered %>%
-          dplyr::filter(SampleName ==IdLaneNorm_RelDens[1]) %>%
-          dplyr::pull(AUC)
+        if (IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected" && !gsub("^\\d+\\.\\s*", "", IdLaneNorm_RelDens) %in% gsub("^\\d+\\.\\s*", "", wbquantResult$WBanalysis_filtered$SampleName)) {
+          showNotification(
+            HTML("<b style='font-size:16px;'>️Attenzione! Il SampleName selezionato non è presente tra quelli da normalizzare scelti.</b>"),
+            type = "warning"
+          )
+          IdLaneNorm_RelDens = "Nothing selected"
+        }
         
-        tbWBnorm = wbquantResult$NormWBanalysis_filtered %>% 
-          dplyr::rename(AUC_Norm = AUC,
-                        Truncation_Norm = Truncation) %>%
-          dplyr::mutate(RelDens_Norm = AUC_Norm/tbWBnormDen)
-        
-        tbWBDen = wbquantResult$WBanalysis_filtered %>%
-          dplyr::filter(SampleName ==IdLaneNorm_RelDens[1]) %>% 
-          dplyr::pull(AUC)
-        
-        tbWB = wbquantResult$WBanalysis_filtered %>%
-          dplyr::mutate(RelDens = AUC/tbWBDen)
-        
-        
-        if(!is.null(tbWBnorm) & !is.null(tbWB) ){
-          if(!all(table(tbWB$SampleName)==1) && !all(table(tbWBnorm$SampleName)==1) ){
-            showAlert("Error",  "Only one sample name per panel is allowed", "error", 5000)
-            return()
-          }
-          else{ 
-            table = merge(tbWB,tbWBnorm,all =T) %>%
-              dplyr::select(SampleName, Truncation, AUC, RelDens, AUC_Norm, RelDens_Norm) 
-            tableAdjRel = table %>% na.omit() %>% dplyr::mutate(AdjRelDensity = RelDens/RelDens_Norm) %>% dplyr::select(SampleName,AdjRelDensity)
-            barPlotAdjRelDens = tableAdjRel  %>%
-              ggplot() +
-              geom_bar(aes(x = SampleName,
-                           y = AdjRelDensity,
-                           fill = SampleName ),
-                       stat = "identity" ) +
-              theme_bw()
+        table =  data.frame(SampleName = "-",
+                            Truncation = "-", 
+                            Truncation_Norm = "-",
+                            AUC = "-", 
+                            RelDens = "-",
+                            AUC_Norm = "-",
+                            RelDens_Norm = "-")
+        tableAdjRel = data.frame(SampleName = "-",
+                                 AdjRelDensity = "-")
+        barPlotAdjRelDens = ggplot()
+        if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered) && IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected"){
+          IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
+          
+          tbWBnormDen = wbquantResult$NormWBanalysis_filtered %>%
+            dplyr::filter(SampleName ==IdLaneNorm_RelDens[1]) %>%
+            dplyr::pull(AUC)
+          
+          tbWBnorm = wbquantResult$NormWBanalysis_filtered %>% 
+            dplyr::rename(AUC_Norm = AUC,
+                          Truncation_Norm = Truncation) %>%
+            dplyr::mutate(RelDens_Norm = AUC_Norm/tbWBnormDen)
+          
+          IdLaneNorm_RelDens = gsub("^\\d+\\.\\s*", "", IdLaneNorm_RelDens)
+          tbWBDen <- wbquantResult$WBanalysis_filtered %>%
+            dplyr::filter(gsub("^\\d+\\.\\s*", "", SampleName) == IdLaneNorm_RelDens[1]) %>%
+            dplyr::pull(AUC)
+          
+          tbWB = wbquantResult$WBanalysis_filtered %>%
+            dplyr::mutate(RelDens = AUC/tbWBDen)
+          
+          
+          if(!is.null(tbWBnorm) & !is.null(tbWB) ){
+            if(!all(table(tbWB$SampleName)==1) && !all(table(tbWBnorm$SampleName)==1) ){
+              showAlert("Error",  "Only one sample name per panel is allowed", "error", 5000)
+              return()
+            }
+            else{ 
+              table = merge(tbWB,tbWBnorm,all =T) %>%
+                dplyr::select(SampleName, Truncation, AUC, RelDens, AUC_Norm, RelDens_Norm) 
+              tableAdjRel = table %>% na.omit() %>% dplyr::mutate(AdjRelDensity = RelDens/RelDens_Norm) %>% dplyr::select(SampleName,AdjRelDensity)
+              barPlotAdjRelDens = tableAdjRel  %>%
+                ggplot() +
+                geom_bar(aes(x = SampleName,
+                             y = AdjRelDensity,
+                             fill = SampleName ),
+                         stat = "identity" ) +
+                theme_bw()
+            }
           }
         }
-      }
-      
-      wbquantResult$RelDensitiy = table
-      wbquantResult$AdjRelDensity = tableAdjRel
-      
-      output$AUC_RelDens <- renderDT(
-        table,
-        filter = 'top',
-        server = FALSE,
-        options = list(lengthChange = FALSE, autoWidth = TRUE),
-        rownames= FALSE
-      )
-      
-      output$AUC_AdjRelDens <- renderDT(
-        tableAdjRel ,
-        server = FALSE,
-        options = list(lengthChange = FALSE, autoWidth = TRUE),
-        rownames= FALSE
-      )
-      output$plot_AdjRelDens <- renderPlot({
-        barPlotAdjRelDens
+        
+        wbquantResult$RelDensitiy = table
+        wbquantResult$AdjRelDensity = tableAdjRel
+        
+        output$AUC_RelDens <- renderDT(
+          table,
+          filter = 'top',
+          server = FALSE,
+          options = list(lengthChange = FALSE, autoWidth = TRUE),
+          rownames= FALSE
+        )
+        
+        output$AUC_AdjRelDens <- renderDT(
+          tableAdjRel ,
+          server = FALSE,
+          options = list(lengthChange = FALSE, autoWidth = TRUE),
+          rownames= FALSE
+        )
+        output$plot_AdjRelDens <- renderPlot({
+          barPlotAdjRelDens
+        })
+        
+        wbquantResult$AdjRelDensityPlot <- barPlotAdjRelDens
       })
-      
-      wbquantResult$AdjRelDensityPlot <- barPlotAdjRelDens
-    })
   })
   
   
