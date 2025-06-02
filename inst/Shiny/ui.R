@@ -29,6 +29,7 @@ library(xml2)
 library(visNetwork)
 library(shinyFiles)  # Load shinyFiles package
 library(colourpicker)
+library(ggcyto)
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
@@ -116,9 +117,9 @@ ui <- dashboardPage(
                                   menuSubItem("Upload data", tabName = "uploadIF"),
                                   menuSubItem("Quantification", tabName = "tablesIF")),
                          menuItem('Flow Cytometry analysis', tabName = 'facs',
-                                  #menuItem("Raw data", tabName = "RawFACS",
-                                  #         menuSubItem("Uppload data", tabName = "uploadRawFACS"),
-                                  #         menuSubItem("Raw data", tabName = "plotRawFACS")),
+                                  menuItem("Raw data", tabName = "RawFACS",
+                                           menuSubItem("Upload data", tabName = "uploadRawFACS"),
+                                           menuSubItem("Raw data", tabName = "plotRawFACS")),
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
                                   menuSubItem("Hierarchical gating", tabName = "tablesFACS"),
                                   menuSubItem("Statistics", tabName = "statFACS")) 
@@ -1620,10 +1621,10 @@ ui <- dashboardPage(
               fluidRow(
                 tags$head(
                   tags$style(HTML("
-                      #rawFACSmatrix { 
-                        float: center;
-                      }
-                    "))
+                #rawFACSmatrix { 
+                  float: center;
+                }
+              "))
                 ),
                 column(12, 
                        tableOutput("rawFACSmatrix")          
@@ -1647,6 +1648,42 @@ ui <- dashboardPage(
                   fluidRow(
                     plotOutput("facs_ChannelscatterPlot"),
                     plotOutput("facs_autoPlot",height = "800px")
+                  )
+              ),
+              
+              # Nuova sezione per la selezione gerarchica
+              box(width = 12, title = "Selezione Gerarchica Interattiva", status = "primary", solidHeader = TRUE,
+                  fluidRow(
+                    column(4,
+                           selectInput("facs_sampleSelector", 
+                                       "Seleziona Campione (Name):",
+                                       choices = character(0),
+                                       selected = NULL)
+                    ),
+                    column(4,
+                           selectInput("facs_hierarchySelector", 
+                                       "Livello Gerarchico:",
+                                       choices = character(0),
+                                       selected = NULL)
+                    ),
+                    column(4,
+                           br(),
+                           actionButton("facs_openSelectionModal", 
+                                        "Apri Selezione Interattiva", 
+                                        class = "btn-info",
+                                        icon = icon("mouse-pointer"),
+                                        style = "width: 100%;")
+                    )
+                  ),
+                  
+                  # Pannello informativo delle selezioni
+                  conditionalPanel(
+                    condition = "output.facs_hasSelections",
+                    hr(),
+                    h4("Selezioni Create:", style = "color: #337ab7;"),
+                    div(style = "background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 10px;",
+                        verbatimTextOutput("facs_selectionsInfo")
+                    )
                   )
               )
       ),

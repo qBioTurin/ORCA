@@ -5847,7 +5847,9 @@ server <- function(input, output, session) {
   
   ### End CITOXICITY analysis ####
   
+  
   #### RAW FACS analysis ####
+  
   rawfacsResult = reactiveValues(
     Initdata= NULL
   )
@@ -5860,9 +5862,16 @@ server <- function(input, output, session) {
     firsflag= NULL
   )
   
+  # Reactive values per la gestione delle selezioni gerarchiche
+  facsSelections = reactiveValues(
+    selections = list(), 
+    currentPlot = NULL   
+  )
+  
   rawFACSresultListen <- reactive({
     reactiveValuesToList(rawfacsResult)
   })
+  
   observeEvent(rawFACSresultListen(), {
     DataAnalysisModule$rawfacsResult = reactiveValuesToList(rawfacsResult)
     DataAnalysisModule$rawfacsResult$Flags = reactiveValuesToList(rawFlagsFACS)
@@ -5910,7 +5919,6 @@ server <- function(input, output, session) {
       
       rawfacsResult$Initdata <- data <- mess
       
-      # data mangement
       fileNames = sampleNames(data)
       
       medianTable = fsApply(data, each_col, median)
@@ -5920,8 +5928,18 @@ server <- function(input, output, session) {
       updateSelectInput(session, "facs_xChannel", choices = channels, selected = channels[1])
       updateSelectInput(session, "facs_yChannel", choices = channels, selected = channels[2])
       
+      updateSelectInput(session, "facs_sampleSelector", 
+                        choices = fileNames,
+                        selected = fileNames[1])
+      updateSelectInput(session, "facs_hierarchySelector", 
+                        choices = character(0),
+                        selected = NULL)
+      
+      facsSelections$selections <- list()  
+      facsSelections$currentPlot <- NULL  
+      
       removeModal()
-      showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
+      showAlert("Success", "The FCS file has been uploaded with success", "success", 2000)
       
       output$rawFACSmatrix = renderTable({
         medianTable
@@ -5930,7 +5948,25 @@ server <- function(input, output, session) {
     }
   }
   
-  # Generate scatter plot when the plot button is clicked
+  # Observer per aggiornare il selettore gerarchico quando cambia il campione
+  observeEvent(input$facs_sampleSelector, {
+    req(input$facs_sampleSelector)
+    
+    selectedSample <- input$facs_sampleSelector
+    
+    # Trova tutte le selezioni disponibili per il campione selezionato
+    availableSelections <- character(0)
+    
+    if(!is.null(facsSelections$selections[[selectedSample]])) {
+      availableSelections <- names(facsSelections$selections[[selectedSample]])
+    }
+  
+    updateSelectInput(session, "facs_hierarchySelector", 
+                      choices = availableSelections,
+                      selected = NULL)
+  })
+  
+
   observeEvent(input$facs_plotChannelButton, {
     req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel)
     
@@ -5948,7 +5984,6 @@ server <- function(input, output, session) {
     channelx = input$facs_xChannel
     channely = input$facs_yChannel
     
-    # Create scatter plot using ggplot2
     output$facs_ChannelscatterPlot <- renderPlot({
       ggplot(expr, aes(x = !!sym(channelx),  y = !!sym(channely) )) +
         geom_point(alpha = 0.5, color = "blue") +
@@ -5959,8 +5994,200 @@ server <- function(input, output, session) {
     output$facs_autoPlot <- renderPlot({
       ggcyto::autoplot(data, channelx,channely)
     })
-    
   })
+  
+  # Gestione del bottone per aprire il modal di selezione
+  observeEvent(input$facs_openSelectionModal, {
+    req(input$facs_sampleSelector)
+    
+    selectedSample <- input$facs_sampleSelector
+    hierarchyLevel <- input$facs_hierarchySelector
+    
+    if(is.null(hierarchyLevel) || hierarchyLevel == "") {
+      plotTitle <- paste("Sample:", selectedSample)
+    } else {
+      plotTitle <- paste("Selection:", hierarchyLevel, "- Sample:", selectedSample)
+    }
+    
+    showModal(modalDialog(
+      title = plotTitle,
+      size = "l",
+      easyClose = TRUE,
+      footer = tagList(
+        div(style = "display: flex; align-items: center; gap: 10px;",
+            textInput("facs_selectionName", "Nome della nuova selezione:", 
+                      value = "", width = "300px"),
+            actionButton("facs_confirmSelection", "Conferma Selezione", 
+                         class = "btn-primary"),
+            modalButton("Annulla")
+        )
+      ),
+      fluidRow(
+        column(12,
+               div(style = "text-align: center; margin-bottom: 10px;",
+                   strong("Trascina il mouse sul plot per selezionare un'area")
+               ),
+               plotOutput("facs_modalPlot",
+                          brush = "facs_plot_brush",
+                          height = "500px")
+        )
+      )
+    ))
+    
+    # Renderizza il plot nel modal
+    output$facs_modalPlot <- renderPlot({
+      req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel, input$facs_sampleSelector)
+      
+      selectedSample <- input$facs_sampleSelector
+      hierarchyLevel <- input$facs_hierarchySelector
+      
+      # Determino da quale dataset partire
+      data <- NULL
+      if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0) {
+        data <- rawfacsResult$Initdata
+      } else {
+        if(!is.null(facsSelections$selections[[selectedSample]]) && !is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) {
+          data <- facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data
+        } else {
+          data <- rawfacsResult$Initdata
+        }
+      }
+      
+      channelx <- input$facs_xChannel
+      channely <- input$facs_yChannel
+      
+        sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
+        sample_expr$Name <- selectedSample
+        
+        ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
+          geom_point(alpha = 0.5, color = "blue", size = 0.8) +
+          labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
+          theme_minimal() +
+          theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
+    })
+  })
+  
+  # Conferma la selezione e crea una nuova entry nella gerarchia
+  observeEvent(input$facs_confirmSelection, {
+    req(input$facs_selectionName, input$facs_plot_brush, input$facs_sampleSelector)
+    
+    brush <- input$facs_plot_brush
+    selectionName <- input$facs_selectionName
+    selectedSample <- input$facs_sampleSelector
+    
+    if(selectionName == "" || (!is.null(facsSelections$selections[[selectedSample]]) && selectionName %in% names(facsSelections$selections[[selectedSample]]))) {
+      showAlert("Error", "Nome della selezione non valido o già esistente per questo campione", "error", 3000)
+      return()
+    }
+    
+    hierarchyLevel <- input$facs_hierarchySelector
+    currentData <- NULL
+    
+    if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0) {
+      currentData <- rawfacsResult$Initdata
+    } else {
+      if(!is.null(facsSelections$selections[[selectedSample]]) && !is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) {
+        currentData <- facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data
+      } else {
+        currentData <- rawfacsResult$Initdata
+      }
+    }
+    
+    channelx <- input$facs_xChannel
+    channely <- input$facs_yChannel
+    
+    filteredData <- filterFACSDataBySample(currentData, brush, channelx, channely, selectedSample)
+    
+    if(is.null(filteredData)) {
+      showAlert("Error", "Nessun dato nella selezione effettuata", "error", 3000)
+      return()
+    }
+    
+    if(is.null(facsSelections$selections[[selectedSample]])) {
+      facsSelections$selections[[selectedSample]] <- list()
+    }
+    
+    facsSelections$selections[[selectedSample]][[selectionName]] <- list(
+      data = filteredData,
+      parent = if(is.null(hierarchyLevel) || hierarchyLevel == "") selectedSample else hierarchyLevel,
+      brush = brush,
+      channels = c(channelx, channely),
+      sample = selectedSample
+    )
+    
+    availableSelections <- names(facsSelections$selections[[selectedSample]])
+    updateSelectInput(session, "facs_hierarchySelector", 
+                      choices = availableSelections,
+                      selected = selectionName)
+    
+    removeModal()
+    showAlert("Success", paste("Selezione", selectionName, "creata con successo per il campione", selectedSample), "success", 2000)
+  })
+  
+  # Output per verificare se ci sono selezioni
+  output$facs_hasSelections <- reactive({
+    length(facsSelections$selections) > 0
+  })
+  outputOptions(output, "facs_hasSelections", suspendWhenHidden = FALSE)
+  
+  # Output informativo sulle selezioni create
+  output$facs_selectionsInfo <- renderText({
+    if(length(facsSelections$selections) == 0) {
+      return("Nessuna selezione creata")
+    }
+    
+    info <- character(0)
+    for(sampleName in names(facsSelections$selections)) {
+      sampleSelections <- facsSelections$selections[[sampleName]]
+      for(selName in names(sampleSelections)) {
+        sel <- sampleSelections[[selName]]
+        parent <- sel$parent
+        info <- c(info, paste0("• ", sampleName, " - ", selName, " (da: ", parent, ")"))
+      }
+    }
+    
+    paste(info, collapse = "\n")
+  })
+  
+  # Filtra i dati basandosi sulla selezione del brush per il campione specifico
+  filterFACSDataBySample <- function(data, brush, channelx, channely, selectedSample) {
+    tryCatch({
+      filtered_frames <- list()
+      
+      if(!selectedSample %in% sampleNames(data)) {
+        return(NULL)
+      }
+      
+      frame <- data@frames[[selectedSample]]
+      expr_data <- exprs(frame)
+      
+      mask <- expr_data[, channelx] >= brush$xmin & 
+        expr_data[, channelx] <= brush$xmax & 
+        expr_data[, channely] >= brush$ymin & 
+        expr_data[, channely] <= brush$ymax
+      
+      # Crea il nuovo frame filtrato
+      filtered_expr <- expr_data[mask, , drop = FALSE]
+      
+      if(nrow(filtered_expr) > 0) {
+        filtered_frame <- flowCore::flowFrame(
+          exprs = filtered_expr,
+          parameters = parameters(frame),
+          description = description(frame)
+        )
+        
+        filtered_frames[[selectedSample]] <- filtered_frame
+        filtered_flowset <- flowCore::flowSet(filtered_frames)
+        
+        return(filtered_flowset)
+      } else {
+        return(NULL)
+      }
+    }, error = function(e) {
+      print(paste("Errore nel filtraggio:", e$message))
+      return(NULL)
+    })
+  }
   
   #### END RAW FACS analysis ####
   
@@ -7181,7 +7408,8 @@ server <- function(input, output, session) {
                                                      FlagCYTOTOX = F,
                                                      FlagENDOC = F,
                                                      FlagBCA = F,
-                                                     FlagFACS = F)
+                                                     FlagFACS = F,
+                                                     FlagIF = F)
   UploadDataAnalysisModule = reactiveValues(FlagALL = F,
                                             FlagUpdate = F,
                                             FlagWB = F,
@@ -7191,7 +7419,8 @@ server <- function(input, output, session) {
                                             FlagCYTOTOX = F,
                                             FlagENDOC = F,
                                             FlagBCA = F,
-                                            FlagFACS = F)
+                                            FlagFACS = F,
+                                            FlagIF = F)
   
   # general upload in the app
   observeEvent(input$loadAnalysis_Button,{
@@ -7260,7 +7489,7 @@ server <- function(input, output, session) {
     UploadDataAnalysisModule$FlagUpdate = T
     manageSpinner(FALSE)
     showAlert("Success", "The RDs file has been uploaded  with success." , "success", 5000)
-    
+
   })
   
   observeEvent(UploadDataAnalysisModule$FlagUpdate,{
