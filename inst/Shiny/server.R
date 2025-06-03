@@ -2795,9 +2795,18 @@ server <- function(input, output, session) {
     FlagsWBquant$BothUploaded
     input$AUC_WB_rows_selected
     input$AUC_WBnorm_rows_selected
-    
     input$IdLaneNorm_RelDens -> IdLaneNorm_RelDens
+    
     isolate({
+      
+      if (IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected" && !gsub("^\\d+\\.\\s*", "", IdLaneNorm_RelDens) %in% gsub("^\\d+\\.\\s*", "", wbquantResult$WBanalysis_filtered$SampleName)) {
+        showNotification(
+          HTML("<b style='font-size:16px;'>Error! The selected SampleName is not among those chosen to normalize.</b>"),
+          type = "warning"
+        )
+        IdLaneNorm_RelDens = "Nothing selected"
+      }
+      
       table =  data.frame(SampleName = "-",
                           Truncation = "-", 
                           Truncation_Norm = "-",
@@ -2808,8 +2817,7 @@ server <- function(input, output, session) {
       tableAdjRel = data.frame(SampleName = "-",
                                AdjRelDensity = "-")
       barPlotAdjRelDens = ggplot()
-      if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered) &&
-         IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected"){
+      if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered) && IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected"){
         IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
         
         tbWBnormDen = wbquantResult$NormWBanalysis_filtered %>%
@@ -2821,8 +2829,9 @@ server <- function(input, output, session) {
                         Truncation_Norm = Truncation) %>%
           dplyr::mutate(RelDens_Norm = AUC_Norm/tbWBnormDen)
         
-        tbWBDen = wbquantResult$WBanalysis_filtered %>%
-          dplyr::filter(SampleName ==IdLaneNorm_RelDens[1]) %>% 
+        IdLaneNorm_RelDens = gsub("^\\d+\\.\\s*", "", IdLaneNorm_RelDens)
+        tbWBDen <- wbquantResult$WBanalysis_filtered %>%
+          dplyr::filter(gsub("^\\d+\\.\\s*", "", SampleName) == IdLaneNorm_RelDens[1]) %>%
           dplyr::pull(AUC)
         
         tbWB = wbquantResult$WBanalysis_filtered %>%
@@ -7172,7 +7181,8 @@ server <- function(input, output, session) {
                                                      FlagCYTOTOX = F,
                                                      FlagENDOC = F,
                                                      FlagBCA = F,
-                                                     FlagFACS = F)
+                                                     FlagFACS = F,
+                                                     FlagIF = F)
   UploadDataAnalysisModule = reactiveValues(FlagALL = F,
                                             FlagUpdate = F,
                                             FlagWB = F,
@@ -7182,7 +7192,8 @@ server <- function(input, output, session) {
                                             FlagCYTOTOX = F,
                                             FlagENDOC = F,
                                             FlagBCA = F,
-                                            FlagFACS = F)
+                                            FlagFACS = F,
+                                            FlagIF = F)
   
   # general upload in the app
   observeEvent(input$loadAnalysis_Button,{
