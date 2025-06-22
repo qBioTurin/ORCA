@@ -1575,6 +1575,8 @@ ui <- dashboardPage(
                     collapsible = TRUE,
                     collapsed = TRUE,
                     plotOutput("CYTOTOXplots"),
+                    actionButton("Customize_plot_CYTOTOX", "Customize or Download Plot"),
+                    selectInput("CYTOTOX_plot_customize_selection", "Plot selection", choices = c("Plot 1", "Plot 2")),
                     DTOutput("CYTOTOXtables"),
                     fluidRow(
                       column(width = 2, offset = 9,

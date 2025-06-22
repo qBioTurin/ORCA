@@ -2157,11 +2157,11 @@ generateLayerParameters <- function(plot) {
     
     if(!is.null(aes_mapping$colour)){
       colour_mapping<-rlang::quo_name(aes_mapping$colour)
-      data<-data %>% mutate(!!colour_mapping := plot_build$plot$data[[colour_mapping]])
+      data<-data %>% dplyr::mutate(!!colour_mapping := plot_build$plot$data[[colour_mapping]])
     }
     if(!is.null(aes_mapping$shape)){
       shape_mapping<-rlang::quo_name(aes_mapping$shape)
-      data<-data %>% mutate(!!shape_mapping := plot_build$plot$data[[shape_mapping]])
+      data<-data %>% dplyr::mutate(!!shape_mapping := plot_build$plot$data[[shape_mapping]])
     }
     
     #Function to extract specific aesthetic values
