@@ -889,6 +889,14 @@ ui <- dashboardPage(
                               label = "Column name where searching the timings:",
                               choices = ""
                             )
+                          ),
+                          column(
+                            width = 6,
+                            textInput(
+                              inputId = "PCR_sample_colname_new",
+                              label = "Column name for saving the splitted sample:",
+                              placeholder = "e.g. Sample"
+                            )
                           )
                         ),
                         actionButton(
