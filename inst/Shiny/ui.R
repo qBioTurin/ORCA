@@ -461,11 +461,11 @@ ui <- dashboardPage(
                     # Inputs for model generation function
                     fluidRow(
                       column(4,
-                           fileInput("transFileInput", "Upload Transitions File (.cpp)", accept = ".cpp")
-                    ),
-                    column(2,offset = 6,
-                           actionButton("generateModel", "Generate the model")
-                    )
+                             fileInput("transFileInput", "Upload Transitions File (.cpp)", accept = ".cpp")
+                      ),
+                      column(2,offset = 6,
+                             actionButton("generateModel", "Generate the model")
+                      )
                     ),
                     fluidRow(
                       column(10,offset = 1,verbatimTextOutput("EPIMODgenerationOutput"))
@@ -516,16 +516,16 @@ ui <- dashboardPage(
                     )
                 )
               ),
-      fluidRow(
-        box(width = 12, title = "Visualisations", collapsible = T,
-            fluidRow(
-              column(10,offset = 1,selectInput("epimod_placesPlot","Places dynamics to show:", choices = "" , multiple = TRUE))
-            ),
-            fluidRow(
-              plotOutput("epimod_tracePlot")
-            )
-        )
-      )
+              fluidRow(
+                box(width = 12, title = "Visualisations", collapsible = T,
+                    fluidRow(
+                      column(10,offset = 1,selectInput("epimod_placesPlot","Places dynamics to show:", choices = "" , multiple = TRUE))
+                    ),
+                    fluidRow(
+                      plotOutput("epimod_tracePlot")
+                    )
+                )
+              )
       ),
       ## END epimod ####
       ## END model integration: GreatMOD ####
@@ -800,104 +800,104 @@ ui <- dashboardPage(
                   width = 12,
                   title = "Experimental Setup:",
                   fluidRow(
-                  column(
-                    width = 6,
-                    h2("Select the columns to assign"),
-                    fluidRow(
-                      column(
-                        width = 3,
-                        selectInput(
-                          inputId = "PCR_gene",
-                          label = "Gene names:",
-                          choices = ""
-                        )
-                      ),
-                      column(
-                        width = 3,
-                        selectInput(
-                          inputId = "PCR_sample",
-                          label = "Sample names:",
-                          choices = ""
-                        )
-                      ),
-                      column(
-                        width = 3,
-                        selectInput(
-                          inputId = "PCR_value",
-                          label = "Values:",
-                          choices = ""
-                        )
-                      ),
-                      column(
-                        width = 3,
-                        selectInput(
-                          inputId = "PCR_time",
-                          label = "Times:",
-                          choices = ""
-                        )
-                      )
-                    ),
-                    DTOutput("PCRpreview")
-                  ),
-                  column(
-                    width = 3,
-                    selectizeInput(
-                      inputId = "PCRnorm", multiple = T, choices = "",
-                      label = "Select housekeeping genes:")
-                  ),
-                  column(
-                    width = 3,
-                    selectInput(
-                      inputId = "PCRbaseline",
-                      label = "Select baseline sample:",
-                      choices = "ID"
-                    )
-                  )
-                  ),
-                  br(),
-                  fluidRow(
-                  column(
-                    width = 12,
-                    actionButton("toggleTimePatterns", "Define Time Patterns", icon = icon("caret-down")),
-                    hidden(
-                      div(
-                        id = "timePatternsSection",
+                    box(width = 8,
+                        h2("Select the columns to assign"),
                         fluidRow(
                           column(
-                            width = 6,
-                            textInput(
-                              inputId = "PCR_time_patterns",
-                              label = "Enter time patterns (comma-separated):",
-                              placeholder = "e.g. 1T, 3T, 48H, 5DAYS"
+                            width = 3,
+                            selectInput(
+                              inputId = "PCR_gene",
+                              label = "Gene names:",
+                              choices = ""
                             )
                           ),
                           column(
-                            width = 6,
-                            textInput(
-                              inputId = "PCR_time_colname",
-                              label = "Column name for saving the timings:",
-                              placeholder = "e.g. Time"
-                            )
-                          )
-                        ),
-                        fluidRow(
-                          column(
-                            width = 6,
+                            width = 3,
                             selectInput(
-                              inputId = "PCR_sample_colname",
-                              label = "Column name where searching the timings:",
+                              inputId = "PCR_sample",
+                              label = "Sample names:",
+                              choices = ""
+                            )
+                          ),
+                          column(
+                            width = 3,
+                            selectInput(
+                              inputId = "PCR_value",
+                              label = "Values:",
+                              choices = ""
+                            )
+                          ),
+                          column(
+                            width = 3,
+                            selectInput(
+                              inputId = "PCR_time",
+                              label = "Times:",
                               choices = ""
                             )
                           )
                         ),
-                        actionButton(
-                          inputId = "ApplyTimePatterns",
-                          label = "Apply Time Extraction",
-                          icon = shiny::icon("check")
+                        DTOutput("PCRpreview")
+                    ),
+                    box(width = 4,
+                        column(
+                          width = 6,
+                          selectizeInput(
+                            inputId = "PCRnorm", multiple = T, choices = "",
+                            label = "Select housekeeping genes:")
+                        ),
+                        column(
+                          width = 6,
+                          selectInput(
+                            inputId = "PCRbaseline",label = "Select baseline:",
+                            choices = "ID"
+                          )
+                        ),
+                    )
+                  ),
+                  br(),
+                  fluidRow(
+                    column(
+                      width = 12,
+                      actionButton("toggleTimePatterns", "Define Time Patterns", icon = icon("caret-down")),
+                      hidden(
+                        div(
+                          id = "timePatternsSection",
+                          fluidRow(
+                            column(
+                              width = 6,
+                              textInput(
+                                inputId = "PCR_time_patterns",
+                                label = "Enter time patterns (comma-separated):",
+                                placeholder = "e.g. 1T, 3T, 48H, 5DAYS"
+                              )
+                            ),
+                            column(
+                              width = 6,
+                              textInput(
+                                inputId = "PCR_time_colname",
+                                label = "Column name for saving the timings:",
+                                placeholder = "e.g. Time"
+                              )
+                            )
+                          ),
+                          fluidRow(
+                            column(
+                              width = 6,
+                              selectInput(
+                                inputId = "PCR_sample_colname",
+                                label = "Column name where searching the timings:",
+                                choices = ""
+                              )
+                            )
+                          ),
+                          actionButton(
+                            inputId = "ApplyTimePatterns",
+                            label = "Apply Time Extraction",
+                            icon = shiny::icon("check")
+                          )
                         )
                       )
                     )
-                  )
                   ),
                   column(
                     width = 3,
@@ -909,6 +909,35 @@ ui <- dashboardPage(
                       icon = shiny::icon("forward")
                     )
                   )
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "Help: RT-qPCR Q Value Calculation",
+                  status = "info",
+                  solidHeader = TRUE,
+                  collapsible = TRUE,
+                  collapsed = TRUE,
+                  width = 12,
+                  HTML("
+        <h4>Standard ΔΔCt Method:</h4>
+        <ol>
+          <li><b>ΔCt_gene</b> = mean(Ct<sub>gene</sub>) − mean(Ct<sub>housekeeping</sub>) </li>
+          <li><b>ΔCt_baseline</b> = mean(Ct<sub>baseline</sub>) − mean(Ct<sub>housekeeping</sub>) </li>
+          <li><b>ΔΔCt</b> = ΔCt<sub>gene</sub> − ΔCt<sub>baseline</sub></li>
+          <li><b>Q</b> = 2<sup>−ΔΔCt</sup></li>
+        </ol>
+        This normalizes gene expression to a housekeeping gene, then compares it to a control condition.<br><br>
+
+        <h4>Time-Dependent Analysis:</h4>
+        <ol>
+          <li>Perform the same ΔCt calculation at each time point</li>
+          <li>Choose a baseline time (e.g., <b>0h</b>): ΔCt<sub>ref</sub> = mean(Ct<sub>gene,0h</sub>) − mean(Ct<sub>housekeeping,0h</sub>)</li>
+          <li><b>ΔΔCt<sub>t</sub></b> = ΔCt<sub>t</sub> − ΔCt<sub>ref</sub></li>
+          <li><b>Q<sub>t</sub></b> = 2<sup>−ΔΔCt<sub>t</sub></sup></li>
+        </ol>
+        This shows how expression changes over time <b>per sample</b> relative to the starting point (e.g., 0h).<br><br>
+        ")
                 )
               )
       ),
@@ -974,7 +1003,7 @@ ui <- dashboardPage(
                     ),
                     column(
                       width = 2,
-                      radioButtons("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "bar")
+                      checkboxGroupInput("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "bar")
                     ),
                     column(
                       width = 2,
@@ -982,7 +1011,8 @@ ui <- dashboardPage(
                     ),
                     fluidRow(
                       column(width = 12,
-                             plotly::plotlyOutput("SingleGenePlot")
+                             #plotly::plotlyOutput("SingleGenePlot")
+                             plotOutput("SingleGenePlot")
                       )
                     ),
                     fluidRow(
@@ -1010,17 +1040,20 @@ ui <- dashboardPage(
                     h3("Plot with all the saved genes:"),
                     fluidRow(
                       column(width = 12,
-                             plotOutput("PointGenePlot"),
-                             #actionButton("Select_customize_plot_PCR","Select the plot to customize"),
-                             actionButton("Customize_PCR_Button_1", "Customize or Download Plot")
+                             plotOutput("PointGenePlot")
                       )
                     ),
+                    fluidRow(
+                      column(width = 3, offset = 9,
+                             actionButton("Customize_PCR_Button_1", "Customize or Download Plot") )
+                    ),
                     br(),br(),
+                    h3("Plots of the saved genes:"),
                     fluidRow(
                       column(width = 12,
                              fluidRow(
                                uiOutput("PCRplot")
-                               ),
+                             ),
                              h3("Select the plot to customize:"),
                              fluidRow(
                                column(
@@ -1043,12 +1076,13 @@ ui <- dashboardPage(
                                ),
                                column(
                                  width = 3,
-                                 actionButton("Customize_PCR_Button_2", "Customize or Download Plot")
+                                 actionButton("Customize_PCR_Button_2", "Customize or Download Plot", style="margin-top:25px;")
                                )
                              )
                       )
                     ), 
                     br(),
+                    h3("Tables of the saved genes:"),
                     fluidRow(
                       column(width = 12,
                              uiOutput("PCRtables")
@@ -1896,9 +1930,9 @@ ui <- dashboardPage(
                     ),
                     fluidRow(
                       column(3,offset = 1,
-                        selectizeInput("StatAnalysis",
-                                     label = "Select the analysis:",
-                                     choices = "")
+                             selectizeInput("StatAnalysis",
+                                            label = "Select the analysis:",
+                                            choices = "")
                       ),
                       column(3,
                              conditionalPanel(condition = "input.StatAnalysis == 'PCR'",
