@@ -48,7 +48,7 @@ areColors <- function(x) {
              error = function(e) FALSE)
   })
 }
-resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlanes = NULL, planeSelected = NULL, result, output = NULL, panelData = NULL) {
+resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlanes = NULL, planeSelected = NULL, result, output = NULL, panelData = NULL, session = NULL) {
   switch(type,
          "WB" = {
            flags$ShowTif <- FALSE
@@ -93,6 +93,19 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            result$PointPlot = NULL
            result$CustomGene=NULL
            result$CustomHgene=NULL
+           
+           output$FoldchangeAllGenesPlot <- NULL
+           output$AllGenesTable <- NULL
+           output$SingleGenePlot <- NULL
+           output$SingleGeneTable <- NULL
+           output$PCRtables <- NULL
+           output$PCRplot <- NULL
+           
+           updateSelectizeInput("HousKgene_plot", choices = "", session = session)
+           updateSelectizeInput("Gene_plot", choices = "", session = session)
+           updateSelectizeInput("Select_Customize_Gene_plot", choices = "", session = session)
+           updateSelectizeInput("Select_Customize_HousKgene_plot", choices = "", session = session)
+   
          },
          "ENDOC" = {
            result$Initdata <- NULL
@@ -333,7 +346,7 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       result <- list(data = list(), error = NULL)
       filenames <- filename
       
-       for(filename in filenames){
+      for(filename in filenames){
         if(!isFileUploaded || !file.exists(filename)) {
           return (list(message = "Please, select an Excel file", call = ""))
         } else if(tolower(tools::file_ext(filename)) != "xls" && tolower(tools::file_ext(filename)) != "xlsx") {
@@ -370,7 +383,7 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       }
       
       x = flowCore::read.flowSet(filenames,name.keyword = "$FIL",
-                             transformation = FALSE, truncate_max_range = FALSE)
+                                 transformation = FALSE, truncate_max_range = FALSE)
       flowCore::sampleNames(x) = colname
       
       return(x) 
@@ -509,23 +522,23 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            if(!is.null(PanelStructures$data)){
              
-           addWorksheet(wb, "WBimage and protein bands")
-           plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
-           rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
-           for (i in seq_len(nrow(PanelStructures$data))) {
+             addWorksheet(wb, "WBimage and protein bands")
+             plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
+             rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
+             for (i in seq_len(nrow(PanelStructures$data))) {
                with(PanelStructures$data, {
                  rect(xmin[i], ymin[i], xmax[i], ymax[i], border = "red")
                })
+             }
+             
+             insertPlot(wb = wb, sheet = "WBimage and protein bands",
+                        fileType = "tiff",
+                        units = "in",
+                        dpi = 600)
+             
+             startRow <- 22
+             writeDataTable(wb, PanelStructures$data, sheet = "WBimage and protein bands", startRow = startRow, startCol = 1)
            }
-           
-           insertPlot(wb = wb, sheet = "WBimage and protein bands",
-                      fileType = "tiff",
-                      units = "in",
-                      dpi = 600)
-           
-           startRow <- 22
-           writeDataTable(wb, PanelStructures$data, sheet = "WBimage and protein bands", startRow = startRow, startCol = 1)
-          }
            
            addWorksheet(wb, "Plot")
            print(ResultList[["Plots"]])
@@ -572,14 +585,14 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              print(
                ResultList[["AdjRelDensityPlot"]]
              )
-               # ResultList[["AdjRelDensity"]]   %>%
-               #   ggplot() +
-               #   geom_bar(aes(x = SampleName,
-               #                y = AdjRelDensity,
-               #                fill = SampleName ),
-               #            stat = "identity" ) +
-               #   theme_bw()
-               # 
+             # ResultList[["AdjRelDensity"]]   %>%
+             #   ggplot() +
+             #   geom_bar(aes(x = SampleName,
+             #                y = AdjRelDensity,
+             #                fill = SampleName ),
+             #            stat = "identity" ) +
+             #   theme_bw()
+             # 
              insertPlot(wb, sheet = "Barplot AdjRelDensity",
                         fileType = "tiff",
                         units = "in",
@@ -982,14 +995,14 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
                
              }
            }
-
+           
            ExpDataTable = Result$TablePlot$x$data
            completeExpDataTable = cbind(Result$Initdata, Result[[grep(x=names(Result), pattern = "cell_COLOR", value = TRUE)]])
            colnames(completeExpDataTable) = colnames(ExpDataTable)
-
+           
            cols.color = grep(x = colnames(ExpDataTable), pattern = "Col", value = TRUE)
            cols.keep = grep(x = colnames(ExpDataTable), pattern = "V", value = TRUE)
-
+           
            Result$TablePlot = datatable(completeExpDataTable,
                                         filter = 'none',
                                         selection = list(mode = 'single', target = 'cell'),
@@ -1012,7 +1025,7 @@ tableExcelColored = function(session, output,Result, FlagsExp, type,inputVal,pre
              formatStyle(cols.keep,
                          cols.color,
                          backgroundColor = styleEqual(names(FlagsExp$EXPcol), FlagsExp$EXPcol))
-
+           
            print("Table and colors updated.")
          }
   )
@@ -1258,7 +1271,7 @@ updateTable <- function(analysis, info, color_code, result, flag, session) {
           if (analysis %in% c("ELISA","IF","BCA","CYTOTOX","ENDOC") ) {
             result[[paste0(analysis, "cell_SN")]][idx["row"], idx["col"]] <- new_value
           } 
-        
+          
           assign(paste0(analysis_lower, "Result"), result, envir = .GlobalEnv)
         })
         
@@ -1529,18 +1542,18 @@ UploadRDs = function(Flag, session, output,
     }
     if(!is.null(DataAnalysisModule$pcrResult$PCRnorm)){
       updateCheckboxGroupInput(session = session,
-                             inputId = "PCRnorm",
-                             selected = unique(DataAnalysisModule$pcrResult$PCRnorm)
+                               inputId = "PCRnorm",
+                               selected = unique(DataAnalysisModule$pcrResult$PCRnorm)
       )
     }
     if(!is.null(DataAnalysisModule$pcrResult$BaselineExp)){
       updateCheckboxGroupInput(session = session,
-                             inputId = "PCRbaseline",
-                             selected = unique(DataAnalysisModule$pcrResult$BaselineExp)
+                               inputId = "PCRbaseline",
+                               selected = unique(DataAnalysisModule$pcrResult$BaselineExp)
       )
     }
     
-
+    
   }
   else if(Flag == "ENDOC"){
     
@@ -1587,10 +1600,10 @@ UploadRDs = function(Flag, session, output,
       baselines =  FlagsExp$BASEselected
       lapply(expToselect[! expToselect %in% baselines],function(i){
         updateSelectInput(session = session,
-                       inputId = paste0("Exp",i),
-                       label = i,
-                       choices = c("",baselines),
-                       selected = Result$MapBaseline$Baseline[Result$MapBaseline$Exp == i])
+                          inputId = paste0("Exp",i),
+                          label = i,
+                          choices = c("",baselines),
+                          selected = Result$MapBaseline$Baseline[Result$MapBaseline$Exp == i])
       })
       # expToselect = FlagsExp$EXPselected
       # baselines =  FlagsExp$BASEselected
@@ -1931,7 +1944,7 @@ UploadRDs = function(Flag, session, output,
                                                                     searching = FALSE,
                                                                     dom = 't' # Only display the table
                                                      ))
-        })
+      })
     }
     
     if(!is.null(Result$IF_expcond)){
@@ -1969,8 +1982,8 @@ testStat.function <- function(data) {
     dplyr::summarise(minN = min(n)) %>% pull(minN)
   
   if(minN < 3) return(NULL) # all the groups must have more than 2 elements
-    
-    shapiro_results <- data %>%
+  
+  shapiro_results <- data %>%
     group_by(data[[1]]) %>%
     dplyr::filter(n() >= 3) %>%
     summarize(
@@ -2016,16 +2029,16 @@ testStat.function <- function(data) {
       
       combo <- combo[combo$Var1 != combo$Var2, ]
       BivTest <- do.call(rbind,
-                          lapply(1:dim(combo)[1], function(x){
-                            sn <- combo[x,]
-                            ttest <- t.test(data[data[,1] == sn$Var1, "Value"],
-                                            data[data[,1] == sn$Var2, "Value"]) 
-                            data.frame(Test = "t-test",
-                                       Condition = paste(sn$Var1, " vs ", sn$Var2), 
-                                       pValue = ttest$p.value,
-                                       conf.int = paste(ttest$conf.int, collapse = ";")
-                            )
-                          })
+                         lapply(1:dim(combo)[1], function(x){
+                           sn <- combo[x,]
+                           ttest <- t.test(data[data[,1] == sn$Var1, "Value"],
+                                           data[data[,1] == sn$Var2, "Value"]) 
+                           data.frame(Test = "t-test",
+                                      Condition = paste(sn$Var1, " vs ", sn$Var2), 
+                                      pValue = ttest$p.value,
+                                      conf.int = paste(ttest$conf.int, collapse = ";")
+                           )
+                         })
       )
     } else if(length(vars) > 2){
       steps <- c(steps, paste("Step ", step_counter, ". groups are more than 2, I will use ANOVA for analysis", "\n"))
@@ -2086,16 +2099,16 @@ testStat.function <- function(data) {
       
       combo <- combo[combo$Var1 != combo$Var2, ]
       BivTest <- do.call(rbind,
-                          lapply(1:dim(combo)[1], function(x){
-                            sn <- combo[x,]
-                            wilcox_test <- wilcox.test(data[data[,1] == sn$Var1, "Value"],
-                                                       data[data[,1] == sn$Var2, "Value"]) 
-                            data.frame(Test = "Wilcoxon",
-                                       Condition = paste(sn$Var1, " vs ", sn$Var2), 
-                                       pValue = wilcox_test$p.value,
-                                       conf.int = paste(wilcox_test$conf.int, collapse = ";")
-                            )
-                          })
+                         lapply(1:dim(combo)[1], function(x){
+                           sn <- combo[x,]
+                           wilcox_test <- wilcox.test(data[data[,1] == sn$Var1, "Value"],
+                                                      data[data[,1] == sn$Var2, "Value"]) 
+                           data.frame(Test = "Wilcoxon",
+                                      Condition = paste(sn$Var1, " vs ", sn$Var2), 
+                                      pValue = wilcox_test$p.value,
+                                      conf.int = paste(wilcox_test$conf.int, collapse = ";")
+                           )
+                         })
       )
     } else if(length(vars) > 2){
       steps <- c(steps, paste("Step ", step_counter, ". groups are more than 2, I will use Kruskal-Wallis for analysis", "\n"))

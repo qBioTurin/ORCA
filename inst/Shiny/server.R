@@ -3048,7 +3048,7 @@ server <- function(input, output, session) {
   observeEvent(input$shinyalert, {
     removeModal()
     if (input$shinyalert && alert$alertContext == "PCR-reset") {  
-      resetPanel("PCR", flags = FlagsPCR, result = pcrResult)
+      resetPanel("PCR", flags = FlagsPCR, result = pcrResult,output = output, session = session)
       loadExcelFilePCR()
     }
   })
@@ -3305,7 +3305,7 @@ server <- function(input, output, session) {
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
-        dplyr::mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
+        dplyr::mutate(Cut = if_else(-ddCt >= cut, 1, 0.5))
 
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
@@ -3314,7 +3314,7 @@ server <- function(input, output, session) {
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
-        dplyr::mutate(Cut = if_else(-ddCt <= cut,  "Smaller", "Greater"))
+        dplyr::mutate(Cut = if_else(-ddCt <= cut,  1, 0.5))
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter(-DDCT <= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
@@ -3325,14 +3325,13 @@ server <- function(input, output, session) {
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
-        dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , "Outside interval", "Inside interval"))
+        dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , 0.5, 1))
 
       
       table  =  PCRstep5 %>% 
         dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter( -DDCT >= max(cut) | -DDCT <= min(cut),
-                       !is.na(DDCT), Sample != pcrResult$BaselineExp ) %>%
-        dplyr::select(-Cut)
+                       !is.na(DDCT), Sample != pcrResult$BaselineExp )
     }
     
     if(input$PCR_time != ""){
@@ -3345,7 +3344,7 @@ server <- function(input, output, session) {
                       )
                     ),aes(x = TimeGene, y = -ddCt)) +
         geom_jitter(aes(shape=Time, color = Sample,
-                        alpha = ifelse(Cut == "Greater", 1, 0.5),
+                        alpha = Cut,
                         text = paste("Gene:", Gene, "<br>-DDCT:", -ddCt,
                                      "<br>Housekeeping Gene: ", HousekGene,
                                      "<br>Sample: ", Sample,
@@ -3364,7 +3363,7 @@ server <- function(input, output, session) {
     }else{
       pl = ggplot(PCRstep5,aes(x = Gene , y = -ddCt)) +
         geom_jitter(aes(color = Sample,
-                        alpha = ifelse(Cut == "Greater", 1, 0.5),
+                        alpha = Cut,
                         text = paste("Gene:", Gene, "<br>-DDCT:", -ddCt,
                                      "<br>Housekeeping Gene: ", HousekGene,
                                      "<br>Sample: ", Sample) ),
@@ -3424,6 +3423,7 @@ server <- function(input, output, session) {
   })
   
   output$FoldchangeAllGenesPlot = plotly::renderPlotly({ 
+    req(pcrResult$AllGenesFoldChangePlot)
     plotly::ggplotly(pcrResult$AllGenesFoldChangePlot, tooltip = "text") 
     })
   
@@ -3471,18 +3471,18 @@ server <- function(input, output, session) {
           if(length(unique(PCRstep5$Time)) >1){
             plot1 <- plot1 + geom_jitter(aes(shape=Time, color = Sample,
                                             text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0, size = 3)
+                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0,width = 0.1, size = 3)
             plot2 <- plot2 + geom_jitter(aes(shape=Time, color = Sample,
                                             text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0, size = 3)
+                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0,width = 0.1, size = 3)
           }
           else{
             plot1 <- plot1 + geom_jitter(aes(color = Sample,
                                             text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample)),height = 0,size = 3)
+                                                         "<br>Sample: ", Sample)),height = 0,width = 0.1, size = 3)
             plot2 <- plot2 + geom_jitter(aes(color = Sample,
                                             text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample)),height = 0,size = 3)
+                                                         "<br>Sample: ", Sample)),height = 0,width = 0.1, size = 3)
           }
 
         } 
