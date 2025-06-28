@@ -888,6 +888,14 @@ ui <- dashboardPage(
                               label = "Column name where searching the timings:",
                               choices = ""
                             )
+                          ),
+                          column(
+                            width = 6,
+                            textInput(
+                              inputId = "PCR_sample_colname_new",
+                              label = "Column name for saving the splitted sample:",
+                              placeholder = "e.g. Sample"
+                            )
                           )
                         ),
                         actionButton(
@@ -955,17 +963,26 @@ ui <- dashboardPage(
                 box(width= 12,
                     title = "Focus on specific genes",
                     column(
-                      width = 3,
+                      width = 2,
                       offset = 1,
                       selectizeInput(
-                        inputId = "Gene_plot",
-                        "Select gene:", 
+                        inputId = "PCR_sample_plot",
+                        "Select Sample:", 
                         choices = c(""),
                         selected = ""
                       )
                     ),
                     column(
-                      width = 3,
+                      width = 2,
+                      selectizeInput(
+                        inputId = "Gene_plot",
+                        "Select gene:", 
+                        choices = c(""),
+                        selected = "All"
+                      )
+                    ),
+                    column(
+                      width = 2,
                       selectizeInput(
                         inputId = "HousKgene_plot",
                         "Select housekeeping gene:", 
