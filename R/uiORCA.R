@@ -834,14 +834,6 @@ ui <- dashboardPage(
                               label = "Times:",
                               choices = ""
                             )
-                          ),
-                          column(
-                            width = 6,
-                            textInput(
-                              inputId = "PCR_sample_colname_new",
-                              label = "Column name for saving the splitted sample:",
-                              placeholder = "e.g. Sample"
-                            )
                           )
                         ),
                         DTOutput("PCRpreview")
@@ -992,26 +984,17 @@ ui <- dashboardPage(
                 box(width= 12,
                     title = "Focus on specific genes",
                     column(
-                      width = 2,
+                      width = 3,
                       offset = 1,
                       selectizeInput(
-                        inputId = "PCR_sample_plot",
-                        "Select Sample:", 
+                        inputId = "Gene_plot",
+                        "Select gene:", 
                         choices = c(""),
                         selected = ""
                       )
                     ),
                     column(
-                      width = 2,
-                      selectizeInput(
-                        inputId = "Gene_plot",
-                        "Select gene:", 
-                        choices = c(""),
-                        selected = "All"
-                      )
-                    ),
-                    column(
-                      width = 2,
+                      width = 3,
                       selectizeInput(
                         inputId = "HousKgene_plot",
                         "Select housekeeping gene:", 

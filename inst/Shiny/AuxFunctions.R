@@ -655,7 +655,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(DDCT == 0)
            
            print(
-             ggplot(df,aes(x = Gene, y = -DDCT)) +
+             ggplot(df,aes(x = Gene, y = -DDCT , col = Sample)) +
                geom_point() +
                facet_wrap(~HousekGene, ncol = 1)+
                theme_bw()+

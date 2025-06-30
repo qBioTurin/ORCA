@@ -3100,8 +3100,12 @@ server <- function(input, output, session) {
   
   applyTimePatterns <- function() {
     req(pcrResult$Initdata)  
-    if(!is.null(input$PCR_time_colname) && input$PCR_time_colname != "" && !is.null(input$PCR_sample_colname) && input$PCR_sample_colname != ""){
+    if(!is.null(input$PCR_time_colname) && input$PCR_time_colname != "" && 
+       !is.null(input$PCR_sample_colname) && input$PCR_sample_colname != "" && 
+       !is.null(input$PCR_sample_colname_new) && input$PCR_sample_colname_new != "" ){
+      
       Time<-input$PCR_time_colname
+      Sample_new <- input$PCR_sample_colname_new
       Sample<- input$PCR_sample_colname
       Sample <- trimws(Sample) 
       time_patterns <- strsplit(input$PCR_time_patterns, ",")[[1]]
@@ -3109,19 +3113,24 @@ server <- function(input, output, session) {
       
       if (Sample %in% colnames(pcrResult$Initdata)) {
         pcrResult$Initdata[Time] <- NA  
-        
+        pcrResult$Initdata[Sample_new] <- NA  
         for (pattern in time_patterns) {
           matched_rows <- grepl(pattern, pcrResult$Initdata[[Sample]], ignore.case = TRUE)
           pcrResult$Initdata[Time][matched_rows,] <- pattern
-          pcrResult$Initdata[Sample] <- gsub(pattern, "", pcrResult$Initdata[[Sample]], ignore.case = TRUE)
+          pcrResult$Initdata[Sample_new] <- gsub(pattern, "", pcrResult$Initdata[[Sample]], ignore.case = TRUE)
         }
         
         pcrResult$Initdata[Time] <- factor(x = pcrResult$Initdata[[Time]] , levels = time_patterns)
         
-        pcrResult$Initdata[Sample] <- trimws(pcrResult$Initdata[[Sample]])
+        pcrResult$Initdata[Sample_new] <- trimws(pcrResult$Initdata[[Sample_new]])
         updateSelectInput(session, "PCR_time",
                           choices = c("", colnames(pcrResult$Initdata)),
                           selected = Time)
+        updateSelectInput(session, "PCR_sample",
+                          choices = c("", colnames(pcrResult$Initdata)),
+                          selected = Sample_new)
+        
+        
         showAlert("Success", "Time patterns applied successfully!", "success", 2000)
       } else {
         showAlert("Error", "Sample column not found!", "error", 3000)
@@ -3281,6 +3290,7 @@ server <- function(input, output, session) {
     isolate({
       NewPCRFiltered = NewPCR %>% dplyr::filter(!is.na(ddCt) | Sample == pcrResult$BaselineExp )
       updateSelectizeInput(inputId = "HousKgene_plot", choices = c("",unique(NewPCR$HousekGene)),selected = "" )
+      updateSelectizeInput(inputId = "PCR_sample_plot", choices = c("All",unique(NewPCR$Sample)),selected = "All" )
       updateSelectizeInput(inputId = "Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
       
       if(PCR_cut_type == "Both"){
@@ -3307,7 +3317,6 @@ server <- function(input, output, session) {
         dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt >= cut, 1, 0.5))
 
-      
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
     }else if(PCR_cut_type == "Smaller"){
@@ -3431,6 +3440,7 @@ server <- function(input, output, session) {
     input$Gene_plot -> gene
     input$HousKgene_plot -> Hgene
     input$PCR_plot_y -> y_axis
+    input$PCR_sample_plot -> sample
     plot_type <- req(input$PCR_plot_type)
     
     isolate({
@@ -3439,7 +3449,9 @@ server <- function(input, output, session) {
         PCRstep5 = pcrResult$NewPCR %>% 
           dplyr::filter(HousekGene == Hgene, Gene == gene) %>%
           dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
-        
+        if(sample != "All"){
+          PCRstep5 = PCRstep5 %>% dplyr::filter(Sample == sample)
+        }
         if(length(unique(PCRstep5$Time)) >1 ){
           plot1 = 
             ggplot(data = PCRstep5,aes(x = Time, y = ddCt))+
