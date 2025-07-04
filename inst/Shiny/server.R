@@ -49,6 +49,11 @@ server <- function(input, output, session) {
   
   
   #### DATA INTEGRATION ####
+  observeEvent(input$NextDataOmicsQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "DataIntegration_tab")
+  })
+  
   ### Omics ####
   
   Omics = reactiveValues(DefaultInit = NULL,
@@ -1208,7 +1213,6 @@ server <- function(input, output, session) {
       
       if (value.now != "" && value.now != value.bef) {
         bcaResult$BCAcell_EXP[cellCoo[1], cellCoo[2]] <- value.now
-        output$BCASelectedValues <- renderText(paste("Updated value", paste(bcaResult$Initdata[cellCoo[1], cellCoo[2]]), ": Exp Condition ", value.now))
         tableExcelColored(session = session,
                           Result = bcaResult, 
                           FlagsExp = FlagsBCA,
@@ -1423,6 +1427,13 @@ server <- function(input, output, session) {
         exp = exp[exp != ""]
         expNotBlank = unique(c(stcd,exp))
         
+        if( length(na.omit(standcurve$Concentrations))  == 0 || 
+            length(na.omit(standcurve$Concentrations)) != length(na.omit(standcurve$Measures)) ) {
+          showAlert("Error",  "It is necessary to define the Analyte Concentrations for the standard curve", "error", 5000)
+          updateRadioButtons("BCA_blanks",selected = "no")
+          return()
+        } 
+        
         BlankV = standcurve %>% dplyr::filter(Concentrations == min(Concentrations)) %>% dplyr::summarize(M = mean(Measures)) %>% pull(M)
         
         standcurve$BlankValues = BlankV
@@ -1632,7 +1643,7 @@ server <- function(input, output, session) {
         showAlert("Error", "The value must be numeric!", "error", 5000)
         return()
       }else{
-        bcamean[,paste0("UgBaseline/",BCA_UGvalue)] =  bcamean$UgBaseline/BCA_UGvalue
+        bcamean[,paste0(BCA_UGvalue,"/UgBaseline")] =  BCA_UGvalue / bcamean$UgBaseline
         
         bcaResult$dataFinal = bcamean
         
@@ -2633,9 +2644,8 @@ server <- function(input, output, session) {
   )
   
   loadWBanalysi4Quant = function(datapath,wbResult){
-    manageSpinner(TRUE)
+
     names(wbResult) -> namesAll
-    
     mess = readfile(
       filename = datapath,
       type = "RDs",
@@ -2646,28 +2656,30 @@ server <- function(input, output, session) {
       showAlert("Error", mess[["message"]], "error", 5000)
       return(mess[["message"]]) 
     }
-    
-    #wbquantResult$NormWBanalysis = mess
-    manageSpinner(FALSE)
-    
+  
     showAlert("Success", "The RDS has been uploaded with success", "success", 2000)
     return(mess)
   }
   
   observeEvent(input$actionB_loadingNormWB, {
-    alert$alertContext <- "WBNormQuant-reset"
-    if(!is.null(wbquantResult$NormWBanalysis) ) { 
-      shinyalert(
-        title = "Important message",
-        text = "Do you want to update the WB data already present, by resetting the previous analysis?",
-        type = "warning",
-        showCancelButton = TRUE,
-        confirmButtonText = "Update",
-        cancelButtonText = "Cancel",
-      )
-    } else{
-      wbquantResult$NormWBanalysis = loadWBanalysi4Quant(input$NormWBImport$datapath,wbResult)
-    }
+    req(input$NormWBImport$datapath)
+    isolate({
+      if(!is.null(wbquantResult$NormWBanalysis) ) { 
+        alert$alertContext <- "WBNormQuant-reset"
+        shinyalert(
+          title = "Important message",
+          text = "Do you want to update the WB data already present, by resetting the previous analysis?",
+          type = "warning",
+          showCancelButton = TRUE,
+          confirmButtonText = "Update",
+          cancelButtonText = "Cancel",
+        )
+      } else{
+        manageSpinner(TRUE)
+        wbquantResult$NormWBanalysis = loadWBanalysi4Quant(input$NormWBImport$datapath,wbResult)
+        manageSpinner(FALSE)
+      }
+    })
   })
   
   observeEvent(input$shinyalert, {
@@ -2684,13 +2696,16 @@ server <- function(input, output, session) {
       output$AUC_RelDens <- renderDT(NULL)
       output$AUC_AdjRelDens <- renderDT(NULL)
       
+      manageSpinner(TRUE)
       wbquantResult$NormWBanalysis = loadWBanalysi4Quant(input$NormWBImport$datapath,wbResult)
+      manageSpinner(FALSE)
     }
   })
   
   observeEvent(input$actionB_loadingWB, {
-    alert$alertContext <- "WBQuant-reset"
+    req(input$WBImport$datapath)
     if(!is.null(wbquantResult$WBanalysis) ) { 
+      alert$alertContext <- "WBQuant-reset"
       shinyalert(
         title = "Important message",
         text = "Do you want to update the WB data already present, by resetting the previous analysis?",
@@ -2700,8 +2715,10 @@ server <- function(input, output, session) {
         cancelButtonText = "Cancel",
       ) 
     } else{
+      manageSpinner(TRUE)
       wbquantResult$WBanalysis = loadWBanalysi4Quant(input$WBImport$datapath,wbResult)
       wbquantResult$WBanalysis_filtered = NULL
+      manageSpinner(FALSE)
     }
   })
   
@@ -2715,8 +2732,11 @@ server <- function(input, output, session) {
       output$AUC_RelDens <- renderDT(NULL)
       output$AUC_AdjRelDens <- renderDT(NULL)
       
+      manageSpinner(TRUE)
       wbquantResult$WBanalysis = loadWBanalysi4Quant(input$WBImport$datapath,wbResult)
-      wbquantResult$WBanalysis_filtered = NULL    }
+      wbquantResult$WBanalysis_filtered = NULL 
+      manageSpinner(FALSE)
+      }
   })
   
   observe({
@@ -2725,6 +2745,7 @@ server <- function(input, output, session) {
   })
   
   observe({
+    
     if(is.null(wbquantResult$NormWBanalysis)){
       table = wbResult0$AUCdf
     }else{
@@ -3293,6 +3314,7 @@ server <- function(input, output, session) {
       updateSelectizeInput(inputId = "PCR_sample_plot", choices = c("All",unique(NewPCR$Sample)),selected = "All" )
       updateSelectizeInput(inputId = "Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
       
+      NewPCRFiltered$ddCt = NewPCRFiltered$ddCt + 0.01 # in this way the slider at the beginning does not touch any points
       if(PCR_cut_type == "Both"){
         updateSliderInput(session = session, inputId = "BothCutFoldChange_slider",
                           min = min(-NewPCRFiltered$ddCt,na.rm = T), max = max(-NewPCRFiltered$ddCt,na.rm = T), 
@@ -7422,7 +7444,10 @@ server <- function(input, output, session) {
                   FlagsExp = FlagsFACS)
         
       }
-      UploadDataAnalysisModule = UploadDataAnalysisModuleAllFalse
+      
+      for(nameList in names(UploadDataAnalysisModuleAllFalse))
+        UploadDataAnalysisModule[[nameList]] <- UploadDataAnalysisModuleAllFalse[[nameList]]
+      
     }
     
   })

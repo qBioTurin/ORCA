@@ -245,6 +245,14 @@ ui <- dashboardPage(
                       DTOutput("OmicsUser_table",width = "80%")
                     )
                 ),
+                fluidRow(
+                  column(width = 1,offset = 9,
+                         actionButton(inputId = "NextDataOmicsQuantif",
+                                      label = 'Proceed to Data Harmonization',
+                                      align = "right",
+                                      icon = shiny::icon("forward"))
+                  )
+                )
               )
       ),
       ## END model integration: Omics
@@ -723,49 +731,51 @@ ui <- dashboardPage(
                      )
                 )
               ),
-              box( width = 12,
-                   title = tagList(shiny::icon("gear", verify_fa = FALSE), "WB quantification"),
-                   h3("Relative Density"),
-                   fluidRow(
-                     column(
-                       width = 8,
-                       selectInput("IdLaneNorm_RelDens",
-                                   label = "Select the Lane to use for the relative normalization",
-                                   choices = "Nothing selected",selected = "Nothing selected")
-                     ),
-                     column(
-                       width = 12,
-                       DTOutput('AUC_RelDens')
-                     )
-                   ),
-                   h3("Adjusted Relative Density"),
-                   fluidRow(
-                     column(
-                       width = 12,
-                       DTOutput('AUC_AdjRelDens')
-                     )
-                   ),
-                   plotOutput("plot_AdjRelDens"),
-                   fluidRow(
-                     column(
-                       width = 2, offset = 7,  # Adjusting offset to align properly
-                       actionButton(
-                         inputId = "CustomizePlotWBQuantification", 
-                         label = "Customize or Download Plot", 
-                         icon = icon("paint-brush")
+              fluidRow(
+                box( width = 12,
+                     title = tagList(shiny::icon("gear", verify_fa = FALSE), "WB quantification"),
+                     h3("Relative Density"),
+                     fluidRow(
+                       column(
+                         width = 8,
+                         selectInput("IdLaneNorm_RelDens",
+                                     label = "Select the Lane to use for the relative normalization",
+                                     choices = "Nothing selected",selected = "Nothing selected")
+                       ),
+                       column(
+                         width = 12,
+                         DTOutput('AUC_RelDens')
                        )
                      ),
-                     column(
-                       width = 2, 
-                       downloadButton(
-                         label = "Download Analysis & Excel", 
-                         outputId = "downloadWBquantAnalysis",
-                         #href = "Results.RData",
-                         #download = "Results.RData",
-                         icon = icon("download")
+                     h3("Adjusted Relative Density"),
+                     fluidRow(
+                       column(
+                         width = 12,
+                         DTOutput('AUC_AdjRelDens')
+                       )
+                     ),
+                     plotOutput("plot_AdjRelDens"),
+                     fluidRow(
+                       column(
+                         width = 2, offset = 7,  # Adjusting offset to align properly
+                         actionButton(
+                           inputId = "CustomizePlotWBQuantification", 
+                           label = "Customize or Download Plot", 
+                           icon = icon("paint-brush")
+                         )
+                       ),
+                       column(
+                         width = 2, 
+                         downloadButton(
+                           label = "Download Analysis & Excel", 
+                           outputId = "downloadWBquantAnalysis",
+                           #href = "Results.RData",
+                           #download = "Results.RData",
+                           icon = icon("download")
+                         )
                        )
                      )
-                   )
+                )
               )
       ),
       ## END data analysis: WB  #######
@@ -834,14 +844,6 @@ ui <- dashboardPage(
                               label = "Times:",
                               choices = ""
                             )
-                          ),
-                          column(
-                            width = 6,
-                            textInput(
-                              inputId = "PCR_sample_colname_new",
-                              label = "Column name for saving the splitted sample:",
-                              placeholder = "e.g. Sample"
-                            )
                           )
                         ),
                         DTOutput("PCRpreview")
@@ -895,6 +897,14 @@ ui <- dashboardPage(
                                 inputId = "PCR_sample_colname",
                                 label = "Column name where searching the timings:",
                                 choices = ""
+                              )
+                            ),
+                            column(
+                              width = 6,
+                              textInput(
+                                inputId = "PCR_sample_colname_new",
+                                label = "Column name for saving the splitted sample:",
+                                placeholder = "e.g. Sample"
                               )
                             )
                           ),
@@ -1156,7 +1166,8 @@ ui <- dashboardPage(
                      selectizeInput("BCAcell_EXP",
                                     div(class = "icon-container",
                                         h4("Experimental condition or Analyte Concentrations:", icon("info-circle")),
-                                        div(class = "icon-text", "Analyte Concentrations refers to the standard curve sample.")
+                                        div(class = "icon-text", style = "font-size: 12px; max-width: 100px; white-space: normal;",
+                                            "Analyte Concentrations refers to the standard curve sample.")
                                     ),
                                     choices = "",
                                     options = list(create = TRUE)),
@@ -1171,19 +1182,11 @@ ui <- dashboardPage(
                                 inputId = "BCA_blanks",
                                 label = div(class = "icon-container",
                                             h4("Removing blank: ", icon("info-circle")),
-                                            div(class = "icon-text", "Blank refers to the standard curve value with the smaller concetrantion.")
+                                            div(class = "icon-text", style = "font-size: 12px; max-width: 100px; white-space: normal;",
+                                                "Blank refers to the standard curve value with the smaller concentration.")
                                 ),
                                 choices = c("No" = "no", "Yes" = "yes"),
                                 selected = "no"
-                              )
-                       )
-                     ),
-                     fluidRow(
-                       column(12,
-                              tags$div(
-                                textOutput("BCASelectedValues"),
-                                style = "font-size: 24px; text-align: center; color: green;
-                                             width: 100%; margin-top: 20px;"
                               )
                        )
                      )
@@ -1191,8 +1194,6 @@ ui <- dashboardPage(
           ),
           fluidRow(
             uiOutput("tablesBCA")
-            # column(6, dataTableOutput("leftTableBCA")),
-            # column(6, dataTableOutput("rightTableBCA"))
           ),
           fluidRow(
             column(width = 1,offset = 9,
@@ -1201,6 +1202,37 @@ ui <- dashboardPage(
                                 align = "right",
                                 icon = shiny::icon("forward"))
             )
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Help: BCA Protein Quantification",
+            status = "info",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            collapsed = TRUE,
+            width = 12,
+            HTML("
+    <h4>BCA Assay Overview</h4>
+    The BCA assay quantifies total protein concentration based on the color change produced by the reaction of protein with BCA reagent, which is measured via absorbance.
+
+    <h4>Steps in Quantification</h4>
+    <ol>
+      <li><b>Blank Subtraction:</b> For each sample, the average blank absorbance is subtracted:
+        <br><code>Corrected Absorbance = Sample Mean − Blank Mean</code>
+      </li>
+      <li><b>Standard Curve Regression:</b> A regression function <i>f(x)</i> is estimated from known analyte concentrations and their corrected absorbance values.</li>
+      <li><b>Protein Quantification:</b> Apply the regression to the corrected absorbance:
+        <br><code>Protein (µg) = f(Corrected Absorbance)</code>
+      </li>
+    </ol>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li><b>Quantification (µg):</b> Estimated protein content per sample.</li>
+      <li><b>Standard Curve:</b> Used to interpolate protein concentration from absorbance.</li>
+    </ul>
+  ")
           )
         )
       ),
