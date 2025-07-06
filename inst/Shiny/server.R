@@ -323,11 +323,36 @@ server <- function(input, output, session) {
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
                  MeanScaled = OmicsValue*Mean/100 # I have to divide 100 because Mean is in %
                )%>% select(-sd) 
-               
-               list(Table = finalTable)
              },
              "WB" =  {
+               results = do.call(rbind, results)
+               finalTable = results %>% mutate(
+                 OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
+                 MeanAdjRelDensityScaled = OmicsValue*AdjRelDensity/100 # I have to divide 100 because Mean is in %
+               )
+             },
+             "PCR" = {
+               # Collect all tables from all results
+               all_tables <- lapply(results, function(res) {
+                 if (!is.null(res$plotPCR)) {
+                   lapply(res$plotPCR, function(x) x$table)
+                 } else {
+                   NULL
+                 }
+               })
                
+               # Flatten the nested list and remove NULLs/empty tables
+               all_tables_flat <- unlist(all_tables, recursive = FALSE)
+               valid_tables <- Filter(function(tbl) !is.null(tbl) && nrow(tbl) > 0, all_tables_flat)
+               
+               if (length(valid_tables) > 0) {
+                 combined_table <- bind_rows(valid_tables)
+               }
+               
+               finalTable = combined_table %>% mutate(
+                 OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
+                 Qscaled = OmicsValue*`2^(-DDCT)`/100 # I have to divide 100 because Mean is in %
+               ) %>% select(-GeneH, - DDCT , -Sd) %>% rename(Q = `2^(-DDCT)` )
              },
              "IF" = {
                
@@ -336,6 +361,7 @@ server <- function(input, output, session) {
                
              }
       )
+      list(Table = finalTable)
     } else {
       NULL
     }
@@ -6899,15 +6925,30 @@ server <- function(input, output, session) {
              "PCR" = {
                req(input$stat_genHpcr)
                
-               resultsNew <- do.call(rbind,
-                                     lapply(1:length(results),
-                                            function(l){
-                                              d = results[[l]]$NewPCR
-                                              d$File = l
-                                              d
-                                            } 
-                                     ) 
-               )
+               # Collect all tables from all results
+               all_tables <- lapply(1:length(results), function(res) {
+                 if (!is.null(results[[res]]$plotPCR)) {
+                   lapply(results[[res]]$plotPCR, function(x) {
+                     d = x$table 
+                     d$file = res
+                     d
+                     } )
+                 } else {
+                   NULL
+                 }
+               })
+               
+               # Flatten the nested list and remove NULLs/empty tables
+               all_tables_flat <- unlist(all_tables, recursive = FALSE)
+               valid_tables <- Filter(function(tbl) !is.null(tbl) && nrow(tbl) > 0, all_tables_flat)
+               
+               if (length(valid_tables) > 0) {
+                 combined_table <- bind_rows(valid_tables)
+               }
+               
+               resultsNew = combined_table %>% 
+                 rename(Q = `2^(-DDCT)` )
+ 
                
                resultsNew <- as.data.frame(resultsNew) %>%
                  mutate(Q = as.numeric(Q), GeneH = paste(Gene, ", Housekeeping: ", HousekGene))%>% 

@@ -72,4 +72,4 @@ EXPOSE 3838
 # Define default command.
 # CMD ["bash"]
 # run app on container start
-CMD ["R", "-e", "ORCA::ORCA.run(host = '0.0.0.0', port = 3838)"]
+#CMD ["R", "-e", "ORCA::ORCA.run(host = '0.0.0.0', port = 3838)"]

@@ -32,7 +32,6 @@ Imports:
     shiny,
     randomcoloR,
     plotly,
-    flowCore, 
     xml2, 
     visNetwork,
     shinyFiles, 
