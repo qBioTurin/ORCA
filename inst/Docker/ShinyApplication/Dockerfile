@@ -58,9 +58,10 @@ RUN R -e 'install.packages("tidyverse")'
 
 RUN R -e 'install.packages(c("patchwork","BiocManager"))'
 RUN R -e 'install.packages("remotes")'
+COPY ./inst/Shiny/* ./app/
 RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="main")'
 # copy the app directory into the image
-COPY ./inst/Shiny/* ./app/
+
 
 # Create data directory
 RUN mkdir ./home/data; chmod 777 ./home/data
