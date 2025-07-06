@@ -328,8 +328,12 @@ server <- function(input, output, session) {
                results = do.call(rbind, results)
                finalTable = results %>% mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
-                 MeanAdjRelDensityScaled = OmicsValue*AdjRelDensity/100 # I have to divide 100 because Mean is in %
-               )
+                 AdjRelDensityScaled = OmicsValue*AdjRelDensity/100 # I have to divide 100 because Mean is in %
+               ) %>% 
+                 group_by(SampleName) %>%
+                 summarise(meanAdjRelDensity = mean(AdjRelDensity),
+                           OmicsValue = OmicsValue,
+                           meanAdjRelDensityScaled = mean(AdjRelDensityScaled) )
              },
              "PCR" = {
                # Collect all tables from all results
@@ -352,7 +356,12 @@ server <- function(input, output, session) {
                finalTable = combined_table %>% mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
                  Qscaled = OmicsValue*`2^(-DDCT)`/100 # I have to divide 100 because Mean is in %
-               ) %>% select(-GeneH, - DDCT , -Sd) %>% rename(Q = `2^(-DDCT)` )
+               ) %>% select(-GeneH, - DDCT , -Sd) %>% 
+                 rename(Q = `2^(-DDCT)` )%>% 
+                 group_by(Sample) %>%
+                 summarise(meanQ = mean(Q),
+                           OmicsValue = OmicsValue,
+                           meanQScaled = mean(Qscaled) )
              },
              "IF" = {
                

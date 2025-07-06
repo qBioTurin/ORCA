@@ -45,19 +45,30 @@ docker.application.run <- function(port = 3838, image = "qbioturin/orca-shiny-ap
   }
   
   # Open app in browser
-  browse_url <- paste0("http://localhost:", port)
+  browse_url <- paste0("http://0.0.0.0:", port)
   cat("\nOpening Shiny app in your browser: ", browse_url, "\n")
   utils::browseURL(browse_url)
   
   # Monitor container
   cat("Waiting for container to finish...\n")
+  cat("\nType 's' and press ENTER to stop the container...\n")
   repeat {
+    input <- tryCatch(readLines(n = 1, warn = FALSE), error = function(e) "")
+    if (tolower(input) == "s") {
+      cat("\n Stopping container...\n")
+      system(paste("docker stop", container_id))
+      break
+    }
+    
+    # Check if container is still running
+    status <- system(paste("docker inspect -f {{.State.Running}}", container_id), intern = TRUE)
+    if (status != "true") {
+      cat("\n️  Container has stopped.\n")
+      break
+    }
+    
     Sys.sleep(5)
-    status <- system(paste("docker inspect -f '{{.State.Running}}'", container_id), intern = TRUE)
-    if (status != "true") break
-    cat(".")
   }
-  cat("\nContainer has stopped.\n")
   
   # Get exit code
   exit_code <- system(paste("docker inspect -f '{{.State.ExitCode}}'", container_id), intern = TRUE)
@@ -83,5 +94,7 @@ docker.application.run <- function(port = 3838, image = "qbioturin/orca-shiny-ap
   
   system("echo 0 > ExitStatusFile 2>&1")
   cat("\nShiny app ran successfully.\n")
+  
+  
   return(0)
 }

@@ -58,11 +58,11 @@ RUN R -e 'install.packages("tidyverse")'
 
 RUN R -e 'install.packages(c("patchwork","BiocManager"))'
 RUN R -e 'install.packages("remotes")'
-COPY ./inst/Shiny/* ./app/
-RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="main")'
+
+RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="main");'
 # copy the app directory into the image
 
-
+COPY ./inst/Shiny/* ./app/
 # Create data directory
 RUN mkdir ./home/data; chmod 777 ./home/data
 #COPY ./Data/ ./home/data/Examples/
@@ -73,4 +73,4 @@ EXPOSE 3838
 # Define default command.
 # CMD ["bash"]
 # run app on container start
-#CMD ["R", "-e", "ORCA::ORCA.run(host = '0.0.0.0', port = 3838)"]
+CMD R -e ' ORCA::ORCA.run(TRUE)'
