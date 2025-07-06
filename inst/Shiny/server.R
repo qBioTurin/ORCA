@@ -277,7 +277,7 @@ server <- function(input, output, session) {
     
     datapaths <- input$IntGImport$datapath
     
-    updateMultiValues(datapaths,DataIntegrationModule)
+    updateMultiValues(datapaths,DataIntegrationModule,DataAnalysisModule)
     
     manageSpinner(FALSE)
     showAlert("Success", "The RDs files have been uploaded with success", "success", 2000)

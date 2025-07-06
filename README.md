@@ -28,7 +28,8 @@ The following R packages must be installed:
 install.packages(c("rjson", "openxlsx", "patchwork", "ggplot2", "shinydashboard", 
                    "shinyWidgets", "shiny", "dashboardthemes", "dplyr", "OpenImageR", 
                    "knitr", "zoo", "shinythemes", "readxl", "DT", "shinyjs","randomcoloR",
-                   "plotly","flowCore"))
+                   "plotly","flowCore","xml2",  "visNetwork","shinyFiles", "ggraph", "tidyverse",
+                   "ggpubr", "shinybusy", "shinyalert", "BiocManager","colourpicker"))
 ```
 
 ## How to Install

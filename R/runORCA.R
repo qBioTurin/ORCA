@@ -15,7 +15,7 @@
 #' }
 #' @export
 
-ORCA.run <-function()
+ORCA.run <-function(port = getOption("shiny.port"), host = getOption("shiny.host", "127.0.0.1"))
 {
   x = T
   
@@ -34,7 +34,7 @@ ORCA.run <-function()
       `/` = httpuv::staticPath(system.file("Shiny","www", package = "ORCA"), indexhtml = FALSE, fallthrough = TRUE)
     )
   
-  runApp(app)
+  runApp(app, host = host, port = port)
   # runApp(
   #   appDir = system.file("Shiny", package = "ORCA"),
   #   launch.browser = T
