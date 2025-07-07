@@ -15,7 +15,7 @@
 #' }
 #' @export
 
-ORCA.run <-function(inDocker = FALSE)
+ORCA.run <-function(port = 3838, inDocker = FALSE)
 {
   x = T
   
@@ -30,14 +30,12 @@ ORCA.run <-function(inDocker = FALSE)
                    options =  options(shiny.maxRequestSize=1000*1024^2)
     )
     host = '0.0.0.0'
-    port = 3838
   }else{
     app <-shinyApp(ui, server,
                    options =  options(shiny.maxRequestSize=1000*1024^2,
                                       shiny.launch.browser = .rs.invokeShinyWindowExternal)
     )
     host = getOption("shiny.host", "127.0.0.1")
-    port = getOption("shiny.port")
   }
 
   app$staticPaths <- list(

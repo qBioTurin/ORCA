@@ -59,7 +59,7 @@ RUN R -e 'install.packages("tidyverse")'
 RUN R -e 'install.packages(c("patchwork","BiocManager"))'
 RUN R -e 'install.packages("remotes")'
 
-RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="main");'
+RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="main"); '
 # copy the app directory into the image
 
 COPY ./inst/Shiny/* ./app/
