@@ -6585,7 +6585,6 @@ server <- function(input, output, session) {
   
   
   #### RAW FACS analysis ####
-  
   rawfacsResult = reactiveValues(
     Initdata= NULL
   )
@@ -6601,7 +6600,8 @@ server <- function(input, output, session) {
   # Reactive values per la gestione delle selezioni gerarchiche
   facsSelections = reactiveValues(
     selections = list(), 
-    currentPlot = NULL   
+    currentPlot = NULL,
+    polygonPoints = list()  # Aggiunto per memorizzare i punti del poligono
   )
   
   rawFACSresultListen <- reactive({
@@ -6673,6 +6673,7 @@ server <- function(input, output, session) {
       
       facsSelections$selections <- list()  
       facsSelections$currentPlot <- NULL  
+      facsSelections$polygonPoints <- list()  # Reset dei punti del poligono
       
       removeModal()
       showAlert("Success", "The FCS file has been uploaded with success", "success", 2000)
@@ -6696,13 +6697,13 @@ server <- function(input, output, session) {
     if(!is.null(facsSelections$selections[[selectedSample]])) {
       availableSelections <- names(facsSelections$selections[[selectedSample]])
     }
-  
+    
     updateSelectInput(session, "facs_hierarchySelector", 
                       choices = c("None",availableSelections),
                       selected = NULL)
   })
   
-
+  
   observeEvent(input$facs_plotChannelButton, {
     req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel)
     
@@ -6739,6 +6740,9 @@ server <- function(input, output, session) {
     selectedSample <- input$facs_sampleSelector
     hierarchyLevel <- input$facs_hierarchySelector
     
+    # Reset dei punti del poligono quando si apre il modal
+    facsSelections$polygonPoints <- list()
+    
     if(is.null(hierarchyLevel) || hierarchyLevel == "") {
       plotTitle <- paste("Sample:", selectedSample)
     } else {
@@ -6750,21 +6754,31 @@ server <- function(input, output, session) {
       size = "l",
       easyClose = TRUE,
       footer = tagList(
-        div(style = "display: flex; align-items: center; gap: 10px;",
-            textInput("facs_selectionName", "Nome della nuova selezione:", 
-                      value = "", width = "300px"),
-            actionButton("facs_confirmSelection", "Conferma Selezione", 
-                         class = "btn-primary"),
-            modalButton("Annulla")
+        div(style = "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;",
+            div(style = "display: flex; align-items: center; gap: 10px;",
+                textInput("facs_selectionName", "Nome della nuova selezione:", 
+                          value = "", width = "250px"),
+                actionButton("facs_clearPolygon", "Cancella Poligono", 
+                             class = "btn-warning"),
+                actionButton("facs_confirmSelection", "Conferma Selezione", 
+                             class = "btn-primary"),
+                modalButton("Annulla")
+            ),
+            div(id = "polygon_info", style = "width: 100%; margin-top: 10px;",
+                textOutput("facs_polygonInfo")
+            )
         )
       ),
       fluidRow(
         column(12,
                div(style = "text-align: center; margin-bottom: 10px;",
-                   strong("Trascina il mouse sul plot per selezionare un'area")
+                   strong("Clicca sul plot per aggiungere punti al poligono. Il poligono si chiuderà automaticamente."),
+                   br(),
+                   span("Le selezioni precedenti sono mostrate con colori diversi e linee tratteggiate.", 
+                        style = "font-size: 12px; color: #666; font-style: italic;")
                ),
                plotOutput("facs_modalPlot",
-                          brush = "facs_plot_brush",
+                          click = "facs_plot_click",
                           height = "500px")
         )
       )
@@ -6792,22 +6806,142 @@ server <- function(input, output, session) {
       channelx <- input$facs_xChannel
       channely <- input$facs_yChannel
       
-        sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
-        sample_expr$Name <- selectedSample
+      sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
+      sample_expr$Name <- selectedSample
+      
+      p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
+        geom_point(alpha = 0.5, color = "blue", size = 0.8) +
+        labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
+      
+      # Disegna le selezioni precedenti per il campione corrente
+      if(!is.null(facsSelections$selections[[selectedSample]])) {
+        colors <- c("purple", "orange", "green", "brown", "pink", "cyan", "yellow", "gray")
+        selection_names <- names(facsSelections$selections[[selectedSample]])
         
-        ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
-          geom_point(alpha = 0.5, color = "blue", size = 0.8) +
-          labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
-          theme_minimal() +
-          theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
+        for(i in seq_along(selection_names)) {
+          sel_name <- selection_names[i]
+          sel_data <- facsSelections$selections[[selectedSample]][[sel_name]]
+          
+          # Controlla se la selezione usa gli stessi canali del plot corrente
+          if(!is.null(sel_data$polygon) && 
+             !is.null(sel_data$channels) && 
+             length(sel_data$channels) >= 2 && 
+             sel_data$channels[1] == channelx && 
+             sel_data$channels[2] == channely) {
+            
+            color_idx <- ((i - 1) %% length(colors)) + 1
+            sel_color <- colors[color_idx]
+            
+            # Disegna il poligono della selezione precedente
+            if(nrow(sel_data$polygon) >= 3) {
+              polygon_df_closed <- rbind(sel_data$polygon, sel_data$polygon[1, ])
+              
+              # Poligono con bordo e riempimento trasparente
+              p <- p + 
+                geom_polygon(data = sel_data$polygon, aes(x = x, y = y), 
+                             fill = sel_color, alpha = 0.15, color = sel_color, size = 1.2) +
+                geom_path(data = polygon_df_closed, aes(x = x, y = y), 
+                          color = sel_color, size = 1.2, linetype = "dashed") +
+                geom_point(data = sel_data$polygon, aes(x = x, y = y), 
+                           color = sel_color, size = 2.5, shape = 17)
+              
+              # Aggiungi etichetta al centroide del poligono
+              centroid_x <- mean(sel_data$polygon$x)
+              centroid_y <- mean(sel_data$polygon$y)
+              
+              p <- p + annotate("text", x = centroid_x, y = centroid_y, 
+                                label = sel_name, color = sel_color, 
+                                size = 3, fontface = "bold",
+                                hjust = 0.5, vjust = 0.5,
+                                alpha = 0.8)
+            }
+          }
+        }
+      }
+      
+      # Aggiungi i punti del poligono corrente (in rosso, in primo piano)
+      if(length(facsSelections$polygonPoints) > 0) {
+        polygon_df <- data.frame(
+          x = sapply(facsSelections$polygonPoints, function(p) p$x),
+          y = sapply(facsSelections$polygonPoints, function(p) p$y)
+        )
+        
+        # Aggiungi i punti del poligono corrente
+        p <- p + geom_point(data = polygon_df, aes(x = x, y = y), 
+                            color = "red", size = 3, shape = 16)
+        
+        # Se ci sono almeno 2 punti, disegna le linee
+        if(nrow(polygon_df) >= 2) {
+          p <- p + geom_path(data = polygon_df, aes(x = x, y = y), 
+                             color = "red", size = 1.5)
+        }
+        
+        # Se ci sono almeno 3 punti, chiudi il poligono
+        if(nrow(polygon_df) >= 3) {
+          polygon_df_closed <- rbind(polygon_df, polygon_df[1, ])
+          p <- p + geom_path(data = polygon_df_closed, aes(x = x, y = y), 
+                             color = "red", size = 1.5) +
+            geom_polygon(data = polygon_df, aes(x = x, y = y), 
+                         fill = "red", alpha = 0.3)
+        }
+      }
+      
+      p
     })
+    
+    # Info sui punti del poligono
+    output$facs_polygonInfo <- renderText({
+      n_points <- length(facsSelections$polygonPoints)
+      selectedSample <- input$facs_sampleSelector
+      
+      # Conta le selezioni precedenti per questo campione
+      n_prev_selections <- 0
+      if(!is.null(facsSelections$selections[[selectedSample]])) {
+        n_prev_selections <- length(facsSelections$selections[[selectedSample]])
+      }
+      
+      info_text <- ""
+      if(n_prev_selections > 0) {
+        info_text <- paste("Selezioni esistenti:", n_prev_selections, "| ")
+      }
+      
+      if(n_points == 0) {
+        paste0(info_text, "Nessun punto selezionato")
+      } else if(n_points < 3) {
+        paste0(info_text, "Punti selezionati: ", n_points, " - Servono almeno 3 punti per creare un poligono")
+      } else {
+        paste0(info_text, "Punti selezionati: ", n_points, " - Poligono completo")
+      }
+    })
+  })
+  
+  # Gestione dei click per aggiungere punti al poligono
+  observeEvent(input$facs_plot_click, {
+    req(input$facs_plot_click)
+    
+    # Aggiungi il punto cliccato alla lista
+    facsSelections$polygonPoints <- append(facsSelections$polygonPoints, 
+                                           list(list(x = input$facs_plot_click$x, 
+                                                     y = input$facs_plot_click$y)))
+  })
+  
+  # Cancella il poligono
+  observeEvent(input$facs_clearPolygon, {
+    facsSelections$polygonPoints <- list()
   })
   
   # Conferma la selezione e crea una nuova entry nella gerarchia
   observeEvent(input$facs_confirmSelection, {
-    req(input$facs_selectionName, input$facs_plot_brush, input$facs_sampleSelector)
+    req(input$facs_selectionName, input$facs_sampleSelector)
     
-    brush <- input$facs_plot_brush
+    # Verifica che ci siano almeno 3 punti per formare un poligono
+    if(length(facsSelections$polygonPoints) < 3) {
+      showAlert("Error", "Servono almeno 3 punti per creare una selezione poligonale", "error", 3000)
+      return()
+    }
+    
     selectionName <- input$facs_selectionName
     selectedSample <- input$facs_sampleSelector
     
@@ -6832,7 +6966,13 @@ server <- function(input, output, session) {
     channelx <- input$facs_xChannel
     channely <- input$facs_yChannel
     
-    filteredData <- filterFACSDataBySample(currentData, brush, channelx, channely, selectedSample)
+    # Crea il poligono dalle coordinate
+    polygon_coords <- data.frame(
+      x = sapply(facsSelections$polygonPoints, function(p) p$x),
+      y = sapply(facsSelections$polygonPoints, function(p) p$y)
+    )
+    
+    filteredData <- filterFACSDataByPolygon(currentData, polygon_coords, channelx, channely, selectedSample)
     
     if(is.null(filteredData)) {
       showAlert("Error", "Nessun dato nella selezione effettuata", "error", 3000)
@@ -6846,7 +6986,7 @@ server <- function(input, output, session) {
     facsSelections$selections[[selectedSample]][[selectionName]] <- list(
       data = filteredData,
       parent = if(is.null(hierarchyLevel) || hierarchyLevel == "") selectedSample else hierarchyLevel,
-      brush = brush,
+      polygon = polygon_coords,
       channels = c(channelx, channely),
       sample = selectedSample
     )
@@ -6855,6 +6995,9 @@ server <- function(input, output, session) {
     updateSelectInput(session, "facs_hierarchySelector", 
                       choices = c("None",availableSelections),
                       selected = selectionName)
+    
+    # Reset dei punti del poligono
+    facsSelections$polygonPoints <- list()
     
     removeModal()
     showAlert("Success", paste("Selezione", selectionName, "creata con successo per il campione", selectedSample), "success", 2000)
@@ -6885,8 +7028,26 @@ server <- function(input, output, session) {
     paste(info, collapse = "\n")
   })
   
-  # Filtra i dati basandosi sulla selezione del brush per il campione specifico
-  filterFACSDataBySample <- function(data, brush, channelx, channely, selectedSample) {
+  # Funzione per verificare se un punto è dentro un poligono (algoritmo ray casting)
+  pointInPolygon <- function(x, y, polygon) {
+    n <- nrow(polygon)
+    inside <- FALSE
+    
+    j <- n
+    for(i in 1:n) {
+      if(((polygon[i, "y"] > y) != (polygon[j, "y"] > y)) &&
+         (x < (polygon[j, "x"] - polygon[i, "x"]) * (y - polygon[i, "y"]) / 
+          (polygon[j, "y"] - polygon[i, "y"]) + polygon[i, "x"])) {
+        inside <- !inside
+      }
+      j <- i
+    }
+    
+    return(inside)
+  }
+  
+  # Filtra i dati basandosi sulla selezione del poligono per il campione specifico
+  filterFACSDataByPolygon <- function(data, polygon_coords, channelx, channely, selectedSample) {
     tryCatch({
       filtered_frames <- list()
       
@@ -6897,10 +7058,11 @@ server <- function(input, output, session) {
       frame <- data@frames[[selectedSample]]
       expr_data <- exprs(frame)
       
-      mask <- expr_data[, channelx] >= brush$xmin & 
-        expr_data[, channelx] <= brush$xmax & 
-        expr_data[, channely] >= brush$ymin & 
-        expr_data[, channely] <= brush$ymax
+      # Controlla ogni punto per vedere se è dentro il poligono
+      mask <- logical(nrow(expr_data))
+      for(i in 1:nrow(expr_data)) {
+        mask[i] <- pointInPolygon(expr_data[i, channelx], expr_data[i, channely], polygon_coords)
+      }
       
       # Crea il nuovo frame filtrato
       filtered_expr <- expr_data[mask, , drop = FALSE]
@@ -6924,8 +7086,8 @@ server <- function(input, output, session) {
       return(NULL)
     })
   }
-  
   #### END RAW FACS analysis ####
+  
   
   #### FACS analysis ####
   facsResult = reactiveValues(

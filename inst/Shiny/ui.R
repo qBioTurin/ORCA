@@ -1691,8 +1691,8 @@ ui <- dashboardPage(
                     condition = "output.facs_hasSelections",
                     hr(),
                     h4("Selezioni Create:", style = "color: #337ab7;"),
-                    div(style = "background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 10px;",
-                        verbatimTextOutput("facs_selectionsInfo")
+                    div(style = "background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 10px; overflow-x: auto;",
+                        tableOutput("facs_selectionsInfo")
                     )
                   )
               )
