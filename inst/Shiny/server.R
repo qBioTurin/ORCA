@@ -6921,6 +6921,44 @@ server <- function(input, output, session) {
     })
   })
   
+  # Elimina i livelli gerarchici
+  observeEvent(input$facs_clearSelection, {
+    req(input$facs_hierarchySelector, input$facs_sampleSelector)
+    
+    selectedLevel <- input$facs_hierarchySelector
+    selectedSample <- input$facs_sampleSelector
+    
+    if (is.null(facsSelections$selections[[selectedSample]])) {
+      showAlert("Error", "Nessuna selezione trovata per questo campione", "error", 3000)
+      return()
+    }
+    
+    if (selectedLevel == "None" || selectedLevel == "") {
+      showAlert("Error", "Seleziona un livello valido da eliminare", "error", 3000)
+      return()
+    }
+    
+    # Filtra tutte le selezioni non correlate al livello scelto
+    remainingSelections <- facsSelections$selections[[selectedSample]][
+      sapply(facsSelections$selections[[selectedSample]], function(sel) {
+        !(startsWith(sel$name, paste0(facsSelections$selections[[selectedSample]][[selectedLevel]]$name, "/")) ||
+            sel$name == facsSelections$selections[[selectedSample]][[selectedLevel]]$name)
+      })
+    ]
+    
+    # Aggiorna selections
+    facsSelections$selections[[selectedSample]] <- remainingSelections
+    
+    # Aggiorna selettore gerarchia
+    newAvailableSelections <- names(remainingSelections)
+    updateSelectInput(session, "facs_hierarchySelector",
+                      choices = c("None", newAvailableSelections),
+                      selected = "None")
+    
+    showAlert("Success", paste("Livello", selectedLevel, "e tutte le sue sottoselezioni sono state eliminate"), "success", 2000)
+  })
+  
+  
   # Gestione dei click per aggiungere punti al poligono
   observeEvent(input$facs_plot_click, {
     req(input$facs_plot_click)

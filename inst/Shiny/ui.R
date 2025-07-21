@@ -1679,10 +1679,15 @@ ui <- dashboardPage(
                     column(4,
                            br(),
                            actionButton("facs_openSelectionModal", 
-                                        "Apri Selezione Interattiva", 
+                                        "Open Interactive Selection", 
                                         class = "btn-info",
                                         icon = icon("mouse-pointer"),
-                                        style = "width: 100%;")
+                                        style = "width: 100%;"),
+                           actionButton("facs_clearSelection",
+                                        "Remove Level and Sons",
+                                        class = "btn-danger",
+                                        icon = icon("eraser"),
+                                        style = "width: 100%; margin-top: 10px;")
                     )
                   ),
                   
