@@ -6820,9 +6820,15 @@ server <- function(input, output, session) {
         colors <- c("purple", "orange", "green", "brown", "pink", "cyan", "yellow", "gray")
         
         sampleSelections <- facsSelections$selections[[selectedSample]]
-        validSelections <- names(sampleSelections)[
-          sapply(sampleSelections, function(sel) sel$parent == hierarchyLevel)
-        ]
+        if (hierarchyLevel == "None" || is.null(hierarchyLevel) || hierarchyLevel == ""){
+          validSelections <- names(sampleSelections)[
+            sapply(sampleSelections, function(sel) sel$parent == selectedSample)
+          ]
+        } else {
+          validSelections <- names(sampleSelections)[
+            sapply(sampleSelections, function(sel) sel$parent == hierarchyLevel)
+          ]
+        }
         
         for (i in seq_along(validSelections)) {
           sel_name <- validSelections[i]
