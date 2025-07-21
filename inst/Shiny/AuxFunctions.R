@@ -101,8 +101,13 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            output$PCRtables <- NULL
            output$PCRplot <- NULL
            
+           output$PCRbaseline_different <- renderUI({})
+             
+           updateCheckboxInput("CheckBaseline", value = TRUE, session = session)
            updateSelectizeInput("HousKgene_plot", choices = "", session = session)
            updateSelectizeInput("Gene_plot", choices = "", session = session)
+           updateSelectizeInput(inputId = "PCR_sample_plot", choices = c("All"),selected = "All" , session = session)
+           updateSelectizeInput(inputId = "PCR_Baseline_plot", choices = c("All"),selected = "All", session = session )
            updateSelectizeInput("Select_Customize_Gene_plot", choices = "", session = session)
            updateSelectizeInput("Select_Customize_HousKgene_plot", choices = "", session = session)
    

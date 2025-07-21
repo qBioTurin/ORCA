@@ -3105,6 +3105,7 @@ server <- function(input, output, session) {
     removeModal()
     if (input$shinyalert && alert$alertContext == "PCR-reset") {  
       resetPanel("PCR", flags = FlagsPCR, result = pcrResult,output = output, session = session)
+      selected_baselines <- reactiveValues()
       loadExcelFilePCR()
     }
   })
@@ -3259,7 +3260,6 @@ server <- function(input, output, session) {
       
     }
   })
-  
   
   observe({
       PCR = req(pcrResult$data)
