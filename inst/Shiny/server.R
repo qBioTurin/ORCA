@@ -6601,7 +6601,7 @@ server <- function(input, output, session) {
   facsSelections = reactiveValues(
     selections = list(), 
     currentPlot = NULL,
-    polygonPoints = list()  # Aggiunto per memorizzare i punti del poligono
+    polygonPoints = list()  
   )
   
   rawFACSresultListen <- reactive({
@@ -6815,51 +6815,49 @@ server <- function(input, output, session) {
         theme_minimal() +
         theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
       
-      # Disegna le selezioni precedenti per il campione corrente
-      if(!is.null(facsSelections$selections[[selectedSample]])) {
+      # Disegna le selezioni precedenti per il campione corrente con parent == hierarchyLevel
+      if (!is.null(facsSelections$selections[[selectedSample]])) {
         colors <- c("purple", "orange", "green", "brown", "pink", "cyan", "yellow", "gray")
-        selection_names <- names(facsSelections$selections[[selectedSample]])
         
-        for(i in seq_along(selection_names)) {
-          sel_name <- selection_names[i]
-          sel_data <- facsSelections$selections[[selectedSample]][[sel_name]]
+        sampleSelections <- facsSelections$selections[[selectedSample]]
+        validSelections <- names(sampleSelections)[
+          sapply(sampleSelections, function(sel) sel$parent == hierarchyLevel)
+        ]
+        
+        for (i in seq_along(validSelections)) {
+          sel_name <- validSelections[i]
+          sel_data <- sampleSelections[[sel_name]]
           
-          # Controlla se la selezione usa gli stessi canali del plot corrente
-          if(!is.null(sel_data$polygon) && 
-             !is.null(sel_data$channels) && 
-             length(sel_data$channels) >= 2 && 
-             sel_data$channels[1] == channelx && 
-             sel_data$channels[2] == channely) {
+          if (!is.null(sel_data$polygon) &&
+              !is.null(sel_data$channels) &&
+              length(sel_data$channels) >= 2 &&
+              sel_data$channels[1] == channelx &&
+              sel_data$channels[2] == channely) {
             
-            color_idx <- ((i - 1) %% length(colors)) + 1
-            sel_color <- colors[color_idx]
+            sel_color <- colors[((i - 1) %% length(colors)) + 1]
             
-            # Disegna il poligono della selezione precedente
-            if(nrow(sel_data$polygon) >= 3) {
+            if (nrow(sel_data$polygon) >= 3) {
               polygon_df_closed <- rbind(sel_data$polygon, sel_data$polygon[1, ])
               
-              # Poligono con bordo e riempimento trasparente
-              p <- p + 
-                geom_polygon(data = sel_data$polygon, aes(x = x, y = y), 
+              p <- p +
+                geom_polygon(data = sel_data$polygon, aes(x = x, y = y),
                              fill = sel_color, alpha = 0.15, color = sel_color, size = 1.2) +
-                geom_path(data = polygon_df_closed, aes(x = x, y = y), 
+                geom_path(data = polygon_df_closed, aes(x = x, y = y),
                           color = sel_color, size = 1.2, linetype = "dashed") +
-                geom_point(data = sel_data$polygon, aes(x = x, y = y), 
+                geom_point(data = sel_data$polygon, aes(x = x, y = y),
                            color = sel_color, size = 2.5, shape = 17)
               
-              # Aggiungi etichetta al centroide del poligono
               centroid_x <- mean(sel_data$polygon$x)
               centroid_y <- mean(sel_data$polygon$y)
               
-              p <- p + annotate("text", x = centroid_x, y = centroid_y, 
-                                label = sel_name, color = sel_color, 
-                                size = 3, fontface = "bold",
-                                hjust = 0.5, vjust = 0.5,
-                                alpha = 0.8)
+              p <- p + annotate("text", x = centroid_x, y = centroid_y,
+                                label = sel_name, color = sel_color,
+                                size = 3, fontface = "bold", hjust = 0.5, vjust = 0.5, alpha = 0.8)
             }
           }
         }
       }
+      
       
       # Aggiungi i punti del poligono corrente (in rosso, in primo piano)
       if(length(facsSelections$polygonPoints) > 0) {
@@ -6985,10 +6983,15 @@ server <- function(input, output, session) {
     
     facsSelections$selections[[selectedSample]][[selectionName]] <- list(
       data = filteredData,
-      parent = if(is.null(hierarchyLevel) || hierarchyLevel == "") selectedSample else hierarchyLevel,
+      parent = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) selectedSample else hierarchyLevel,
       polygon = polygon_coords,
       channels = c(channelx, channely),
-      sample = selectedSample
+      sample = selectedSample,
+      depth = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) ">" else 
+        paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$depth, ">"),
+      name = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) paste0(selectedSample, "/", selectionName) else 
+        paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$name, "/", selectionName),
+      n_cells = nrow(exprs(filteredData@frames[[selectedSample]]))
     )
     
     availableSelections <- names(facsSelections$selections[[selectedSample]])
@@ -7010,23 +7013,38 @@ server <- function(input, output, session) {
   outputOptions(output, "facs_hasSelections", suspendWhenHidden = FALSE)
   
   # Output informativo sulle selezioni create
-  output$facs_selectionsInfo <- renderText({
-    if(length(facsSelections$selections) == 0) {
-      return("Nessuna selezione creata")
+  output$facs_selectionsInfo <- renderTable({
+    if (length(facsSelections$selections) == 0) {
+      return(data.frame(
+        Depth = character(0),
+        Name = character(0),
+        Cells = numeric(0)
+      ))
     }
     
-    info <- character(0)
-    for(sampleName in names(facsSelections$selections)) {
+    all_selections <- data.frame(
+      Depth = character(),
+      Name = character(),
+      Cells = numeric(),
+      stringsAsFactors = FALSE
+    )
+    
+    for (sampleName in names(facsSelections$selections)) {
       sampleSelections <- facsSelections$selections[[sampleName]]
-      for(selName in names(sampleSelections)) {
+      for (selName in names(sampleSelections)) {
         sel <- sampleSelections[[selName]]
-        parent <- sel$parent
-        info <- c(info, paste0("• ", sampleName, " - ", selName, " (da: ", parent, ")"))
+        all_selections <- rbind(all_selections, data.frame(
+          Depth = sel$depth,
+          Name = sel$name,
+          Cells = sel$n_cells,
+          stringsAsFactors = FALSE
+        ))
       }
     }
     
-    paste(info, collapse = "\n")
+    all_selections
   })
+  
   
   # Funzione per verificare se un punto è dentro un poligono (algoritmo ray casting)
   pointInPolygon <- function(x, y, polygon) {
