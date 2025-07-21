@@ -849,19 +849,39 @@ ui <- dashboardPage(
                         DTOutput("PCRpreview")
                     ),
                     box(width = 4,
-                        column(
-                          width = 6,
-                          selectizeInput(
-                            inputId = "PCRnorm", multiple = T, choices = "",
-                            label = "Select housekeeping genes:")
-                        ),
-                        column(
-                          width = 6,
-                          selectInput(
-                            inputId = "PCRbaseline",label = "Select baseline:",
-                            choices = "ID"
+                        fluidRow(
+                          column(
+                            width = 6,
+                            selectizeInput(
+                              inputId = "PCRnorm", multiple = T, choices = "",
+                              label = "Select housekeeping genes:")
                           )
                         ),
+                        fluidRow(
+                          column(
+                            width = 6,
+                            checkboxInput( inputId = "CheckBaseline", 
+                                           label = "Baseline equal for each sample", 
+                                           value = TRUE)
+                          ),
+                          fluidRow(
+                            conditionalPanel(condition = "input.CheckBaseline == true",
+                                             column(
+                                               width = 6,
+                                               selectInput(
+                                                 inputId = "PCRbaseline",label = "Select baseline:",
+                                                 choices = ""
+                                               )
+                                             )
+                            ),
+                            conditionalPanel(condition = "input.CheckBaseline == false",
+                                             column(
+                                               width = 12,
+                                               uiOutput("PCRbaseline_different")
+                                             )
+                            )
+                          )
+                        )
                     )
                   ),
                   br(),
@@ -1001,40 +1021,54 @@ ui <- dashboardPage(
               fluidRow(
                 box(width= 12,
                     title = "Focus on specific genes",
-                    column(
-                      width = 2,
-                      offset = 1,
-                      selectizeInput(
-                        inputId = "PCR_sample_plot",
-                        "Select Sample:", 
-                        choices = c(""),
-                        selected = ""
+                    fluidRow(
+                      column(
+                        width = 2,
+                        offset = 1,
+                        selectizeInput(
+                          inputId = "PCR_sample_plot",
+                          "Select Sample:", 
+                          choices = c(""),
+                          selected = "", multiple = TRUE
+                        )
+                      ),
+                      column(
+                        width = 2,
+                        selectizeInput(
+                          inputId = "PCR_Baseline_plot",
+                          "Select Baseline:", 
+                          choices = c(""),
+                          selected = "", multiple = TRUE
+                        )
+                      ),
+                      column(
+                        width = 2,
+                        selectizeInput(
+                          inputId = "Gene_plot",
+                          "Select gene:", 
+                          choices = c(""),
+                          selected = ""
+                        )
+                      ),
+                      column(
+                        width = 2,
+                        selectizeInput(
+                          inputId = "HousKgene_plot",
+                          "Select housekeeping gene:", 
+                          choices = c(""), selected = ""
+                        )
                       )
                     ),
-                    column(
-                      width = 2,
-                      selectizeInput(
-                        inputId = "Gene_plot",
-                        "Select gene:", 
-                        choices = c(""),
-                        selected = "All"
+                    fluidRow(
+                      column(
+                        offset = 1,
+                        width = 2,
+                        checkboxGroupInput("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "bar")
+                      ),
+                      column(
+                        width = 2,
+                        radioButtons("PCR_plot_y", "Visualization: ", choices = c("DDCT" = "ddCt", "2^(-DDCT)" = "Q"), selected = "ddCt")
                       )
-                    ),
-                    column(
-                      width = 2,
-                      selectizeInput(
-                        inputId = "HousKgene_plot",
-                        "Select housekeeping gene:", 
-                        choices = c(""), selected = ""
-                      )
-                    ),
-                    column(
-                      width = 2,
-                      checkboxGroupInput("PCR_plot_type", "Plot Type", choices = c("Point" = "point", "Bar" = "bar"), selected = "bar")
-                    ),
-                    column(
-                      width = 2,
-                      radioButtons("PCR_plot_y", "Visualization: ", choices = c("DDCT" = "ddCt", "2^(-DDCT)" = "Q"), selected = "ddCt")
                     ),
                     fluidRow(
                       column(width = 12,

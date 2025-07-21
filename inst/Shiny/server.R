@@ -328,7 +328,7 @@ server <- function(input, output, session) {
                results = do.call(rbind, results)
                finalTable = results %>% mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
-                 AdjRelDensityScaled = OmicsValue*AdjRelDensity/100 # I have to divide 100 because Mean is in %
+                 AdjRelDensityScaled = OmicsValue*AdjRelDensity # I have to divide 100 because Mean is in %
                ) %>% 
                  group_by(SampleName) %>%
                  summarise(meanAdjRelDensity = mean(AdjRelDensity),
@@ -355,7 +355,7 @@ server <- function(input, output, session) {
                
                finalTable = combined_table %>% mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
-                 Qscaled = OmicsValue*`2^(-DDCT)`/100 # I have to divide 100 because Mean is in %
+                 Qscaled = OmicsValue*`2^(-DDCT)` # I have to divide 100 because Mean is in %
                ) %>% select(-GeneH, - DDCT , -Sd) %>% 
                  rename(Q = `2^(-DDCT)` )%>% 
                  group_by(Sample) %>%
@@ -3238,45 +3238,91 @@ server <- function(input, output, session) {
     }
     
   })
+
+  selected_baselines <- reactiveValues()
   
   observe({
-    if(!is.null(pcrResult$data)){
-      
-      PCR = pcrResult$data
-      
-      AllGenes = unique(PCR$Gene)
+    PCR = req(pcrResult$data)
+    if(!input$CheckBaseline){
       Exp = unique(PCR$Sample)
       
-      if(input$PCR_time != ""){
-        updateSelectInput(session, "PCRbaseline",
-                          choices = unique(PCR$Time) )
-      }else{
-        updateSelectInput(session, "PCRbaseline",
-                          choices = Exp )
-      }
- 
-      updateSelectizeInput(session,"PCRnorm",
-                               choices = AllGenes )
+      lapply(Exp, function(col_name) {
+        input_id <- paste0("select_base4", col_name)
+        
+        observeEvent(input[[input_id]], {
+          # If something is selected, store it and remove the input
+          if (!is.null(input[[input_id]])) {
+            selected_baselines[[col_name]] <- input[[input_id]]
+          }
+        }, ignoreInit = TRUE)
+      })
       
-    }else{
-      updateSelectInput(session, "PCRbaseline",
-                        choices = "" )
-      updateCheckboxGroupInput(session,"PCRnorm",
-                               choices = "" )
     }
   })
   
-  observeEvent(input$PCRnorm,{
-    pcrResult$PCRnorm = input$PCRnorm
-    FlagsPCR$norm = T
-  })
-  observeEvent(input$PCRbaseline,{
-    pcrResult$BaselineExp = input$PCRbaseline
-    FlagsPCR$baseline = T
+  
+  observe({
+      PCR = req(pcrResult$data)
+      input$CheckBaseline
+      AllGenes = unique(PCR$Gene)
+      Exp = unique(PCR$Sample)
+      
+        if(input$PCR_time != ""){
+          updateSelectInput(session, "PCRbaseline",
+                            choices = unique(PCR$Time) )
+        }else{
+          if(input$CheckBaseline)
+          {
+            updateSelectInput(session, "PCRbaseline",
+                              choices = Exp )
+          }else{
+            baselines = unlist(reactiveValuesToList(selected_baselines))
+            baselines = baselines[baselines != ""]
+            inputs_to_render <- setdiff(Exp, baselines)
+            
+            Exp = Exp[!Exp %in% names(baselines)]
+            
+            output$PCRbaseline_different <- renderUI({
+              # Crea una lista di selectizeInput dinamici
+              lapply(inputs_to_render, function(sample_name) {
+                selectizeInput(
+                  inputId = paste0("select_base4", sample_name),
+                  label = paste("Select baseline for", sample_name),
+                  choices = c("",Exp[Exp != sample_name]),
+                  selected = ifelse(!is.null(selected_baselines[[sample_name]]),selected_baselines[[sample_name]], "")
+                )
+              })
+            })
+          }
+        }
+
+      updateSelectizeInput(session,"PCRnorm",
+                           choices = AllGenes )
+
   })
   
   observe({
-    if(FlagsPCR$baseline & FlagsPCR$norm & !is.null(pcrResult$data)){
+    req(pcrResult$data)
+    pcrResult$PCRnorm <- req(input$PCRnorm)
+    if(input$CheckBaseline){
+        BaselineExp = req(input$PCRbaseline)
+        samples = unique(pcrResult$data$Sample[pcrResult$data$Sample!=BaselineExp])
+        if(length(samples) < 1){
+          showAlert("Error", "Number of samples should be > 1", "error", 5000)
+          return()
+        }
+        pcrResult$BaselineExp = data.frame(Sample = samples,
+                                           Baseline = BaselineExp )
+      }else{
+        baselines = unlist(reactiveValuesToList(selected_baselines))
+        baselines = baselines[baselines != ""]
+        if(length(baselines)>0)
+          pcrResult$BaselineExp = data.frame(Sample = names(baselines), Baseline = baselines )
+        else{
+          return()
+        }
+      }
+    
       
       pcrResult$BaselineExp -> BaselineExp
       pcrResult$PCRnorm -> PCRnorm
@@ -3304,38 +3350,42 @@ server <- function(input, output, session) {
         ungroup()
       
       if(input$PCR_time != ""){
+        # Da gestire con più baseline!! -> elimiare unique come sotto!
+        if(length(unique(BaselineExp$Baseline)) > 1 )
+           return()
+           
         BaselinePCR = PCRstep3 %>% 
-          dplyr::filter(Time == BaselineExp) %>%
-          rename(BaselineMean=Mean, BaselineSd=Sd,BaselinedCt = dCt) %>%
-          dplyr::select(-HousekGeneMean, -HousekGeneSd,-Time)
+          dplyr::filter(Time == unique(BaselineExp$Baseline)) %>%
+          rename(BaselineMean=Mean, BaselineSd=Sd, BaselinedCt = dCt, Baseline = Time) %>%
+          dplyr::select(-HousekGeneMean, -HousekGeneSd)
+        
         PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Sample","HousekGene") )
         
       }else{
+        
         BaselinePCR = PCRstep3 %>% 
-          dplyr::filter(Sample == BaselineExp) %>%
-          rename(BaselineMean=Mean, BaselineSd=Sd,BaselinedCt = dCt) %>%
-          dplyr::select(-Sample,  -HousekGeneMean, -HousekGeneSd)
+          dplyr::filter(Sample %in% BaselineExp$Baseline) %>%
+          rename(BaselineMean=Mean, BaselineSd=Sd,BaselinedCt = dCt, Baseline = Sample) %>%
+          dplyr::select(  -HousekGeneMean, -HousekGeneSd)
+        BaselinePCR = merge(BaselinePCR,BaselineExp)
         
-        PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time","HousekGene") )
+        for(b in unique(BaselinePCR$Baseline))
+          BaselinePCR = rbind(BaselinePCR, BaselinePCR %>% filter(Baseline == b) %>%  mutate(Sample = b) )
         
+        PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time","HousekGene","Sample") )
       }
       
         PCRstep5 = PCRstep4 %>%
-          group_by(Sample,Gene,Time,HousekGene) %>%
+          group_by(Sample,Gene,Time,HousekGene,Baseline) %>%
           dplyr::summarize(
             ddCt = dCt - BaselinedCt,
             Q = 2^{-ddCt},
             Sd = Sd,
             Mean = Mean)%>%
           ungroup()
-
-
-      AllGenes = unique(PCR$Gene)
+        
       pcrResult$NewPCR = PCRstep5
       
-      PCRstep5 = PCRstep5 %>% dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
-      
-    }
   })
   # pcr plot
   
@@ -3344,9 +3394,11 @@ server <- function(input, output, session) {
     input$PCR_cut_type -> PCR_cut_type
     
     isolate({
-      NewPCRFiltered = NewPCR %>% dplyr::filter(!is.na(ddCt) | Sample == pcrResult$BaselineExp )
+      pcrResult$BaselineExp$Baseline -> baselines
+      NewPCRFiltered = NewPCR %>% dplyr::filter(!is.na(ddCt) | Sample %in% baselines )
       updateSelectizeInput(inputId = "HousKgene_plot", choices = c("",unique(NewPCR$HousekGene)),selected = "" )
       updateSelectizeInput(inputId = "PCR_sample_plot", choices = c("All",unique(NewPCR$Sample)),selected = "All" )
+      updateSelectizeInput(inputId = "PCR_Baseline_plot", choices = c("All",unique(NewPCR$Baseline)),selected = "All" )
       updateSelectizeInput(inputId = "Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
       
       NewPCRFiltered$ddCt = NewPCRFiltered$ddCt + 0.01 # in this way the slider at the beginning does not touch any points
@@ -3367,37 +3419,38 @@ server <- function(input, output, session) {
     NewPCR = req(pcrResult$NewPCR)
     cut = req(input$CutFoldChange_slider)
     input$PCR_cut_type -> PCR_cut_type
+    pcrResult$BaselineExp$Baseline -> baselines
     
     if(PCR_cut_type == "Greater"){
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
-        dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
+        dplyr::filter(!is.na(ddCt), !Sample %in% baselines ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt >= cut, 1, 0.5))
 
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
-        dplyr::filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
+        dplyr::filter(-DDCT >= cut,!is.na(DDCT), !Sample %in% baselines  )
     }else if(PCR_cut_type == "Smaller"){
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
-        dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
+        dplyr::filter(!is.na(ddCt), !Sample %in% baselines  ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt <= cut,  1, 0.5))
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
-        dplyr::filter(-DDCT <= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
+        dplyr::filter(-DDCT <= cut,!is.na(DDCT), !Sample %in% baselines  )
       
     }else if(PCR_cut_type == "Both"){
       cut = req(input$BothCutFoldChange_slider)
       
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
-        dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
+        dplyr::filter(!is.na(ddCt),! Sample %in% baselines ) %>% 
         dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , 0.5, 1))
 
       
       table  =  PCRstep5 %>% 
         dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter( -DDCT >= max(cut) | -DDCT <= min(cut),
-                       !is.na(DDCT), Sample != pcrResult$BaselineExp )
+                       !is.na(DDCT), !Sample %in% baselines  )
     }
     
     if(input$PCR_time != ""){
@@ -3497,7 +3550,8 @@ server <- function(input, output, session) {
     input$Gene_plot -> gene
     input$HousKgene_plot -> Hgene
     input$PCR_plot_y -> y_axis
-    input$PCR_sample_plot -> sample
+    req(input$PCR_sample_plot) -> sample
+    req(input$PCR_Baseline_plot) -> baseline
     plot_type <- req(input$PCR_plot_type)
     
     isolate({
@@ -3506,9 +3560,13 @@ server <- function(input, output, session) {
         PCRstep5 = pcrResult$NewPCR %>% 
           dplyr::filter(HousekGene == Hgene, Gene == gene) %>%
           dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
-        if(sample != "All"){
-          PCRstep5 = PCRstep5 %>% dplyr::filter(Sample == sample)
+        if( ! "All" %in% sample){
+          PCRstep5 = PCRstep5 %>% dplyr::filter(Sample %in% sample)
         }
+        if( ! "All" %in% baseline){
+          PCRstep5 = PCRstep5 %>% dplyr::filter(Baseline %in% baseline)
+        }
+        
         if(length(unique(PCRstep5$Time)) >1 ){
           plot1 = 
             ggplot(data = PCRstep5,aes(x = Time, y = ddCt))+
