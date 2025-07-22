@@ -3170,11 +3170,11 @@ server <- function(input, output, session) {
       
       if (Sample %in% colnames(pcrResult$Initdata)) {
         pcrResult$Initdata[Time] <- NA  
-        pcrResult$Initdata[Sample_new] <- NA  
+        pcrResult$Initdata[Sample_new] <- pcrResult$Initdata[[Sample]]  
         for (pattern in time_patterns) {
           matched_rows <- grepl(pattern, pcrResult$Initdata[[Sample]], ignore.case = TRUE)
           pcrResult$Initdata[Time][matched_rows,] <- pattern
-          pcrResult$Initdata[Sample_new] <- gsub(pattern, "", pcrResult$Initdata[[Sample]], ignore.case = TRUE)
+          pcrResult$Initdata[Sample_new] <- gsub(pattern, "", pcrResult$Initdata[[Sample_new]], ignore.case = TRUE)
         }
         
         pcrResult$Initdata[Time] <- factor(x = pcrResult$Initdata[[Time]] , levels = time_patterns)
