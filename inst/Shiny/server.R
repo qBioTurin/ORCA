@@ -3162,7 +3162,7 @@ server <- function(input, output, session) {
         else
           NULL
       })
-      
+   
       if(length(selectPCRcolumns)==3 ){
         tmp = PCR[,selectPCRcolumns]
         colnames(tmp) = c("Gene", "Sample", "Value")
@@ -6707,6 +6707,7 @@ server <- function(input, output, session) {
   observeEvent(input$facs_plotChannelButton, {
     req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel)
     
+    facsSelections$currentPlot <- TRUE
     data = rawfacsResult$Initdata
     
     # Extract expression matrix
@@ -6756,13 +6757,13 @@ server <- function(input, output, session) {
       footer = tagList(
         div(style = "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;",
             div(style = "display: flex; align-items: center; gap: 10px;",
-                textInput("facs_selectionName", "Nome della nuova selezione:", 
+                textInput("facs_selectionName", "Name of the new selection:", 
                           value = "", width = "250px"),
-                actionButton("facs_clearPolygon", "Cancella Poligono", 
+                actionButton("facs_clearPolygon", "Delete Polygon", 
                              class = "btn-warning"),
-                actionButton("facs_confirmSelection", "Conferma Selezione", 
+                actionButton("facs_confirmSelection", "Confirm Selection", 
                              class = "btn-primary"),
-                modalButton("Annulla")
+                modalButton("Cancel")
             ),
             div(id = "polygon_info", style = "width: 100%; margin-top: 10px;",
                 textOutput("facs_polygonInfo")
@@ -6772,9 +6773,9 @@ server <- function(input, output, session) {
       fluidRow(
         column(12,
                div(style = "text-align: center; margin-bottom: 10px;",
-                   strong("Clicca sul plot per aggiungere punti al poligono. Il poligono si chiuderà automaticamente."),
+                   strong("Click on the plot to add points to the polygon. The polygon will close automatically."),
                    br(),
-                   span("Le selezioni precedenti sono mostrate con colori diversi e linee tratteggiate.", 
+                   span("Previous selections are shown with different colors and dotted lines.", 
                         style = "font-size: 12px; color: #666; font-style: italic;")
                ),
                plotOutput("facs_modalPlot",
@@ -6908,15 +6909,15 @@ server <- function(input, output, session) {
       
       info_text <- ""
       if(n_prev_selections > 0) {
-        info_text <- paste("Selezioni esistenti:", n_prev_selections, "| ")
+        info_text <- paste("Existing selections:", n_prev_selections, "| ")
       }
       
       if(n_points == 0) {
-        paste0(info_text, "Nessun punto selezionato")
+        paste0(info_text, "No points selected")
       } else if(n_points < 3) {
-        paste0(info_text, "Punti selezionati: ", n_points, " - Servono almeno 3 punti per creare un poligono")
+        paste0(info_text, "Selected points: ", n_points, " - You need at least 3 points to create a polygon")
       } else {
-        paste0(info_text, "Punti selezionati: ", n_points, " - Poligono completo")
+        paste0(info_text, "Selected points: ", n_points, " - Complete polygon")
       }
     })
   })
@@ -6928,34 +6929,67 @@ server <- function(input, output, session) {
     selectedLevel <- input$facs_hierarchySelector
     selectedSample <- input$facs_sampleSelector
     
-    if (is.null(facsSelections$selections[[selectedSample]])) {
-      showAlert("Error", "Nessuna selezione trovata per questo campione", "error", 3000)
+    if (is.null(facsSelections$selections[[selectedSample]]) || 
+        length(facsSelections$selections[[selectedSample]]) == 0) {
+      showAlert("Error", "No selection found for this sample", "error", 3000)
+      return()
+    }
+    if (is.null(selectedLevel) || selectedLevel == "None" || selectedLevel == "" || 
+        !selectedLevel %in% names(facsSelections$selections[[selectedSample]])) {
+      showAlert("Error", "Select a valid level to eliminate", "error", 3000)
       return()
     }
     
-    if (selectedLevel == "None" || selectedLevel == "") {
-      showAlert("Error", "Seleziona un livello valido da eliminare", "error", 3000)
-      return()
+    selectionToDelete <- facsSelections$selections[[selectedSample]][[selectedLevel]]
+    selectionFullName <- selectionToDelete$name
+    
+    selectionsToRemove <- c()
+    
+    findDescendants <- function(parentName, parentFullName, allSelections) {
+      descendants <- c()
+      for (selName in names(allSelections)) {
+        sel <- allSelections[[selName]]
+        if (sel$parent == parentName || sel$parent == parentFullName) {
+          descendants <- c(descendants, selName)
+          
+          descendants <- c(descendants, findDescendants(selName, sel$name, allSelections)) # Chiamata ricorsiva
+        }
+      }
+      return(descendants)
     }
     
-    # Filtra tutte le selezioni non correlate al livello scelto
-    remainingSelections <- facsSelections$selections[[selectedSample]][
-      sapply(facsSelections$selections[[selectedSample]], function(sel) {
-        !(startsWith(sel$name, paste0(facsSelections$selections[[selectedSample]][[selectedLevel]]$name, "/")) ||
-            sel$name == facsSelections$selections[[selectedSample]][[selectedLevel]]$name)
-      })
-    ]
+    selectionsToRemove <- c(selectionsToRemove, selectedLevel)
     
-    # Aggiorna selections
-    facsSelections$selections[[selectedSample]] <- remainingSelections
+    descendants <- findDescendants(selectedLevel, selectionFullName, facsSelections$selections[[selectedSample]])
+    selectionsToRemove <- c(selectionsToRemove, descendants)
     
-    # Aggiorna selettore gerarchia
-    newAvailableSelections <- names(remainingSelections)
+    # Rimuove le selezioni identificate
+    for (selToRemove in selectionsToRemove) {
+      if (selToRemove %in% names(facsSelections$selections[[selectedSample]])) {
+        facsSelections$selections[[selectedSample]][[selToRemove]] <- NULL
+      }
+    }
+    
+    if (length(facsSelections$selections[[selectedSample]]) == 0) {
+      facsSelections$selections[[selectedSample]] <- NULL
+    }
+    
+    # Aggiorna il selettore gerarchico
+    remainingSelections <- character(0)
+    if (!is.null(facsSelections$selections[[selectedSample]])) {
+      remainingSelections <- names(facsSelections$selections[[selectedSample]])
+    }
+    
     updateSelectInput(session, "facs_hierarchySelector",
-                      choices = c("None", newAvailableSelections),
+                      choices = c("None", remainingSelections),
                       selected = "None")
     
-    showAlert("Success", paste("Livello", selectedLevel, "e tutte le sue sottoselezioni sono state eliminate"), "success", 2000)
+    numRemoved <- length(selectionsToRemove)
+    if (numRemoved == 1) {
+      showAlert("Success", paste("Level", selectedLevel, "eliminated"), "success", 2000)
+    } else {
+      showAlert("Success", paste("Level", selectedLevel, "and", numRemoved-1, "descendants eliminated"), "success", 2000)
+    }
   })
   
   
@@ -7052,19 +7086,12 @@ server <- function(input, output, session) {
   
   # Output per verificare se ci sono selezioni
   output$facs_hasSelections <- reactive({
-    length(facsSelections$selections) > 0
+    length(facsSelections$selections) > 0 || !is.null(facsSelections$currentPlot)
   })
   outputOptions(output, "facs_hasSelections", suspendWhenHidden = FALSE)
   
   # Output informativo sulle selezioni create
   output$facs_selectionsInfo <- renderTable({
-    if (length(facsSelections$selections) == 0) {
-      return(data.frame(
-        Depth = character(0),
-        Name = character(0),
-        Cells = numeric(0)
-      ))
-    }
     
     all_selections <- data.frame(
       Depth = character(),
@@ -7073,16 +7100,33 @@ server <- function(input, output, session) {
       stringsAsFactors = FALSE
     )
     
-    for (sampleName in names(facsSelections$selections)) {
-      sampleSelections <- facsSelections$selections[[sampleName]]
-      for (selName in names(sampleSelections)) {
-        sel <- sampleSelections[[selName]]
+    # Aggiungi i livelli "None" 
+    if (!is.null(rawfacsResult$Initdata)) {
+      sampleNames_data <- sampleNames(rawfacsResult$Initdata)
+      for (sampleName in sampleNames_data) {
+        n_cells <- nrow(exprs(rawfacsResult$Initdata@frames[[sampleName]]))
         all_selections <- rbind(all_selections, data.frame(
-          Depth = sel$depth,
-          Name = sel$name,
-          Cells = sel$n_cells,
+          Depth = "",
+          Name = sampleName,
+          Cells = n_cells,
           stringsAsFactors = FALSE
         ))
+      }
+    }
+    
+    # Aggiungi le selezioni create
+    if (length(facsSelections$selections) > 0) {
+      for (sampleName in names(facsSelections$selections)) {
+        sampleSelections <- facsSelections$selections[[sampleName]]
+        for (selName in names(sampleSelections)) {
+          sel <- sampleSelections[[selName]]
+          all_selections <- rbind(all_selections, data.frame(
+            Depth = sel$depth,
+            Name = sel$name,
+            Cells = sel$n_cells,
+            stringsAsFactors = FALSE
+          ))
+        }
       }
     }
     

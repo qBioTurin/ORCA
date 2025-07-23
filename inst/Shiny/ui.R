@@ -1662,17 +1662,17 @@ ui <- dashboardPage(
               ),
               
               # Nuova sezione per la selezione gerarchica
-              box(width = 12, title = "Selezione Gerarchica Interattiva", status = "primary", solidHeader = TRUE,
+              box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
                   fluidRow(
                     column(4,
                            selectInput("facs_sampleSelector", 
-                                       "Seleziona Campione (Name):",
+                                       "Select Sample (Name):",
                                        choices = character(0),
                                        selected = NULL)
                     ),
                     column(4,
                            selectInput("facs_hierarchySelector", 
-                                       "Livello Gerarchico:",
+                                       "Hierarchical level:",
                                        choices = character(0),
                                        selected = NULL)
                     ),
@@ -1695,7 +1695,7 @@ ui <- dashboardPage(
                   conditionalPanel(
                     condition = "output.facs_hasSelections",
                     hr(),
-                    h4("Selezioni Create:", style = "color: #337ab7;"),
+                    h4("Selections Created:", style = "color: #337ab7;"),
                     div(style = "background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 10px; overflow-x: auto;",
                         tableOutput("facs_selectionsInfo")
                     )
