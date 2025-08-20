@@ -1640,6 +1640,7 @@ ui <- dashboardPage(
                        tableOutput("rawFACSmatrix")          
                 )
               ),
+              fluidRow(
               box(width = 12,
                   fluidRow(
                     column(
@@ -1657,10 +1658,10 @@ ui <- dashboardPage(
                   ),
                   fluidRow(
                     plotOutput("facs_ChannelscatterPlot"),
-                    plotOutput("facs_autoPlot",height = "800px")
+                    #plotOutput("facs_autoPlot",height = "800px")
                   )
-              ),
-              
+              )),
+              fluidRow(
               # Nuova sezione per la selezione gerarchica
               box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
                   fluidRow(
@@ -1687,6 +1688,10 @@ ui <- dashboardPage(
                                         "Remove Level and Sons",
                                         class = "btn-danger",
                                         icon = icon("eraser"),
+                                        style = "width: 100%; margin-top: 10px;"),
+                           actionButton("facs_saveSelections", "Save Selections", class = "btn-success", 
+                                        style = "width: 100%; margin-top: 10px;"),
+                           actionButton("facs_loadSelections", "Apply Saved Selections", class = "btn-info",
                                         style = "width: 100%; margin-top: 10px;")
                     )
                   ),
@@ -1700,7 +1705,7 @@ ui <- dashboardPage(
                         tableOutput("facs_selectionsInfo")
                     )
                   )
-              )
+              ))
       ),
       tabItem(
         tabName = "uploadFACS",

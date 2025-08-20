@@ -6584,7 +6584,11 @@ server <- function(input, output, session) {
   ### End CYTOTOX analysis ####
   
   
+  
   #### RAW FACS analysis ####
+  
+  savedSelections <- reactiveVal(NULL)
+  
   rawfacsResult = reactiveValues(
     Initdata= NULL
   )
@@ -7083,6 +7087,83 @@ server <- function(input, output, session) {
     removeModal()
     showAlert("Success", paste("Selezione", selectionName, "creata con successo per il campione", selectedSample), "success", 2000)
   })
+  
+  
+  # Salva la gerarchia di selezioni per un sample
+  saveSampleSelections <- function(sampleName) {
+    if (!is.null(facsSelections$selections[[sampleName]])) {
+      return(facsSelections$selections[[sampleName]])
+    } else {
+      return(NULL)
+    }
+  }
+  
+  # Applica selezioni salvate a un nuovo sample
+  applySelectionsToSample <- function(savedSelections, newSample, data) {
+    if (is.null(savedSelections) || length(savedSelections) == 0) return(NULL)
+    
+    newSelections <- list()
+    
+    for (selName in names(savedSelections)) {
+      sel <- savedSelections[[selName]]
+      
+      filteredData <- filterFACSDataByPolygon(
+        data, 
+        sel$polygon, 
+        sel$channels[1], 
+        sel$channels[2], 
+        newSample
+      )
+      
+      if (!is.null(filteredData)) {
+        newSelections[[selName]] <- list(
+          data = filteredData,
+          parent = if(sel$parent == sel$sample) newSample else sel$parent, 
+          polygon = sel$polygon,
+          channels = sel$channels,
+          sample = newSample,
+          depth = sel$depth, 
+          name = gsub(sel$sample, newSample, sel$name, fixed = TRUE),
+          n_cells = nrow(exprs(filteredData@frames[[newSample]]))
+        )
+      }
+    }
+    
+    return(newSelections)
+  }
+  
+
+  # Salva le selezioni correnti del sample
+  observeEvent(input$facs_saveSelections, {
+    req(input$facs_sampleSelector)
+    sel <- saveSampleSelections(input$facs_sampleSelector)
+    if (is.null(sel)) {
+      showAlert("Error", "No selections available to save for this sample", "error", 3000)
+    } else {
+      savedSelections(sel)
+      showAlert("Success", paste("Selections saved for sample", input$facs_sampleSelector), "success", 2000)
+    }
+  })
+  
+  # Applica le selezioni salvate a un nuovo sample
+  observeEvent(input$facs_loadSelections, {
+    req(savedSelections(), input$facs_sampleSelector, rawfacsResult$Initdata)
+    newSample <- input$facs_sampleSelector
+    
+    newSel <- applySelectionsToSample(savedSelections(), newSample, rawfacsResult$Initdata)
+    
+    if (is.null(newSel)) {
+      showAlert("Error", "Could not apply saved selections to this sample", "error", 3000)
+    } else {
+      facsSelections$selections[[newSample]] <- newSel
+      showAlert("Success", paste("Selections applied to sample", newSample), "success", 2000)
+      
+      updateSelectInput(session, "facs_hierarchySelector", 
+                        choices = c("None", names(facsSelections$selections[[newSample]])),
+                        selected = "None")
+    }
+  })
+  
   
   # Output per verificare se ci sono selezioni
   output$facs_hasSelections <- reactive({
