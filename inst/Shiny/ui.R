@@ -1689,10 +1689,15 @@ ui <- dashboardPage(
                                         class = "btn-danger",
                                         icon = icon("eraser"),
                                         style = "width: 100%; margin-top: 10px;"),
-                           actionButton("facs_saveSelections", "Save Selections", class = "btn-success", 
-                                        style = "width: 100%; margin-top: 10px;"),
-                           actionButton("facs_loadSelections", "Apply Saved Selections", class = "btn-info",
-                                        style = "width: 100%; margin-top: 10px;")
+                           br(),
+                           div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
+                               textInput("facs_hierarchyName", "Hierarchy Name", placeholder = "Enter hierarchy name", width = "70%"),
+                               actionButton("facs_saveSelections", "Save", class = "btn-success", style = "width: 30%;")
+                           ),
+                           div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
+                               uiOutput("facs_hierarchySelectorUI", style = "width: 70%;"),
+                               actionButton("facs_loadSelections", "Apply", class = "btn-info", style = "width: 30%;")
+                           )
                     )
                   ),
                   
