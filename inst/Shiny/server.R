@@ -6936,6 +6936,7 @@ server <- function(input, output, session) {
   
   # Elimina i livelli gerarchici
   observeEvent(input$facs_clearSelection, {
+    manageSpinner(TRUE)
     req(input$facs_hierarchySelector, input$facs_sampleSelector)
     
     selectedLevel <- input$facs_hierarchySelector
@@ -6997,6 +6998,7 @@ server <- function(input, output, session) {
                       selected = "None")
     
     numRemoved <- length(selectionsToRemove)
+    manageSpinner(FALSE)
     if (numRemoved == 1) {
       showAlert("Success", paste("Level", selectedLevel, "eliminated"), "success", 2000)
     } else {
@@ -7022,6 +7024,7 @@ server <- function(input, output, session) {
   
   # Conferma la selezione e crea una nuova entry nella gerarchia
   observeEvent(input$facs_confirmSelection, {
+    manageSpinner(TRUE)
     req(input$facs_selectionName, input$facs_sampleSelector)
     
     # Verifica che ci siano almeno 3 punti per formare un poligono
@@ -7093,6 +7096,7 @@ server <- function(input, output, session) {
     facsSelections$polygonPoints <- list()
     
     removeModal()
+    manageSpinner(FALSE)
     showAlert("Success", paste("Selezione", selectionName, "creata con successo per il campione", selectedSample), "success", 2000)
   })
 
@@ -7142,28 +7146,29 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$facs_saveSelections, {
+    manageSpinner(TRUE)
     req(input$facs_sampleSelector, input$facs_hierarchyName)
     sel <- saveSampleSelections(input$facs_sampleSelector)
     
     if (is.null(sel)) {
+      manageSpinner(FALSE)
       showAlert("Error", "No selections available to save for this sample", "error", 3000)
     } else {
       # Salva la gerarchia con il nome scelto
       savedHierarchies$data[[input$facs_hierarchyName]] <- sel
-      
-      # Debug in console
-      print("Gerarchie salvate finora:")
-      print(names(savedHierarchies$data))
-      
+
+      manageSpinner(FALSE)
       showAlert("Success", paste("Hierarchy saved as", input$facs_hierarchyName), "success", 2000)
     }
     updateTextInput(session, "facs_hierarchyName", value = "")
   })
   
   observeEvent(input$facs_loadSelections, {
+    manageSpinner(TRUE)
     req(input$facs_hierarchySelector_saved, input$facs_sampleSelector, rawfacsResult$Initdata)
     
     if (input$facs_hierarchySelector_saved == "None") {
+      manageSpinner(FALSE)
       showAlert("Error", "Please select a valid hierarchy", "error", 3000)
       return(NULL)
     }
@@ -7174,12 +7179,14 @@ server <- function(input, output, session) {
     newSel <- applySelectionsToSample(selectedHierarchy, newSample, rawfacsResult$Initdata)
     
     if (is.null(newSel)) {
+      manageSpinner(FALSE)
       showAlert("Error", "Could not apply saved hierarchy to this sample", "error", 3000)
     } else {
       facsSelections$selections[[newSample]] <- newSel
       updateSelectInput(session, "facs_hierarchySelector", 
                         choices = c("None", names(facsSelections$selections[[newSample]])),
                         selected = NULL)
+      manageSpinner(FALSE)
       showAlert("Success", paste("Hierarchy", input$facs_hierarchySelector_saved, 
                                  "applied to sample", newSample), "success", 2000)
       
