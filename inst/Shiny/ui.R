@@ -1662,55 +1662,75 @@ ui <- dashboardPage(
                   )
               )),
               fluidRow(
-              # Nuova sezione per la selezione gerarchica
-              box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
-                  fluidRow(
-                    column(4,
-                           selectInput("facs_sampleSelector", 
-                                       "Select Sample (Name):",
-                                       choices = character(0),
-                                       selected = NULL)
+                # Nuova sezione per la selezione gerarchica
+                box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
+                    fluidRow(
+                      # Riga 1: i due selectInput
+                      column(4,
+                             selectInput("facs_sampleSelector", 
+                                         "Select Sample (Name):",
+                                         choices = character(0),
+                                         selected = NULL)
+                      ),
+                      column(4,
+                             selectInput("facs_hierarchySelector", 
+                                         "Hierarchical level:",
+                                         choices = character(0),
+                                         selected = NULL)
+                      )
                     ),
-                    column(4,
-                           selectInput("facs_hierarchySelector", 
-                                       "Hierarchical level:",
-                                       choices = character(0),
-                                       selected = NULL)
+                    
+                    fluidRow(
+                      # Riga 2: plot a sinistra
+                      column(8,
+                             plotOutput("facs_previewPlot", height = "300px")
+                      ),
+                      # Riga 2: pulsanti a destra
+                      column(4,
+                             br(),
+                             actionButton("facs_openSelectionModal", 
+                                          "Open Interactive Selection", 
+                                          class = "btn-info",
+                                          icon = icon("mouse-pointer"),
+                                          style = "width: 100%;"),
+                             actionButton("facs_clearSelection",
+                                          "Remove Level and Sons",
+                                          class = "btn-danger",
+                                          icon = icon("eraser"),
+                                          style = "width: 100%; margin-top: 10px;"),
+                             br(),
+                             div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
+                                 textInput("facs_hierarchyName", "Hierarchy Name", placeholder = "Enter hierarchy name", width = "70%"),
+                                 actionButton("facs_saveSelections", "Save", class = "btn-success", style = "width: 30%;")
+                             ),
+                             div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
+                                 uiOutput("facs_hierarchySelectorUI", style = "width: 70%;"),
+                                 actionButton("facs_loadSelections", "Apply", class = "btn-info", style = "width: 30%;")
+                             )
+                      )
                     ),
-                    column(4,
-                           br(),
-                           actionButton("facs_openSelectionModal", 
-                                        "Open Interactive Selection", 
-                                        class = "btn-info",
-                                        icon = icon("mouse-pointer"),
-                                        style = "width: 100%;"),
-                           actionButton("facs_clearSelection",
-                                        "Remove Level and Sons",
-                                        class = "btn-danger",
-                                        icon = icon("eraser"),
-                                        style = "width: 100%; margin-top: 10px;"),
-                           br(),
-                           div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
-                               textInput("facs_hierarchyName", "Hierarchy Name", placeholder = "Enter hierarchy name", width = "70%"),
-                               actionButton("facs_saveSelections", "Save", class = "btn-success", style = "width: 30%;")
-                           ),
-                           div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
-                               uiOutput("facs_hierarchySelectorUI", style = "width: 70%;"),
-                               actionButton("facs_loadSelections", "Apply", class = "btn-info", style = "width: 30%;")
-                           )
+                    
+                    # Pannello informativo delle selezioni
+                    conditionalPanel(
+                      condition = "output.facs_hasSelections",
+                      hr(),
+                      h4("Selections Created:", style = "color: #337ab7;"),
+                      div(style = "background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 10px; overflow-x: auto;",
+                          tableOutput("facs_selectionsInfo")
+                      )
                     )
-                  ),
-                  
-                  # Pannello informativo delle selezioni
-                  conditionalPanel(
-                    condition = "output.facs_hasSelections",
-                    hr(),
-                    h4("Selections Created:", style = "color: #337ab7;"),
-                    div(style = "background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 10px; overflow-x: auto;",
-                        tableOutput("facs_selectionsInfo")
-                    )
-                  )
-              ))
+                ),
+                column(width = 12,
+                       div(style = "display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;",
+                           downloadButton(label = "Download Analysis & Excel", 
+                                          outputId = "downloadRawFacsAnalysis",
+                                          icon = icon("download")),
+                           actionButton(inputId = "NextFacsHierarchicalGating",
+                                        label = 'Proceed to Hierarchical gating',
+                                        icon = shiny::icon("forward"))
+                       )
+                )
+              )
       ),
       tabItem(
         tabName = "uploadFACS",

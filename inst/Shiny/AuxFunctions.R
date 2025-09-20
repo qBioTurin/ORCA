@@ -721,6 +721,17 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                         dpi = 600)
            }
          },
+         "RAWFACS" = {
+           wb <- createWorkbook("RAWFACS")  
+           
+           if (!is.null(ResultList) && is.data.frame(ResultList)) {
+             addWorksheet(wb, "Raw Data")  # Aggiunge un nuovo foglio al workbook
+             writeDataTable(wb, ResultList, sheet = "Raw Data")  # Scrive i dati nel foglio
+             print("Initdata scritto nel foglio Excel")
+           } else {
+             print("Errore: Initdata non disponibile o non è un data.frame")
+           }
+         },
          "FACS" = {
            wb <- createWorkbook("FACS")
            

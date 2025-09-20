@@ -6588,11 +6588,13 @@ server <- function(input, output, session) {
   #### RAW FACS analysis ####
   
   rawfacsResult = reactiveValues(
-    Initdata= NULL
+    Initdata= NULL,
+    tableSelections = NULL
   )
   
   rawfacsResult0 = reactiveValues(
-    Initdata= NULL
+    Initdata= NULL,
+    tableSelections = NULL
   )
   
   rawFlagsFACS = reactiveValues(
@@ -6706,6 +6708,116 @@ server <- function(input, output, session) {
     updateSelectInput(session, "facs_hierarchySelector", 
                       choices = c("None",availableSelections),
                       selected = NULL)
+  })
+  
+  output$facs_previewPlot <- renderPlot({
+    req(input$facs_sampleSelector, input$facs_hierarchySelector)
+    
+    selectedSample <- input$facs_sampleSelector
+    hierarchyLevel <- input$facs_hierarchySelector
+    
+    # Determino da quale dataset partire
+    data <- NULL
+    if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0 || hierarchyLevel == "None") {
+      data <- rawfacsResult$Initdata
+    } else {
+      if(!is.null(facsSelections$selections[[selectedSample]]) && !is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) {
+        data <- facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data
+      } else {
+        data <- rawfacsResult$Initdata
+      }
+    }
+    
+    channelx <- input$facs_xChannel
+    channely <- input$facs_yChannel
+    
+    sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
+    sample_expr$Name <- selectedSample
+    
+    p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
+      geom_point(alpha = 0.5, color = "blue", size = 0.8) +
+      labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
+    
+    # Disegna le selezioni precedenti per il campione corrente con parent == hierarchyLevel
+    if (!is.null(facsSelections$selections[[selectedSample]])) {
+      colors <- c("purple", "orange", "green", "brown", "pink", "cyan", "yellow", "gray")
+      
+      sampleSelections <- facsSelections$selections[[selectedSample]]
+      if (hierarchyLevel == "None" || is.null(hierarchyLevel) || hierarchyLevel == ""){
+        validSelections <- names(sampleSelections)[
+          sapply(sampleSelections, function(sel) sel$parent == selectedSample)
+        ]
+      } else {
+        validSelections <- names(sampleSelections)[
+          sapply(sampleSelections, function(sel) sel$parent == hierarchyLevel)
+        ]
+      }
+      
+      for (i in seq_along(validSelections)) {
+        sel_name <- validSelections[i]
+        sel_data <- sampleSelections[[sel_name]]
+        
+        if (!is.null(sel_data$polygon) &&
+            !is.null(sel_data$channels) &&
+            length(sel_data$channels) >= 2 &&
+            sel_data$channels[1] == channelx &&
+            sel_data$channels[2] == channely) {
+          
+          sel_color <- colors[((i - 1) %% length(colors)) + 1]
+          
+          if (nrow(sel_data$polygon) >= 3) {
+            polygon_df_closed <- rbind(sel_data$polygon, sel_data$polygon[1, ])
+            
+            p <- p +
+              geom_polygon(data = sel_data$polygon, aes(x = x, y = y),
+                           fill = sel_color, alpha = 0.15, color = sel_color, size = 1.2) +
+              geom_path(data = polygon_df_closed, aes(x = x, y = y),
+                        color = sel_color, size = 1.2, linetype = "dashed") +
+              geom_point(data = sel_data$polygon, aes(x = x, y = y),
+                         color = sel_color, size = 2.5, shape = 17)
+            
+            centroid_x <- mean(sel_data$polygon$x)
+            centroid_y <- mean(sel_data$polygon$y)
+            
+            p <- p + annotate("text", x = centroid_x, y = centroid_y,
+                              label = sel_name, color = sel_color,
+                              size = 3, fontface = "bold", hjust = 0.5, vjust = 0.5, alpha = 0.8)
+          }
+        }
+      }
+    }
+    
+    
+    # Aggiungi i punti del poligono corrente (in rosso, in primo piano)
+    if(length(facsSelections$polygonPoints) > 0) {
+      polygon_df <- data.frame(
+        x = sapply(facsSelections$polygonPoints, function(p) p$x),
+        y = sapply(facsSelections$polygonPoints, function(p) p$y)
+      )
+      
+      # Aggiungi i punti del poligono corrente
+      p <- p + geom_point(data = polygon_df, aes(x = x, y = y), 
+                          color = "red", size = 3, shape = 16)
+      
+      # Se ci sono almeno 2 punti, disegna le linee
+      if(nrow(polygon_df) >= 2) {
+        p <- p + geom_path(data = polygon_df, aes(x = x, y = y), 
+                           color = "red", size = 1.5)
+      }
+      
+      # Se ci sono almeno 3 punti, chiudi il poligono
+      if(nrow(polygon_df) >= 3) {
+        polygon_df_closed <- rbind(polygon_df, polygon_df[1, ])
+        p <- p + geom_path(data = polygon_df_closed, aes(x = x, y = y), 
+                           color = "red", size = 1.5) +
+          geom_polygon(data = polygon_df, aes(x = x, y = y), 
+                       fill = "red", alpha = 0.3)
+      }
+    }
+    
+    p
   })
   
   
@@ -7084,7 +7196,13 @@ server <- function(input, output, session) {
         paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$depth, ">"),
       name = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) paste0(selectedSample, "/", selectionName) else 
         paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$name, "/", selectionName),
-      n_cells = nrow(exprs(filteredData@frames[[selectedSample]]))
+      n_cells = nrow(exprs(filteredData@frames[[selectedSample]])),
+      statistic = if (hierarchyLevel=="None") {
+        (nrow(exprs(filteredData@frames[[selectedSample]])) / nrow(exprs(rawfacsResult$Initdata@frames[[selectedSample]]))) * 100
+      } else {
+        ( nrow(exprs(filteredData@frames[[selectedSample]])) /
+            nrow(exprs(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data@frames[[selectedSample]])) ) * 100
+      }
     )
     
     availableSelections <- names(facsSelections$selections[[selectedSample]])
@@ -7137,7 +7255,13 @@ server <- function(input, output, session) {
           sample = newSample, 
           depth = sel$depth, 
           name = gsub(sel$sample, newSample, sel$name, fixed = TRUE), 
-          n_cells = nrow(exprs(filteredData@frames[[newSample]])) 
+          n_cells = nrow(exprs(filteredData@frames[[newSample]])),
+          statistic = if (is.null(newSelections[[sel$parent]])) {
+            (nrow(exprs(filteredData@frames[[newSample]])) / nrow(exprs(rawfacsResult$Initdata@frames[[newSample]]))) * 100
+          } else {
+            ( nrow(exprs(filteredData@frames[[newSample]])) /
+                nrow(exprs(newSelections[[sel$parent]]$data@frames[[newSample]])) ) * 100
+          }
         ) 
       } 
     } 
@@ -7222,6 +7346,7 @@ server <- function(input, output, session) {
     all_selections <- data.frame(
       Depth = character(),
       Name = character(),
+      Statistic = numeric(),
       Cells = numeric(),
       stringsAsFactors = FALSE
     )
@@ -7234,6 +7359,7 @@ server <- function(input, output, session) {
         all_selections <- rbind(all_selections, data.frame(
           Depth = "",
           Name = sampleName,
+          Statistic = 100,
           Cells = n_cells,
           stringsAsFactors = FALSE
         ))
@@ -7249,12 +7375,14 @@ server <- function(input, output, session) {
           all_selections <- rbind(all_selections, data.frame(
             Depth = sel$depth,
             Name = sel$name,
+            Statistic = round(sel$statistic, 2),
             Cells = sel$n_cells,
             stringsAsFactors = FALSE
           ))
         }
       }
     }
+    rawfacsResult$tableSelections <- all_selections
     
     all_selections
   })
@@ -7318,6 +7446,93 @@ server <- function(input, output, session) {
       return(NULL)
     })
   }
+  
+  
+  output$downloadRawFacsAnalysis <- downloadHandler(
+    filename = function() {
+      paste('RawFacsanalysis-', Sys.Date(), '.zip', sep='')
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      
+      tempDir <- tempdir()
+      nomeRDS <- paste0("RawFacs_analysis-", Sys.Date(), ".rds")
+      nomeXLSX <- paste0("RawFacs_analysis-", Sys.Date(), ".xlsx")
+      
+      tempRdsPath <- file.path(tempDir, nomeRDS)
+      tempXlsxPath <- file.path(tempDir, nomeXLSX)
+      
+      saveRDS(rawfacsResult$tableSelections, file = tempRdsPath)
+      
+      saveExcel(filename = tempXlsxPath, ResultList=rawfacsResult$tableSelections, analysis = "RAWFACS")
+      
+      zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
+      manageSpinner(FALSE)
+    } 
+  )
+  
+  observeEvent(input$NextFacsHierarchicalGating,{
+    if(!is.null(rawfacsResult$tableSelections)){
+      alert$alertContext <- ""
+      
+      for(nameList in names(facsResult0)) 
+        facsResult[[nameList]] <- facsResult0[[nameList]]
+      
+      mess = rawfacsResult$tableSelections
+      
+      if (setequal(names(mess), c("message", "call"))) {
+        showAlert("Error", mess[["message"]], "error", 5000)
+      } else {
+        if (nrow(mess) > 1) {
+          data <- mess[-1, , drop = FALSE]  
+          facsResult$Initdata <- data
+          
+          facsResult$depth <- vector("list", nrow(data))
+          facsResult$depthCount <- numeric(nrow(data))
+          facsResult$name <- vector("list", nrow(data))
+          facsResult$statistics <- vector("list", nrow(data))
+          facsResult$cells <- vector("list", nrow(data))
+          facsResult$originalName <- vector("list", nrow(data))
+          
+          for (i in 1:nrow(data)) {
+            x <- data[i, 1]
+            
+            if (is.na(x)) {
+              facsResult$depth[i] <- NA
+              facsResult$depthCount[i] <- 0
+              facsResult$name[i] <- data[i, 2]
+              facsResult$statistics[i] <- data[i, 3]
+              facsResult$cells[i] <- data[i, 4]
+            } else {
+              x_cleaned <- gsub(" ", "", x)  
+              facsResult$depth[i] <- x 
+              facsResult$depthCount[i] <- str_count(x_cleaned, fixed(">"))
+              facsResult$name[i] <- data[i, 2]
+              facsResult$statistics[i] <- data[i, 3]
+              facsResult$cells[i] <- data[i, 4]
+            }
+          }
+          
+          removeModal()
+          maxDepth <- max(facsResult$depthCount, na.rm = TRUE)
+          showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
+          
+          output$dynamicSelectize <- renderUI({
+            updateSelectizeUI(maxDepth)
+          })
+          
+          updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
+          
+        }
+      }
+    }
+
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "tablesFACS")
+  })
+  
+  
+  
   #### END RAW FACS analysis ####
   
   
