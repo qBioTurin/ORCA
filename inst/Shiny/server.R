@@ -7136,86 +7136,90 @@ server <- function(input, output, session) {
   
   # Conferma la selezione e crea una nuova entry nella gerarchia
   observeEvent(input$facs_confirmSelection, {
-    manageSpinner(TRUE)
-    req(input$facs_selectionName, input$facs_sampleSelector)
-    
-    # Verifica che ci siano almeno 3 punti per formare un poligono
-    if(length(facsSelections$polygonPoints) < 3) {
-      showAlert("Error", "Servono almeno 3 punti per creare una selezione poligonale", "error", 3000)
-      return()
-    }
-    
-    selectionName <- input$facs_selectionName
-    selectedSample <- input$facs_sampleSelector
-    
-    if(selectionName == "" || (!is.null(facsSelections$selections[[selectedSample]]) && selectionName %in% names(facsSelections$selections[[selectedSample]]))) {
-      showAlert("Error", "Nome della selezione non valido o già esistente per questo campione", "error", 3000)
-      return()
-    }
-    
-    hierarchyLevel <- input$facs_hierarchySelector
-    currentData <- NULL
-    
-    if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0 || hierarchyLevel == "None") {
-      currentData <- rawfacsResult$Initdata
-    } else {
-      if(!is.null(facsSelections$selections[[selectedSample]]) && !is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) {
-        currentData <- facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data
-      } else {
+    req(input$facs_sampleSelector)
+    if(input$facs_selectionName != ""){
+      manageSpinner(TRUE)
+      # Verifica che ci siano almeno 3 punti per formare un poligono
+      if(length(facsSelections$polygonPoints) < 3) {
+        showAlert("Error", "Servono almeno 3 punti per creare una selezione poligonale", "error", 3000)
+        return()
+      }
+      
+      selectionName <- input$facs_selectionName
+      selectedSample <- input$facs_sampleSelector
+      
+      if(selectionName == "" || (!is.null(facsSelections$selections[[selectedSample]]) && selectionName %in% names(facsSelections$selections[[selectedSample]]))) {
+        showAlert("Error", "Nome della selezione non valido o già esistente per questo campione", "error", 3000)
+        return()
+      }
+      
+      hierarchyLevel <- input$facs_hierarchySelector
+      currentData <- NULL
+      
+      if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0 || hierarchyLevel == "None") {
         currentData <- rawfacsResult$Initdata
+      } else {
+        if(!is.null(facsSelections$selections[[selectedSample]]) && !is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) {
+          currentData <- facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data
+        } else {
+          currentData <- rawfacsResult$Initdata
+        }
       }
-    }
-    
-    channelx <- input$facs_xChannel
-    channely <- input$facs_yChannel
-    
-    # Crea il poligono dalle coordinate
-    polygon_coords <- data.frame(
-      x = sapply(facsSelections$polygonPoints, function(p) p$x),
-      y = sapply(facsSelections$polygonPoints, function(p) p$y)
-    )
-    
-    filteredData <- filterFACSDataByPolygon(currentData, polygon_coords, channelx, channely, selectedSample)
-    
-    if(is.null(filteredData)) {
-      showAlert("Error", "Nessun dato nella selezione effettuata", "error", 3000)
+      
+      channelx <- input$facs_xChannel
+      channely <- input$facs_yChannel
+      
+      # Crea il poligono dalle coordinate
+      polygon_coords <- data.frame(
+        x = sapply(facsSelections$polygonPoints, function(p) p$x),
+        y = sapply(facsSelections$polygonPoints, function(p) p$y)
+      )
+      
+      filteredData <- filterFACSDataByPolygon(currentData, polygon_coords, channelx, channely, selectedSample)
+      
+      if(is.null(filteredData)) {
+        showAlert("Error", "Nessun dato nella selezione effettuata", "error", 3000)
+        return()
+      }
+      
+      if(is.null(facsSelections$selections[[selectedSample]])) {
+        facsSelections$selections[[selectedSample]] <- list()
+      }
+      
+      facsSelections$selections[[selectedSample]][[selectionName]] <- list(
+        data = filteredData,
+        parent = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) selectedSample else hierarchyLevel,
+        polygon = polygon_coords,
+        channels = c(channelx, channely),
+        sample = selectedSample,
+        depth = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) ">" else 
+          paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$depth, ">"),
+        name = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) paste0(selectedSample, "/", selectionName) else 
+          paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$name, "/", selectionName),
+        n_cells = nrow(exprs(filteredData@frames[[selectedSample]])),
+        statistic = if (hierarchyLevel=="None") {
+          (nrow(exprs(filteredData@frames[[selectedSample]])) / nrow(exprs(rawfacsResult$Initdata@frames[[selectedSample]]))) * 100
+        } else {
+          ( nrow(exprs(filteredData@frames[[selectedSample]])) /
+              nrow(exprs(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data@frames[[selectedSample]])) ) * 100
+        }
+      )
+      
+      availableSelections <- names(facsSelections$selections[[selectedSample]])
+      updateSelectInput(session, "facs_hierarchySelector", 
+                        choices = c("None",availableSelections),
+                        selected = selectionName)
+      
+      # Reset dei punti del poligono
+      facsSelections$polygonPoints <- list()
+      
+      removeModal()
+      manageSpinner(FALSE)
+      showAlert("Success", paste("Selezione", selectionName, "creata con successo per il campione", selectedSample), "success", 2000)
+    } else {
+      showAlert("Error", "Insert a name for the selection!", "error", 3000)
       return()
     }
-    
-    if(is.null(facsSelections$selections[[selectedSample]])) {
-      facsSelections$selections[[selectedSample]] <- list()
-    }
-    
-    facsSelections$selections[[selectedSample]][[selectionName]] <- list(
-      data = filteredData,
-      parent = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) selectedSample else hierarchyLevel,
-      polygon = polygon_coords,
-      channels = c(channelx, channely),
-      sample = selectedSample,
-      depth = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) ">" else 
-        paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$depth, ">"),
-      name = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) paste0(selectedSample, "/", selectionName) else 
-        paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$name, "/", selectionName),
-      n_cells = nrow(exprs(filteredData@frames[[selectedSample]])),
-      statistic = if (hierarchyLevel=="None") {
-        (nrow(exprs(filteredData@frames[[selectedSample]])) / nrow(exprs(rawfacsResult$Initdata@frames[[selectedSample]]))) * 100
-      } else {
-        ( nrow(exprs(filteredData@frames[[selectedSample]])) /
-            nrow(exprs(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data@frames[[selectedSample]])) ) * 100
-      }
-    )
-    
-    availableSelections <- names(facsSelections$selections[[selectedSample]])
-    updateSelectInput(session, "facs_hierarchySelector", 
-                      choices = c("None",availableSelections),
-                      selected = selectionName)
-    
-    # Reset dei punti del poligono
-    facsSelections$polygonPoints <- list()
-    
-    removeModal()
-    manageSpinner(FALSE)
-    showAlert("Success", paste("Selezione", selectionName, "creata con successo per il campione", selectedSample), "success", 2000)
   })
 
   
@@ -7278,6 +7282,11 @@ server <- function(input, output, session) {
       manageSpinner(FALSE)
       showAlert("Error", "No selections available to save for this sample", "error", 3000)
     } else {
+      if (input$facs_hierarchyName == "" || input$facs_hierarchyName == "None" || input$facs_hierarchyName %in% names(savedHierarchies$data)) {
+        manageSpinner(FALSE)
+        showAlert("Error", "Please choose a valid and unique name for the hierarchy", "error", 3000)
+        return(NULL)
+      }
       # Salva la gerarchia con il nome scelto
       savedHierarchies$data[[input$facs_hierarchyName]] <- sel
 
