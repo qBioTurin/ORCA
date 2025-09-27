@@ -6604,6 +6604,9 @@ server <- function(input, output, session) {
   # Contenitore per più gerarchie salvate
   savedHierarchies <- reactiveValues(data = list())
   
+  mapping_sample <- reactiveValues(
+    data = list()
+  )
   # Reactive values per la gestione delle selezioni gerarchiche
   facsSelections = reactiveValues(
     selections = list(), 
@@ -6677,6 +6680,12 @@ server <- function(input, output, session) {
       updateSelectInput(session, "facs_hierarchySelector", 
                         choices = "None",
                         selected = NULL)
+      updateSelectInput(session, "facs_sampleSelector_to_norm", 
+                        choices = fileNames,
+                        selected = fileNames[1])
+      updateSelectInput(session, "facs_sampleSelector_normalizer", 
+                        choices = fileNames,
+                        selected = fileNames[1])
       
       facsSelections$selections <- list()  
       facsSelections$currentPlot <- NULL  
@@ -7289,7 +7298,8 @@ server <- function(input, output, session) {
       }
       # Salva la gerarchia con il nome scelto
       savedHierarchies$data[[input$facs_hierarchyName]] <- sel
-
+      mapping_sample$data[[input$facs_sampleSelector]] <- input$facs_hierarchyName
+      
       manageSpinner(FALSE)
       showAlert("Success", paste("Hierarchy saved as", input$facs_hierarchyName), "success", 2000)
     }
@@ -7319,6 +7329,9 @@ server <- function(input, output, session) {
       updateSelectInput(session, "facs_hierarchySelector", 
                         choices = c("None", names(facsSelections$selections[[newSample]])),
                         selected = NULL)
+      
+      mapping_sample$data[[input$facs_sampleSelector]] <- input$facs_hierarchySelector_saved
+      
       manageSpinner(FALSE)
       showAlert("Success", paste("Hierarchy", input$facs_hierarchySelector_saved, 
                                  "applied to sample", newSample), "success", 2000)
@@ -7341,7 +7354,44 @@ server <- function(input, output, session) {
                 selected = selected_choice)
   })
   
-  
+  observeEvent(input$facs_normalizeButton,{
+    req(input$facs_sampleSelector_to_norm,input$facs_sampleSelector_normalizer)
+    manageSpinner(TRUE)
+    
+    if(is.null(mapping_sample$data[[input$facs_sampleSelector_to_norm]]) || is.null(mapping_sample$data[[input$facs_sampleSelector_normalizer]]) 
+       || mapping_sample$data[[input$facs_sampleSelector_to_norm]] != mapping_sample$data[[input$facs_sampleSelector_normalizer]]){
+      manageSpinner(FALSE)
+      showAlert("Error", "Both samples must belong to the same saved hierarchy selection to perform normalization", "error", 3000)
+      return(NULL)
+    }
+    
+    #divide the number of cells of every level of to norm by n_cell of that level of normalizer
+    sampleToNorm <- input$facs_sampleSelector_to_norm
+    sampleNormalizer <- input$facs_sampleSelector_normalizer
+    if(is.null(facsSelections$selections[[sampleToNorm]]) || is.null(facsSelections$selections[[sampleNormalizer]])){
+      manageSpinner(FALSE)
+      showAlert("Error", "Both samples must have selections to perform normalization", "error", 3000)
+      return(NULL)
+    }
+    
+    
+    for(nameList in names(facsSelections$selections[[sampleToNorm]])) {
+      
+      selToNorm <- facsSelections$selections[[sampleToNorm]][[nameList]]
+      selNormalizer <- facsSelections$selections[[sampleNormalizer]][[nameList]]
+      sample_depth <- facsSelections$selections[[sampleToNorm]][[nameList]]$depth
+      
+      facsSelections$selections[[sampleToNorm]][[nameList]]$n_cells <- round((selToNorm$n_cells / selNormalizer$n_cells) * 100,0)
+      if (sample_depth==">") {
+        facsSelections$selections[[sampleToNorm]][[nameList]]$statistic <- (facsSelections$selections[[sampleToNorm]][[nameList]]$n_cells / nrow(exprs(rawfacsResult$Initdata@frames[[sampleToNorm]]))) * 100
+      } else {
+        parent_sample <- facsSelections$selections[[sampleToNorm]][[nameList]]$parent
+        facsSelections$selections[[sampleToNorm]][[nameList]]$statistic <- ( facsSelections$selections[[sampleToNorm]][[nameList]]$n_cells /
+            facsSelections$selections[[sampleToNorm]][[parent_sample]]$n_cells ) * 100
+      }
+    }
+    manageSpinner(FALSE)
+  })
   
   # Output per verificare se ci sono selezioni
   output$facs_hasSelections <- reactive({

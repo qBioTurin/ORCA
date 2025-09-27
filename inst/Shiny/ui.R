@@ -1710,6 +1710,24 @@ ui <- dashboardPage(
                       )
                     ),
                     
+                    fluidRow(
+                      # Riga 1: i due selectInput
+                      column(4,
+                             selectInput("facs_sampleSelector_to_norm", 
+                                         "Select Sample (Name) to normalize:",
+                                         choices = character(0),
+                                         selected = NULL)
+                      ),
+                      column(4,
+                             selectInput("facs_sampleSelector_normalizer", 
+                                         "Select Sample (Name) of normalizer:",
+                                         choices = character(0),
+                                         selected = NULL)
+                      ),
+                      column(3,
+                             actionButton("facs_normalizeButton", "Normalize", class = "btn-warning", icon = icon("balance-scale"), style = "width: 100%;")
+                      )
+                    ),
                     # Pannello informativo delle selezioni
                     conditionalPanel(
                       condition = "output.facs_hasSelections",
