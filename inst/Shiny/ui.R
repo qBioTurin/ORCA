@@ -30,6 +30,7 @@ library(visNetwork)
 library(shinyFiles)  # Load shinyFiles package
 library(colourpicker)
 library(ggcyto)
+library(ggedit)
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
@@ -622,7 +623,8 @@ ui <- dashboardPage(
                   label = "Customize or Download Plot",
                   icon = icon("paint-brush"),
                   class = "btn-primary"
-                )
+                ),
+                uiOutput("plotModalUI")
               ),
               fluidRow(
                 box(width = 6,
@@ -1725,7 +1727,7 @@ ui <- dashboardPage(
                                          selected = NULL)
                       ),
                       column(3,
-                             actionButton("facs_normalizeButton", "Normalize", class = "btn-warning", icon = icon("balance-scale"), style = "width: 100%;")
+                             actionButton("facs_normalizeButton", "Normalize", class = "btn-warning", icon = icon("balance-scale"), style = "width: 100%;margin-top:25px;")
                       )
                     ),
                     # Pannello informativo delle selezioni

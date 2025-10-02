@@ -2320,33 +2320,99 @@ server <- function(input, output, session) {
   })
   
   
+  # ---- Button to open modal ----
   observeEvent(input$CustomizePlotWB1, {
-    layer_tabs <- generateLayerParameters(wbResult$Plots)
+    req(wbResult$Plots)
+    
     showModal(modalDialog(
-      title = "Customize or Download Plot",
-      tabsetPanel(
-        tabPanel(
-          "Layer Customization",
-          # Dynamically generate inputs for each layer
-          do.call(tagList, layer_tabs)
-        ),
-        tabPanel(
-          "Common Parameters",
-          generatePlotParameters(wbResult$Plots)
-        ),
-        tabPanel(
-          "Save Plot",
-          generateSavePlotTab()
-        )
+      title = "Customize Plot",
+      size = "l",
+      easyClose = TRUE,
+      footer = modalButton("Close"),
+      fluidRow(
+        column(12, ggEditUI("pOut1"))
       ),
-      footer = tagList(
-        actionButton("applyChangesWB1", "Apply Changes"),
-        downloadButton("downloadPlotButtonWB1", "Download Plot"),
-        modalButton("Close")
-      ),
-      easyClose = FALSE
+      fluidRow(
+        column(12, uiOutput("x1"))
+      )
     ))
+    
+    outp1 <- callModule(
+      module = ggEdit,
+      id = "pOut1",
+      obj = reactive({
+        req(wbResult$Plots)
+        if(!is.null(wbResult$TruncatedPanelsValue)){
+          plot <- wbResult$TruncatedPlots
+        } else {
+          plot <- wbResult$Plots 
+        }
+        list(p1 = plot)
+      })
+    )
+    
+    output$x1 <- renderUI({
+      req(outp1())
+      
+      if(!is.null(outp1()$UpdatedLayerCalls) && !is.null(outp1()$UpdatedLayerCalls$p1)) {
+        layerTxt <- paste(outp1()$UpdatedLayerCalls$p1, collapse = "\n")
+        
+        aceEditor(
+          outputId = "layerAce",
+          value = layerTxt,
+          mode = "r",
+          theme = "chrome",
+          height = "150px",
+          fontSize = 12,
+          wordWrap = TRUE
+        )
+      }
+    })
+    
+    observeEvent(outp1(), {
+      req(outp1())
+      
+      if(!is.null(outp1()$UpdatedPlot) && !is.null(outp1()$UpdatedPlot$p1)) {
+        if(!is.null(wbResult$TruncatedPanelsValue)){
+          wbResult$TruncatedPlots <- outp1()$UpdatedPlot$p1
+        } else {
+          wbResult$Plots <- outp1()$UpdatedPlot$p1
+        }
+        output$DataPlot <- renderPlot({outp1()$UpdatedPlot$p1})
+      }
+      
+    }, ignoreNULL = TRUE, ignoreInit = TRUE)
   })
+
+  
+  
+  # observeEvent(input$CustomizePlotWB1, {
+  #   layer_tabs <- generateLayerParameters(wbResult$Plots)
+  #   showModal(modalDialog(
+  #     title = "Customize or Download Plot",
+  #     tabsetPanel(
+  #       tabPanel(
+  #         "Layer Customization",
+  #         # Dynamically generate inputs for each layer
+  #         do.call(tagList, layer_tabs)
+  #       ),
+  #       tabPanel(
+  #         "Common Parameters",
+  #         generatePlotParameters(wbResult$Plots)
+  #       ),
+  #       tabPanel(
+  #         "Save Plot",
+  #         generateSavePlotTab()
+  #       )
+  #     ),
+  #     footer = tagList(
+  #       actionButton("applyChangesWB1", "Apply Changes"),
+  #       downloadButton("downloadPlotButtonWB1", "Download Plot"),
+  #       modalButton("Close")
+  #     ),
+  #     easyClose = FALSE
+  #   ))
+  # })
   
   output$downloadPlotButtonWB1 <- downloadHandler(
     filename = function() {
