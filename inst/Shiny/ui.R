@@ -31,6 +31,7 @@ library(shinyFiles)  # Load shinyFiles package
 library(colourpicker)
 library(ggcyto)
 library(ggedit)
+library(shinyAce)
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
@@ -1667,7 +1668,6 @@ ui <- dashboardPage(
                 # Nuova sezione per la selezione gerarchica
                 box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
                     fluidRow(
-                      # Riga 1: i due selectInput
                       column(4,
                              selectInput("facs_sampleSelector", 
                                          "Select Sample (Name):",
@@ -1683,11 +1683,15 @@ ui <- dashboardPage(
                     ),
                     
                     fluidRow(
-                      # Riga 2: plot a sinistra
                       column(8,
-                             plotOutput("facs_previewPlot", height = "300px")
+                             plotOutput("facs_previewPlot", height = "300px"),
+                             br(),
+                             actionButton("CustomizePlotFACS", 
+                                          "Customize Plot", 
+                                          icon = icon("paint-brush"), 
+                                          class = "btn-secondary",
+                                          style = "width: 30%; margin-top: 10px;")
                       ),
-                      # Riga 2: pulsanti a destra
                       column(4,
                              br(),
                              actionButton("facs_openSelectionModal", 
@@ -1702,7 +1706,7 @@ ui <- dashboardPage(
                                           style = "width: 100%; margin-top: 10px;"),
                              br(),
                              div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
-                                 textInput("facs_hierarchyName", "Hierarchy Name", placeholder = "Enter hierarchy name", width = "70%"),
+                                 textInput("facs_hierarchyName", "Hierarchical Name", placeholder = "Enter hierarchy name", width = "70%"),
                                  actionButton("facs_saveSelections", "Save", class = "btn-success", style = "width: 30%;")
                              ),
                              div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
@@ -1713,21 +1717,28 @@ ui <- dashboardPage(
                     ),
                     
                     fluidRow(
-                      # Riga 1: i due selectInput
                       column(4,
-                             selectInput("facs_sampleSelector_to_norm", 
-                                         "Select Sample (Name) to normalize:",
-                                         choices = character(0),
-                                         selected = NULL)
+                             div(style = "margin-top: 10px;",
+                                 selectInput("facs_sampleSelector_to_norm", 
+                                             "Select Sample (Name) to normalize:",
+                                             choices = character(0),
+                                             selected = NULL)
+                             )
                       ),
                       column(4,
-                             selectInput("facs_sampleSelector_normalizer", 
-                                         "Select Sample (Name) of normalizer:",
-                                         choices = character(0),
-                                         selected = NULL)
+                             div(style = "margin-top: 10px;",
+                                 selectInput("facs_sampleSelector_normalizer", 
+                                             "Select Sample (Name) of normalizer:",
+                                             choices = character(0),
+                                             selected = NULL)
+                             )
                       ),
                       column(3,
-                             actionButton("facs_normalizeButton", "Normalize", class = "btn-warning", icon = icon("balance-scale"), style = "width: 100%;margin-top:25px;")
+                             actionButton("facs_normalizeButton", 
+                                          "Normalize", 
+                                          class = "btn-warning", 
+                                          icon = icon("balance-scale"), 
+                                          style = "width: 100%; margin-top: 35px;")
                       )
                     ),
                     # Pannello informativo delle selezioni
