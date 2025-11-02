@@ -1927,12 +1927,17 @@ ui <- dashboardPage(
               h2("Quantification"),
               fluidRow(
                 column(
-                  width = 3,
+                  width = 4,
                   selectInput(
                     inputId = "IF_expcond",
                     label = "Experimental condition:",
                     choices = ""
                   )
+                ),
+                column(
+                  width = 8,
+                  style = "padding-top: 25px;", 
+                  checkboxInput("IF_calc_perc", "Calculate percentages (e.g., Nucleus vs Cytoplasm)", value = TRUE)
                 )
               ),
               fluidRow(
@@ -1952,7 +1957,8 @@ ui <- dashboardPage(
                         selectInput(
                           inputId = "IF_TTestvariable",
                           label = "Ttest variable:",
-                          choices = ""
+                          choices = "",
+                          selected = ""
                         )
                       )
                     ),

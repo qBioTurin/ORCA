@@ -1763,7 +1763,8 @@ server <- function(input, output, session) {
     resplot = NULL,
     TTestData = NULL,
     IF_expcond = NULL,
-    IF_TTestvariable = NULL
+    IF_TTestvariable = NULL,
+    plot_variable_base = NULL
   )
   ifResult0 = reactiveValues(
     Initdata = NULL,
@@ -1775,7 +1776,8 @@ server <- function(input, output, session) {
     resplot = NULL,
     TTestData = NULL,
     IF_expcond = NULL,
-    IF_TTestvariable = NULL
+    IF_TTestvariable = NULL,
+    plot_variable_base = NULL
     )
   
   # save everytime there is a change in the results
@@ -1864,29 +1866,58 @@ server <- function(input, output, session) {
         colNames[ colNames == selectIFcolumns] = "ExpCond"
         colnames(IFdata) = colNames
         
-        IFdataCalc = IFdata %>%
-          group_by(ExpCond) %>%
-          mutate(nRow = 1:n()) %>%
-          ungroup() %>%
-          tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars") %>%
-          group_by(ExpCond,nRow) %>%
-          mutate(Tot = sum(Values), Perc =  Values/Tot*100)
+        # <<<### INIZIO MODIFICA ###>>>
         
-        IFinalData = IFdataCalc  %>%
-          tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
-                              values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
-        
-        statisticData = IFdataCalc %>% 
-          group_by(ExpCond,Vars) %>%
-          summarise(MeanValues = mean(Values),
-                    sdValues = sd(Values),
-                    MeanPerc = mean(Perc),
-                    sdPerc = sd(Perc),
-                    MeanTot = mean(Tot),
-                    sdTot = sd(Tot)) %>%
-          tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
-                              values_from = c(MeanValues, sdValues,MeanPerc,sdPerc)) %>% ungroup()
-        
+        if (input$IF_calc_perc) {
+          # Caso 1: VECCHIO comportamento (Percentuale, es. Nucleo vs Cito)
+          IFdataCalc = IFdata %>%
+            group_by(ExpCond) %>%
+            mutate(nRow = 1:n()) %>%
+            ungroup() %>%
+            tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars") %>%
+            group_by(ExpCond,nRow) %>%
+            mutate(Tot = sum(Values), Perc =  Values/Tot*100)
+          
+          IFinalData = IFdataCalc  %>%
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                                values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
+          
+          statisticData = IFdataCalc %>% 
+            group_by(ExpCond,Vars) %>%
+            summarise(MeanValues = mean(Values),
+                      sdValues = sd(Values),
+                      MeanPerc = mean(Perc),
+                      sdPerc = sd(Perc),
+                      MeanTot = mean(Tot),
+                      sdTot = sd(Tot)) %>%
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                                values_from = c(MeanValues, sdValues,MeanPerc,sdPerc)) %>% ungroup()
+          
+          ifResult$plot_variable_base <- "_Perc" # Plotta le percentuali
+          
+        } else {
+          # Trattato vs Non-Trattato
+          IFdataCalc = IFdata %>%
+            group_by(ExpCond) %>%
+            mutate(nRow = 1:n()) %>%
+            ungroup() %>%
+            tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars")
+          # No Tot o Perc
+          
+          IFinalData = IFdataCalc  %>%
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                                values_from = c(Values)) %>% ungroup() %>% select(-nRow)
+          
+          statisticData = IFdataCalc %>% 
+            group_by(ExpCond,Vars) %>%
+            summarise(MeanValues = mean(Values),
+                      sdValues = sd(Values)) %>% 
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
+                                values_from = c(MeanValues, sdValues)) %>% ungroup()
+          
+          ifResult$plot_variable_base <- "_Values" 
+        }
+
         ifResult$StatData = statisticData
         ifResult$FinalData = IFinalData
         
@@ -1894,28 +1925,24 @@ server <- function(input, output, session) {
         
         output$IFtable = renderDT({DT::datatable( IFinalData,
                                                   selection = 'none',
-                                                  # editable = list(target = "cell",
-                                                  #                 disable = list(columns = 0:2) ),
                                                   rownames= FALSE,
                                                   options = list(scrollX = TRUE,
                                                                  searching = FALSE,
-                                                                 dom = 't' # Only display the table
+                                                                 dom = 't' 
                                                   )
-                                  )
-                            })
+        )
+        })
         
-
+        
         output$IFtable_stat = renderDT({DT::datatable( statisticData,
                                                        selection = 'none',
-                                                       # editable = list(target = "cell",
-                                                       #                 disable = list(columns = 0:2) ),
                                                        rownames= FALSE,
                                                        options = list(scrollX = TRUE,
                                                                       searching = FALSE,
-                                                                      dom = 't' # Only display the table
+                                                                      dom = 't'
                                                        )
-                                            )
-                                      })
+        )
+        })
         
         ifResult$IF_expcond = selectIFcolumns
         ifResult$IF_TTestvariable = unique(IFdataCalc$Vars)
@@ -1923,9 +1950,7 @@ server <- function(input, output, session) {
       else{
         
         updateSelectInput("IF_TTestvariable",session = session, choices = "",selected = "")
-        
         output$IFtable = renderDT({ NULL })
-        
         output$IFtable_stat = renderDT({ NULL })
       }
     }, error = function(e) {
@@ -1988,8 +2013,17 @@ server <- function(input, output, session) {
     ifResult$FinalData -> IFinalData
     input$IF_TTestvariable -> varSel
     
-    if(varSel != "" && !is.null(IFinalData)){
-      IFinalData[,c("ExpCond", paste0(varSel,"_Perc"))] -> SubData
+    plot_variable_base <- ifResult$plot_variable_base # (Perc o Values)
+    
+    if(varSel != "" && !is.null(IFinalData) && !is.null(plot_variable_base)){
+      plot_col_name <- paste0(varSel, plot_variable_base) 
+      if (!plot_col_name %in% colnames(IFinalData)) {
+        showAlert("Error", 
+                  paste("Column", plot_col_name, "not found. Please re-load data or check analysis type."), 
+                  "error", 5000)
+        return()
+      }
+      IFinalData[,c("ExpCond", plot_col_name)] -> SubData 
       colnames(SubData) = c("ExpCond", "Values")
       
       SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
@@ -2002,20 +2036,21 @@ server <- function(input, output, session) {
         geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
                    position = position_jitter(width = 0.2), size = 3) +
         theme_bw()+
-        labs(color = "Experimental Condition", y = "Percentages (%)" , x = "")
+        labs(color = "Experimental Condition", 
+             y = ifelse(plot_variable_base == "_Perc", "Percentages (%)", "Measured Values"), 
+             x = "")
       annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
                hjust = 1.1, vjust = 1.5, size = 5, color = "black")
       
-      
       output$IFsummarise_plot = renderPlot({resplot})
-
+      
       output$IFsummariseMean = renderDT({
         DT::datatable(SubDataStat,
                       selection = 'none',
                       rownames= FALSE,
                       options = list(scrollX = TRUE,
                                      searching = FALSE,
-                                     dom = 't' # Only display the table
+                                     dom = 't' 
                       )
         )
       })
@@ -2026,7 +2061,7 @@ server <- function(input, output, session) {
                       rownames= FALSE,
                       options = list(scrollX = TRUE,
                                      searching = FALSE,
-                                     dom = 't' # Only display the table
+                                     dom = 't'
                       )
         )
       })
@@ -7009,7 +7044,7 @@ server <- function(input, output, session) {
                  if (!is.null(results[[res]]$plotPCR)) {
                    lapply(results[[res]]$plotPCR, function(x) {
                      d = x$table 
-                     d$file = res
+                     d$File = res
                      d
                      } )
                  } else {

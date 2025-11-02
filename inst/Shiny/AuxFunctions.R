@@ -2458,13 +2458,16 @@ customizePlot <- function(plot, input) {
     unique_x<-unique(plot_build$data[[i]][["group"]] )
     unique_x_colour<-unique(plot_build$data[[i]][["colour"]] )
     unique_x_shape<-unique(plot_build$data[[i]][["shape"]] )
+    unique_x_fill<-unique(plot_build$data[[i]][["fill"]] ) 
+    
     # Customize each type of geom layer
     if (layer_type == "GeomPoint") {
       
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
-            input[[paste0("pointColor_", i, "_",  gsub("#", "", x_val))]]
+            input_val <- input[[paste0("pointColor_", i, "_",  gsub("#", "", x_val))]]
+            if (is.null(input_val)) x_val else input_val 
           }))
         )
       } else NULL
@@ -2472,7 +2475,8 @@ customizePlot <- function(plot, input) {
       shape_scale <- if (is_shape_mapped) {
         scale_shape_manual(
           values = unlist(lapply(unique_x_shape, function(x_val) {
-            as.integer(input[[paste0("pointShape_", i, "_", x_val)]])
+            input_val <- input[[paste0("pointShape_", i, "_", x_val)]]
+            if (is.null(input_val)) as.integer(x_val) else as.integer(input_val)
           }))
         )
       } else NULL
@@ -2527,14 +2531,16 @@ customizePlot <- function(plot, input) {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
-            input[[paste0("barColor_", i,"_", x_val)]]
+            input_val <- input[[paste0("barColor_", i,"_", gsub("#", "", x_val))]] 
+            if (is.null(input_val)) x_val else input_val
           }))
         )
       } else NULL
       fill_scale <- if (is_fill_mapped) {
         scale_fill_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
-            input[[paste0("barFillColor_", i,"_", x_val)]]
+          values = unlist(lapply(unique_x_fill, function(x_val) { 
+            input_val <- input[[paste0("barFillColor_", i,"_", gsub("#", "", x_val))]]
+            if (is.null(input_val)) x_val else input_val
           }))
         )
       } else NULL
@@ -2597,14 +2603,16 @@ customizePlot <- function(plot, input) {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
-            input[[paste0("lineColor_", i,"_", x_val)]]
+            input_val <- input[[paste0("lineColor_", i,"_", gsub("#", "", x_val))]]
+            if (is.null(input_val)) x_val else input_val
           }))
         )
       } else NULL
       linetype_scale <- if (is_linetype_mapped) {
         scale_linetype_manual(
           values = unlist(lapply(unique_x, function(x_val) {
-            input[[paste0("lineType_", i,"_", x_val)]]
+            input_val <- input[[paste0("lineType_", i,"_", x_val)]]
+            if (is.null(input_val)) x_val else input_val
           }))
         )
       } else NULL
@@ -2659,14 +2667,16 @@ customizePlot <- function(plot, input) {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
-            input[[paste0("boxOutlineColor_", i,"_", x_val)]]
+            input_val <- input[[paste0("boxOutlineColor_", i,"_", gsub("#", "", x_val))]]
+            if (is.null(input_val)) x_val else input_val
           }))
         )
       } else NULL
       fill_scale <- if (is_fill_mapped) {
         scale_fill_manual(
-          values = unlist(lapply(unique_x, function(x_val) {
-            input[[paste0("boxFillColor_", i,"_", x_val)]]
+          values = unlist(lapply(unique_x_fill, function(x_val) {
+            input_val <- input[[paste0("boxFillColor_", i,"_", gsub("#", "", x_val))]]
+            if (is.null(input_val)) x_val else input_val
           }))
         )
       } else NULL
@@ -2736,7 +2746,8 @@ customizePlot <- function(plot, input) {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
-            input[[paste0("errorBarColor_", i,"_", x_val)]]
+            input_val <- input[[paste0("errorBarColor_", i,"_", gsub("#", "", x_val))]]
+            if (is.null(input_val)) x_val else input_val
           }))
         )
       } else NULL
@@ -2764,7 +2775,8 @@ customizePlot <- function(plot, input) {
       }
       
     } else {
-      warning(paste("No specific customizations applied for layer type:", layer_type))
+      updatedPlot <- updatedPlot + layer
+      warning(paste("No specific customizations applied for layer type:", layer_type, ". Layer copied as is."))
     }
   }
   
