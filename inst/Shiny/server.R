@@ -1855,6 +1855,9 @@ server <- function(input, output, session) {
                       selected = "tablesIF")
   }
   
+  
+################ WARNING COLONNA SELEZIONATA SIA UNA STRINGA ######################  
+  
   observeEvent(input$IF_expcond,{
     tryCatch({
       if( !is.null(ifResult$Initdata) && input$IF_expcond != ""){
@@ -1866,10 +1869,8 @@ server <- function(input, output, session) {
         colNames[ colNames == selectIFcolumns] = "ExpCond"
         colnames(IFdata) = colNames
         
-        # <<<### INIZIO MODIFICA ###>>>
         
         if (input$IF_calc_perc) {
-          # Caso 1: VECCHIO comportamento (Percentuale, es. Nucleo vs Cito)
           IFdataCalc = IFdata %>%
             group_by(ExpCond) %>%
             mutate(nRow = 1:n()) %>%
