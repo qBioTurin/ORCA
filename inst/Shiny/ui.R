@@ -30,7 +30,6 @@ library(visNetwork)
 library(shinyFiles)  # Load shinyFiles package
 library(colourpicker)
 library(ggcyto)
-library(ggedit)
 library(shinyAce)
 
 ui <- dashboardPage(
