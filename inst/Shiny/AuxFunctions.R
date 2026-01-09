@@ -1975,9 +1975,11 @@ testStat.function <- function(data) {
   steps <- ""
   step_counter <- 1
   BivTest <- NULL
-  resANOVA <- NULL
+  resANOVA <- resKRUSKAL <- NULL
   resPairwise <- NULL
   path <- c("shapiro.test")
+  
+  if(is.tibble(data)) data = as.data.frame(data)
   
   data$Value <- as.numeric(gsub("^\\s+|\\s+$", "", as.character(data[[2]])))
   
@@ -2018,12 +2020,12 @@ testStat.function <- function(data) {
     group_by(data[[1]]) %>%
     summarize(count = n())
   
+  vars <- unique(data[,1])
+  
   if (all(group_counts$count < 30) || all(shapiro_results$p.value > 0.05, na.rm = TRUE)) {
     steps <- c(steps, paste("Step ", step_counter, ". the data is normal", "\n"))
     step_counter <- step_counter + 1 
     path <- c(path, "groups check (normal)")
-    
-    vars <- data[,1] %>% distinct() %>% pull() 
     
     if (length(vars) == 2) {
       steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use t-test for analysis", "\n"))
@@ -2092,8 +2094,6 @@ testStat.function <- function(data) {
     steps <- c(steps, paste("Step ", step_counter, ". the data is not normal", "\n"))
     step_counter <- step_counter + 1 
     path <- c(path, "groups check (not normal)")
-    
-    vars <- data[,1] %>% distinct() %>% pull()
     
     if (length(vars) == 2) {
       steps <- c(steps, paste("Step ", step_counter, ". there are 2 groups, I will use Wilcoxon test for analysis", "\n"))

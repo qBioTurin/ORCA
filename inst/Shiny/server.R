@@ -1858,10 +1858,12 @@ server <- function(input, output, session) {
   
 ################ WARNING COLONNA SELEZIONATA SIA UNA STRINGA ######################  
   
-  observeEvent(input$IF_expcond,{
+  observe({
+    IF_expcond = req(input$IF_expcond)
+    input$IF_calc_perc
     tryCatch({
-      if( !is.null(ifResult$Initdata) && input$IF_expcond != ""){
-        selectIFcolumns = input$IF_expcond
+      if( !is.null(ifResult$Initdata) && IF_expcond != ""){
+        selectIFcolumns = IF_expcond
         selectIFcolumns = selectIFcolumns[selectIFcolumns!= ""]
         
         IFdata = ifResult$Initdata
@@ -2010,70 +2012,157 @@ server <- function(input, output, session) {
   })
   
   
-  observeEvent(input$IF_TTestvariable,{
-    ifResult$FinalData -> IFinalData
-    input$IF_TTestvariable -> varSel
+  observe({
+    req(ifResult$FinalData) -> IFinalData
+    req(input$IF_TTestvariable) -> varSel
+    input$IF_calc_perc
     
-    plot_variable_base <- ifResult$plot_variable_base # (Perc o Values)
-    
-    if(varSel != "" && !is.null(IFinalData) && !is.null(plot_variable_base)){
-      plot_col_name <- paste0(varSel, plot_variable_base) 
-      if (!plot_col_name %in% colnames(IFinalData)) {
-        showAlert("Error", 
-                  paste("Column", plot_col_name, "not found. Please re-load data or check analysis type."), 
-                  "error", 5000)
-        return()
+    isolate({
+      plot_variable_base <- ifResult$plot_variable_base # (Perc o Values)
+      
+      if(varSel != "" && !is.null(IFinalData) && !is.null(plot_variable_base)){
+        plot_col_name <- paste0(varSel, plot_variable_base) 
+        if (!plot_col_name %in% colnames(IFinalData)) {
+          showAlert("Error", 
+                    paste("Column", plot_col_name, "not found. Please re-load data or check analysis type."), 
+                    "error", 5000)
+          return()
+        }
+        IFinalData[,c("ExpCond", plot_col_name)] -> SubData 
+        colnames(SubData) = c("ExpCond", "Values")
+        
+        SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
+        
+        resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
+          geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+          geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+          geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
+                     position = position_jitter(width = 0.2), size = 3) +
+          theme_bw()+
+          labs(color = "Experimental Condition", 
+               y = ifelse(plot_variable_base == "_Perc", "Percentages (%)", "Measured Values"), 
+               x = "")
+        
+        if(any(SubDataStat$sd == 0) ){
+          showAlert("Warning", "Standard Deviation is zero for at least one group. Statistical test cannot be performed.", "warning", 5000)
+          BivTest = NULL
+        }else{
+          res = testStat.function(SubData)
+          BivTest <- res$BivTest
+          MulvTest <- res$test
+          PairwiseTest <- res$pairwise
+          steps <- res$steps
+          path <- res$path
+          post_hoc_pairs <- annotations <-length(0)
+          main_test_txt <-  paste0("Test used is: ", path[length(path)])
+          main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
+          
+          if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && main_test_pvalue < 0.05) {
+            PairwiseTest <- PairwiseTest %>%
+              separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
+              mutate(group1 = trimws(group1), 
+                     group2 = trimws(group2),
+                     stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
+            
+            all_combinations <- combn(unique(stats$SampleName), 2, simplify = FALSE)
+            
+            post_hoc_pairs <- lapply(all_combinations, function(pair) {
+              pair <- unlist(pair)
+              c(trimws(pair[1]), trimws(pair[2]))
+            })
+            
+            annotations <- sapply(post_hoc_pairs, function(pair) {
+              idx <- which((PairwiseTest$group1 == pair[1] & PairwiseTest$group2 == pair[2]) |
+                             (PairwiseTest$group1 == pair[2] & PairwiseTest$group2 == pair[1]))
+              if (length(idx) > 0) {
+                as.character(PairwiseTest$stars[idx])
+              } else {
+                "ns"
+              }
+            })
+            
+          } 
+          else if(!is.null(BivTest)){
+            BivTest <- BivTest %>%
+              separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
+              mutate(group1 = trimws(group1), 
+                     group2 = trimws(group2),
+                     stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
+            
+            all_combinations <- combn(unique(SubDataStat$ExpCond), 2, simplify = FALSE)
+            
+            post_hoc_pairs <- lapply(all_combinations, function(pair) {
+              pair <- unlist(pair)
+              c(trimws(pair[1]), trimws(pair[2]))
+            })
+            annotations <- sapply(post_hoc_pairs, function(pair) {
+              idx <- which((BivTest$group1 == pair[1] & BivTest$group2 == pair[2]) |
+                             (BivTest$group1 == pair[2] & BivTest$group2 == pair[1]))
+              if (length(idx) > 0) {
+                as.character(BivTest$stars[idx])
+              } else {
+                "ns"
+              }
+            })
+            
+          }
+          else {
+            print("No pairwise comparisons to plot.")
+          }
+          
+          if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
+            y_max <- max(SubDataStat$Mean + SubDataStat$sd, na.rm = TRUE)
+            y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
+            
+            nspos = which(annotations != "ns")
+            if(length(nspos)>0)
+              resplot <- resplot + 
+              ggsignif::geom_signif(
+                comparisons = post_hoc_pairs[nspos],
+                y_position = y_pos[nspos],
+                annotations = annotations[nspos],
+                tip_length = 0.01,
+                textsize = 8 / 1.5,
+                vjust = 0.8
+              )
+          } else {
+            print("No valid post-hoc comparisons or annotations to plot.")
+          } 
+        }
+        
+        output$IFsummarise_plot = renderPlot({resplot})
+        
+        output$IFsummariseMean = renderDT({
+          DT::datatable(SubDataStat,
+                        selection = 'none',
+                        rownames= FALSE,
+                        options = list(scrollX = TRUE,
+                                       searching = FALSE,
+                                       dom = 't' 
+                        )
+          )
+        })
+        
+        output$IFtable_ttest = renderDT({
+          DT::datatable(BivTest$BivTest,
+                        selection = 'none',
+                        rownames= FALSE,
+                        options = list(scrollX = TRUE,
+                                       searching = FALSE,
+                                       dom = 't'
+                        )
+          )
+        })
+        
+        ifResult$SubStatData = SubDataStat
+        ifResult$TTestData = BivTest
+        ifResult$resplot = resplot
+      }else{
+        output$IFsummarise_plot = renderPlot({NULL})
+        output$IFsummariseMean = renderDT({ NULL })
       }
-      IFinalData[,c("ExpCond", plot_col_name)] -> SubData 
-      colnames(SubData) = c("ExpCond", "Values")
-      
-      SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
-      
-      BivTest = testStat.function(SubData)
-      
-      resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
-        geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-        geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-        geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
-                   position = position_jitter(width = 0.2), size = 3) +
-        theme_bw()+
-        labs(color = "Experimental Condition", 
-             y = ifelse(plot_variable_base == "_Perc", "Percentages (%)", "Measured Values"), 
-             x = "")
-      annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-               hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-      
-      output$IFsummarise_plot = renderPlot({resplot})
-      
-      output$IFsummariseMean = renderDT({
-        DT::datatable(SubDataStat,
-                      selection = 'none',
-                      rownames= FALSE,
-                      options = list(scrollX = TRUE,
-                                     searching = FALSE,
-                                     dom = 't' 
-                      )
-        )
-      })
-      
-      output$IFtable_ttest = renderDT({
-        DT::datatable(BivTest$BivTest,
-                      selection = 'none',
-                      rownames= FALSE,
-                      options = list(scrollX = TRUE,
-                                     searching = FALSE,
-                                     dom = 't'
-                      )
-        )
-      })
-      
-      ifResult$SubStatData = SubDataStat
-      ifResult$TTestData = BivTest
-      ifResult$resplot = resplot
-    }else{
-      output$IFsummarise_plot = renderPlot({NULL})
-      output$IFsummariseMean = renderDT({ NULL })
-    }
+    })
+
     
   })
   
