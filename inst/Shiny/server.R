@@ -2081,8 +2081,12 @@ server <- function(input, output, session) {
               }
             })
             
-          } 
-          else if(!is.null(BivTest)){
+            test_to_show = PairwiseTest
+            
+          } else if(!is.null(main_test_pvalue) && main_test_pvalue >= 0.05){
+            #to check
+            test_to_show = MulvTest
+          }else if(!is.null(BivTest)){
             BivTest <- BivTest %>%
               separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
               mutate(group1 = trimws(group1), 
@@ -2105,6 +2109,7 @@ server <- function(input, output, session) {
               }
             })
             
+            test_to_show = BivTest
           }
           else {
             print("No pairwise comparisons to plot.")
@@ -2145,7 +2150,7 @@ server <- function(input, output, session) {
         })
         
         output$IFtable_ttest = renderDT({
-          DT::datatable(BivTest$BivTest,
+          DT::datatable(test_to_show,
                         selection = 'none',
                         rownames= FALSE,
                         options = list(scrollX = TRUE,
