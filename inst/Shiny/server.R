@@ -2049,7 +2049,7 @@ server <- function(input, output, session) {
         }else{
           res = testStat.function(SubData)
           BivTest <- res$BivTest
-          MulvTest <- res$test
+          MulvTest <- res$MulvTest
           PairwiseTest <- res$pairwise
           steps <- res$steps
           path <- res$path
@@ -2064,7 +2064,7 @@ server <- function(input, output, session) {
                      group2 = trimws(group2),
                      stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
             
-            all_combinations <- combn(unique(stats$SampleName), 2, simplify = FALSE)
+            all_combinations <- combn(unique(SubDataStat$ExpCond), 2, simplify = FALSE)
             
             post_hoc_pairs <- lapply(all_combinations, function(pair) {
               pair <- unlist(pair)
@@ -2112,22 +2112,23 @@ server <- function(input, output, session) {
           
           if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
             y_max <- max(SubDataStat$Mean + SubDataStat$sd, na.rm = TRUE)
-            y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
+            stepsize <- 0.1 * y_max
+            y_pos <- seq(y_max + stepsize, y_max + stepsize + stepsize * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
             
-            nspos = which(annotations != "ns")
-            if(length(nspos)>0)
+            # nspos = which(annotations != "ns")
+            # if(length(nspos)>0)
               resplot <- resplot + 
               ggsignif::geom_signif(
-                comparisons = post_hoc_pairs[nspos],
-                y_position = y_pos[nspos],
-                annotations = annotations[nspos],
+                comparisons = post_hoc_pairs,
+                y_position = y_pos,
+                annotations = annotations,
                 tip_length = 0.01,
                 textsize = 8 / 1.5,
-                vjust = 0.8
+                vjust = 0.2
               )
           } else {
             print("No valid post-hoc comparisons or annotations to plot.")
-          } 
+          }
         }
         
         output$IFsummarise_plot = renderPlot({resplot})
