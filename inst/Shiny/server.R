@@ -1584,6 +1584,10 @@ server <- function(input, output, session) {
           generatePlotParameters(bcaResult$Regression$plot)
         ),
         tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(bcaResult$Regression$plot)
+        ),
+        tabPanel(
           "Save Plot",
           generateSavePlotTab()
         )
@@ -1976,6 +1980,10 @@ server <- function(input, output, session) {
           generatePlotParameters(ifResult$resplot)
         ),
         tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(ifResult$resplot)
+        ),
+        tabPanel(
           "Save Plot",
           generateSavePlotTab()
         )
@@ -2045,7 +2053,7 @@ server <- function(input, output, session) {
         
         if(any(SubDataStat$sd == 0) ){
           showAlert("Warning", "Standard Deviation is zero for at least one group. Statistical test cannot be performed.", "warning", 5000)
-          BivTest = NULL
+          test_to_show = BivTest = NULL
         }else{
           res = testStat.function(SubData)
           BivTest <- res$BivTest
@@ -2115,28 +2123,10 @@ server <- function(input, output, session) {
             print("No pairwise comparisons to plot.")
           }
           
-          if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
-            y_max <- max(SubDataStat$Mean + SubDataStat$sd, na.rm = TRUE)
-            stepsize <- 0.1 * y_max
-            y_pos <- seq(y_max + stepsize, y_max + stepsize + stepsize * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
-            
-            # nspos = which(annotations != "ns")
-            # if(length(nspos)>0)
-              resplot <- resplot + 
-              ggsignif::geom_signif(
-                comparisons = post_hoc_pairs,
-                y_position = y_pos,
-                annotations = annotations,
-                tip_length = 0.01,
-                textsize = 8 / 1.5,
-                vjust = 0.2
-              )
-          } else {
-            print("No valid post-hoc comparisons or annotations to plot.")
-          }
+          # Store data for reactive plotting
+          ifResult$post_hoc_pairs <- post_hoc_pairs
+          ifResult$annotations <- annotations
         }
-        
-        output$IFsummarise_plot = renderPlot({resplot})
         
         output$IFsummariseMean = renderDT({
           DT::datatable(SubDataStat,
@@ -2151,7 +2141,7 @@ server <- function(input, output, session) {
         
         output$IFtable_ttest = renderDT({
           DT::datatable(test_to_show,
-                        selection = 'none',
+                        selection = 'multiple',
                         rownames= FALSE,
                         options = list(scrollX = TRUE,
                                        searching = FALSE,
@@ -2161,7 +2151,7 @@ server <- function(input, output, session) {
         })
         
         ifResult$SubStatData = SubDataStat
-        ifResult$TTestData = BivTest
+        ifResult$TTestData = test_to_show
         ifResult$resplot = resplot
       }else{
         output$IFsummarise_plot = renderPlot({NULL})
@@ -2171,6 +2161,57 @@ server <- function(input, output, session) {
 
     
   })
+  
+  observe({
+    plot_to_show <- req(ifResult$resplot)
+    SubDataStat <- req(ifResult$SubStatData)
+    test_to_show = req(ifResult$TTestData)
+    
+    selected_rows <- input$IFtable_ttest_rows_selected
+    
+    isolate({ 
+    # Get stored data
+    post_hoc_pairs <- ifResult$post_hoc_pairs
+    annotations <- ifResult$annotations
+    
+    # If there are pairs and annotations available
+    if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
+      # If no rows selected, show all by default
+      if (is.null(selected_rows) || length(selected_rows) == 0) {
+        filtered_pairs <- post_hoc_pairs
+        filtered_annotations <- annotations
+      } else {
+        test_to_show[-selected_rows, ] -> selected_tests
+        # Filter based on selected rows
+        selected_tests %>% select(group1,group2) -> selected_conditions
+        lapply(seq_len(nrow(selected_conditions)), function(i) {
+          c(selected_conditions$group1[i], selected_conditions$group2[i])
+        }) -> filtered_pairs
+        filtered_annotations <- selected_tests$stars
+      }
+      
+      if (length(filtered_pairs) > 0 && length(filtered_annotations) > 0) {
+        y_max <- max(SubDataStat$Mean + SubDataStat$sd, na.rm = TRUE)
+        stepsize <- 0.1 * y_max
+        y_pos <- seq(y_max + stepsize, y_max + stepsize + stepsize * length(filtered_pairs), length.out = length(filtered_pairs))
+        
+        plot_to_show <- plot_to_show + 
+          ggsignif::geom_signif(
+            comparisons = filtered_pairs,
+            y_position = y_pos,
+            annotations = filtered_annotations,
+            tip_length = 0.01,
+            textsize = 8 / 1.5,
+            vjust = 0.2
+          )
+      }
+    }
+    
+    output$IFsummarise_plot = renderPlot({ plot_to_show })
+    })
+    
+  })
+  
   
   
   observe({
@@ -2510,6 +2551,10 @@ server <- function(input, output, session) {
         tabPanel(
           "Common Parameters",
           generatePlotParameters(wbResult$Plots)
+        ),
+        tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(wbResult$Plots)
         ),
         tabPanel(
           "Save Plot",
@@ -3084,6 +3129,10 @@ server <- function(input, output, session) {
         tabPanel(
           "Common Parameters",
           generatePlotParameters(wbquantResult$AdjRelDensityPlot)
+        ),
+        tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(wbquantResult$AdjRelDensityPlot)
         ),
         tabPanel(
           "Save Plot",
@@ -3891,6 +3940,10 @@ server <- function(input, output, session) {
           generatePlotParameters(pcrResult$PointPlot)
         ),
         tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(pcrResult$PointPlot)
+        ),
+        tabPanel(
           "Save Plot",
           generateSavePlotTab()
         )
@@ -3953,6 +4006,10 @@ server <- function(input, output, session) {
           tabPanel(
             "Common Parameters",
             generatePlotParameters(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2)
+          ),
+          tabPanel(
+            "X-Axis Order",
+            generateXAxisOrderTab(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2)
           ),
           tabPanel(
             "Save Plot",

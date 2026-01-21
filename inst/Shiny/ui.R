@@ -29,6 +29,8 @@ library(xml2)
 library(visNetwork)
 library(shinyFiles)  # Load shinyFiles package
 library(colourpicker)
+library(sortable)
+library(stringi)
 
 ui <- dashboardPage(
   dashboardHeader(title = "ORCA",
@@ -782,28 +784,73 @@ ui <- dashboardPage(
       
       #### BEGIN data analysis: RT-PCR ####
       tabItem(tabName = "uploadPCR",
-              h2("Load RT-qPCR raw data"),
-              fluidRow( 
-                column(
-                  9,
-                  fileInput(
-                    inputId = "PCRImport",
-                    label = "",
-                    placeholder = "Select an Excel file",
-                    width = "80%", 
-                    multiple = TRUE
+              div(class = "if-header-box",
+                  h2(icon("dna"), " RT-qPCR Gene Expression Analysis", style = "margin-top: 0;"),
+                  p(class = "if-description",
+                    "Reverse Transcription quantitative PCR (RT-qPCR) analysis for gene expression quantification. Upload your Excel file 
+                    containing Ct values, gene names, samples, and time points. The module performs ΔΔCt calculations, fold-change analysis, 
+                    normalization to housekeeping genes, and generates comprehensive expression profiles with statistical testing."
                   )
-                ),
-                column(
-                  2,
-                  actionButton(
-                    label = "Load",
-                    style = "margin-top: 20px; width: 100%;",
-                    icon = shiny::icon("upload"),
-                    inputId = "LoadPCR_Button"
-                  )
-                ),
-                tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+              ),
+              fluidRow(
+                column(12,
+                       div(class = "if-upload-box",
+                           h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                           p(style = "color: #666; margin-bottom: 20px;",
+                             "Select one or more Excel files containing your RT-qPCR data. Files should include Ct values, gene identifiers, 
+                             sample names, and experimental time points."
+                           ),
+                           fluidRow(
+                             column(9,
+                                    fileInput(
+                                      inputId = "PCRImport",
+                                      label = "",
+                                      placeholder = "Click to browse or drag files here...",
+                                      width = "100%", 
+                                      multiple = TRUE,
+                                      accept = c(".xlsx", ".xls")
+                                    )
+                             ),
+                             column(3,
+                                    actionButton(
+                                      label = "Load Data",
+                                      style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                               border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                               border-radius: 5px; transition: all 0.3s ease;",
+                                      icon = shiny::icon("upload"),
+                                      inputId = "LoadPCR_Button"
+                                    )
+                             )
+                           )
+                       )
+                )
+              ),
+              fluidRow(
+                column(12,
+                       div(class = "if-features",
+                           h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
+                           div(class = "if-feature-item",
+                               tags$strong(icon("calculator"), " ΔΔCt Method:"),
+                               " Automatic calculation of relative gene expression using the comparative Ct method"
+                           ),
+                           div(class = "if-feature-item",
+                               tags$strong(icon("balance-scale"), " Normalization:"),
+                               " Normalize to housekeeping genes and baseline experimental conditions"
+                           ),
+                           div(class = "if-feature-item",
+                               tags$strong(icon("chart-line"), " Time Course Analysis:"),
+                               " Track gene expression changes over time with dynamic line plots"
+                           ),
+                           div(class = "if-feature-item",
+                               tags$strong(icon("chart-bar"), " Fold Change:"),
+                               " Calculate and visualize fold-change values for all genes across conditions"
+                           ),
+                           div(class = "if-feature-item",
+                               tags$strong(icon("download"), " Comprehensive Export:"),
+                               " Download normalized data, fold-change tables, and publication-ready plots"
+                           )
+                       )
+                )
               ),
               fluidRow(
                 box(
@@ -1165,26 +1212,73 @@ ui <- dashboardPage(
       #### BEGIN data analysis: BCA ####
       tabItem(
         tabName = "uploadBCA",
-        h2("Load data"),
+        div(class = "if-header-box",
+            h2(icon("flask"), " BCA Protein Assay Analysis", style = "margin-top: 0;"),
+            p(class = "if-description",
+              "Bicinchoninic Acid (BCA) assay module for protein quantification. Upload your Excel file containing absorbance 
+              measurements and standard curve data. The module automatically generates calibration curves using polynomial regression, 
+              calculates protein concentrations, and provides comprehensive statistical analysis with visualization."
+            )
+        ),
         fluidRow(
-          column(9,
-                 fileInput(
-                   inputId = "BCAImport",
-                   label = "",
-                   placeholder = "Select an Excel file.",
-                   width = "80%", 
-                   multiple = TRUE
+          column(12,
+                 div(class = "if-upload-box",
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     p(style = "color: #666; margin-bottom: 20px;",
+                       "Select one or more Excel files containing your BCA assay measurements. Files should include sample absorbance 
+                       values, experimental conditions, and standard curve concentrations."
+                     ),
+                     fluidRow(
+                       column(9,
+                              fileInput(
+                                inputId = "BCAImport",
+                                label = "",
+                                placeholder = "Click to browse or drag files here...",
+                                width = "100%", 
+                                multiple = TRUE,
+                                accept = c(".xlsx", ".xls")
+                              )
+                       ),
+                       column(3,
+                              actionButton(
+                                label = "Load Data",
+                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                         border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                         border-radius: 5px; transition: all 0.3s ease;",
+                                icon = shiny::icon("upload"),
+                                inputId = "LoadBCA_Button"
+                              )
+                       )
+                     )
                  )
-          ),
-          column(2,
-                 actionButton(
-                   label = "Load",
-                   style = "margin-top: 20px; width: 100%;",
-                   icon = shiny::icon("upload"),
-                   inputId = "LoadBCA_Button"
+          )
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-features",
+                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-area"), " Calibration Curves:"),
+                         " Automatic polynomial regression fitting with R² values and equation display"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("calculator"), " Concentration Calculations:"),
+                         " Determine protein concentrations from absorbance values using the standard curve"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-bar"), " Statistical Analysis:"),
+                         " Mean, standard deviation, and coefficient of variation across replicates"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("palette"), " Interactive Plots:"),
+                         " Publication-ready scatter plots with regression lines and confidence intervals"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("download"), " Export Results:"),
+                         " Download high-resolution plots and comprehensive Excel reports"
+                     )
                  )
-          ),
-          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+          )
         ),
         fluidRow(
           box(width = 12,
@@ -1331,26 +1425,73 @@ ui <- dashboardPage(
       #### BEGIN data analysis:  ELISA ####
       tabItem(
         tabName = "uploadELISA",
-        h2("Load ELISA data"),
+        div(class = "if-header-box",
+            h2(icon("vial"), " ELISA Assay Analysis", style = "margin-top: 0;"),
+            p(class = "if-description",
+              "Enzyme-Linked Immunosorbent Assay (ELISA) quantification module. Upload your Excel file containing absorbance readings 
+              and standard curve concentrations. The module automatically fits calibration curves, determines sample concentrations, 
+              computes dilution factors, and performs statistical comparisons across experimental conditions."
+            )
+        ),
         fluidRow(
-          column(9,
-                 fileInput(
-                   inputId = "ELISAImport",
-                   label = "",
-                   placeholder = "Select an Excel file.",
-                   width = "80%", 
-                   multiple = TRUE
+          column(12,
+                 div(class = "if-upload-box",
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     p(style = "color: #666; margin-bottom: 20px;",
+                       "Select one or more Excel files containing your ELISA measurements. Files should include sample absorbance values, 
+                       experimental conditions, replicates, and standard curve data."
+                     ),
+                     fluidRow(
+                       column(9,
+                              fileInput(
+                                inputId = "ELISAImport",
+                                label = "",
+                                placeholder = "Click to browse or drag files here...",
+                                width = "100%", 
+                                multiple = TRUE,
+                                accept = c(".xlsx", ".xls")
+                              )
+                       ),
+                       column(3,
+                              actionButton(
+                                label = "Load Data",
+                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                         border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                         border-radius: 5px; transition: all 0.3s ease;",
+                                icon = shiny::icon("upload"),
+                                inputId = "LoadELISA_Button"
+                              )
+                       )
+                     )
                  )
-          ),
-          column(2,
-                 actionButton(
-                   label = "Load",
-                   style = "margin-top: 20px; width: 100%;",
-                   icon = shiny::icon("upload"),
-                   inputId = "LoadELISA_Button"
+          )
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-features",
+                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-area"), " Standard Curves:"),
+                         " Automatic 4-parameter logistic (4PL) or polynomial curve fitting"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("calculator"), " Concentration Interpolation:"),
+                         " Determine sample concentrations from OD values with dilution factor corrections"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-bar"), " Statistical Testing:"),
+                         " Comparative analysis across experimental groups with t-tests and ANOVA"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("palette"), " Visualization:"),
+                         " Bar plots with error bars, scatter plots, and calibration curve displays"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("download"), " Export Results:"),
+                         " Download calculated concentrations and plots in high resolution"
+                     )
                  )
-          ),
-          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+          )
         ),
         fluidRow(
           box(width = 12,
@@ -1474,27 +1615,73 @@ ui <- dashboardPage(
       ## BEGIN data analysis:  ENDOC ####
       tabItem(
         tabName = "uploadENDOC",
-        h2("Load Endocytosis data"),
-        fluidRow(
-          column(
-            9,
-            fileInput(
-              inputId = "ENDOCImport",
-              label = "",
-              placeholder = "Select an Excel file.",
-              width = "80%", 
-              multiple = TRUE
+        div(class = "if-header-box",
+            h2(icon("exchange-alt"), " Endocytosis Analysis", style = "margin-top: 0;"),
+            p(class = "if-description",
+              "Quantitative endocytosis assay analysis module. Upload your Excel file containing fluorescence intensity measurements 
+              from endocytosis experiments. The module calculates internalization rates, normalizes to control conditions, performs 
+              statistical comparisons, and generates time-course or dose-response visualizations."
             )
-          ),
-          column(2,
-                 actionButton(
-                   label = "Load",
-                   style = "margin-top: 20px; width: 100%;",
-                   icon = shiny::icon("upload"),
-                   inputId = "LoadENDOC_Button"
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-upload-box",
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     p(style = "color: #666; margin-bottom: 20px;",
+                       "Select one or more Excel files containing your endocytosis measurements. Files should include fluorescence values, 
+                       experimental conditions, time points, and biological replicates."
+                     ),
+                     fluidRow(
+                       column(9,
+                              fileInput(
+                                inputId = "ENDOCImport",
+                                label = "",
+                                placeholder = "Click to browse or drag files here...",
+                                width = "100%", 
+                                multiple = TRUE,
+                                accept = c(".xlsx", ".xls")
+                              )
+                       ),
+                       column(3,
+                              actionButton(
+                                label = "Load Data",
+                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                         border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                         border-radius: 5px; transition: all 0.3s ease;",
+                                icon = shiny::icon("upload"),
+                                inputId = "LoadENDOC_Button"
+                              )
+                       )
+                     )
                  )
-          ),
-          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+          )
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-features",
+                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("calculator"), " Internalization Rates:"),
+                         " Calculate percentage of internalized material over time"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("balance-scale"), " Normalization:"),
+                         " Normalize to baseline or control conditions for comparative analysis"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-bar"), " Statistical Testing:"),
+                         " T-tests, ANOVA, and post-hoc comparisons across experimental groups"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("clock"), " Time-Course Analysis:"),
+                         " Track endocytosis dynamics with customizable time-series plots"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("download"), " Export Results:"),
+                         " Download analysis results and publication-ready figures"
+                     )
+                 )
+          )
         ),
         fluidRow(
           column(
@@ -1598,23 +1785,71 @@ ui <- dashboardPage(
       ## BEGIN data analysis: CYTOTOX  #######
       tabItem(
         tabName = "uploadCYTOTOX",
-        h2("Load Cytotoxicity data"),
+        div(class = "if-header-box",
+            h2(icon("skull-crossbones"), " Cytotoxicity Assay Analysis", style = "margin-top: 0;"),
+            p(class = "if-description",
+              "Cell viability and cytotoxicity assay analysis module. Upload your Excel file containing absorbance or fluorescence 
+              measurements from MTT, LDH, or similar viability assays. The module calculates cell viability percentages, determines 
+              IC50 values, performs dose-response analysis, and compares cytotoxic effects across different treatments."
+            )
+        ),
         fluidRow(
-          column(9,
-                 fileInput(
-                   inputId = "CYTOTOXImport",
-                   label = "",
-                   placeholder = "Select an Excel file.",
-                   width = "80%", 
-                   multiple = TRUE
+          column(12,
+                 div(class = "if-upload-box",
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     p(style = "color: #666; margin-bottom: 20px;",
+                       "Select one or more Excel files containing your cytotoxicity assay data. Files should include absorbance/fluorescence 
+                       values, experimental conditions, concentrations, and replicate information."
+                     ),
+                     fluidRow(
+                       column(9,
+                              fileInput(
+                                inputId = "CYTOTOXImport",
+                                label = "",
+                                placeholder = "Click to browse or drag files here...",
+                                width = "100%", 
+                                multiple = TRUE,
+                                accept = c(".xlsx", ".xls")
+                              )
+                       ),
+                       column(3,
+                              actionButton(
+                                label = "Load Data",
+                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                         border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                         border-radius: 5px; transition: all 0.3s ease;",
+                                icon = shiny::icon("upload"),
+                                inputId = "LoadCYTOTOX_Button"
+                              )
+                       )
+                     )
                  )
-          ),
-          column(2,
-                 actionButton(
-                   label = "Load",
-                   style = "margin-top: 20px; width: 100%;",
-                   icon = shiny::icon("upload"),
-                   inputId = "LoadCYTOTOX_Button"
+          )
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-features",
+                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("percentage"), " Viability Calculations:"),
+                         " Automatic calculation of cell viability percentages relative to controls"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-line"), " IC50 Determination:"),
+                         " Calculate half-maximal inhibitory concentrations from dose-response curves"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-bar"), " Statistical Analysis:"),
+                         " Compare treatments with t-tests, ANOVA, and multiple comparison corrections"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("palette"), " Dose-Response Curves:"),
+                         " Generate sigmoidal curve fits with confidence intervals"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("download"), " Comprehensive Export:"),
+                         " Download viability data, IC50 values, and publication-ready plots"
+                     )
                  )
           )
         ),
@@ -1769,27 +2004,73 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "uploadFACS",
-        h2("Load Flow Cytometry data"),
-        fluidRow(
-          column(
-            9,
-            fileInput(
-              inputId = "FACSImport",
-              label = "",
-              placeholder = "Select an Excel file.",
-              width = "80%", 
-              multiple = TRUE
+        div(class = "if-header-box",
+            h2(icon("dot-circle"), " Flow Cytometry Analysis", style = "margin-top: 0;"),
+            p(class = "if-description",
+              "Flow cytometry data analysis module for cell population quantification. Upload your Excel file containing pre-gated 
+              cell population percentages or counts. The module supports hierarchical gating strategies, calculates population 
+              frequencies, performs comparative statistics across experimental conditions, and generates comprehensive visualizations."
             )
-          ),
-          column(2,
-                 actionButton(
-                   label = "Load",
-                   style = "margin-top: 20px; width: 100%;",
-                   icon = shiny::icon("upload"),
-                   inputId = "LoadFACS_Button"
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-upload-box",
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     p(style = "color: #666; margin-bottom: 20px;",
+                       "Select one or more Excel files containing your flow cytometry data. Files should include gated population percentages, 
+                       experimental conditions, and sample identifiers."
+                     ),
+                     fluidRow(
+                       column(9,
+                              fileInput(
+                                inputId = "FACSImport",
+                                label = "",
+                                placeholder = "Click to browse or drag files here...",
+                                width = "100%", 
+                                multiple = TRUE,
+                                accept = c(".xlsx", ".xls")
+                              )
+                       ),
+                       column(3,
+                              actionButton(
+                                label = "Load Data",
+                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                         border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                         border-radius: 5px; transition: all 0.3s ease;",
+                                icon = shiny::icon("upload"),
+                                inputId = "LoadFACS_Button"
+                              )
+                       )
+                     )
                  )
-          ),
-          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
+          )
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-features",
+                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("project-diagram"), " Hierarchical Gating:"),
+                         " Define parental gates and calculate percentages at each level of the gating strategy"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("calculator"), " Population Frequencies:"),
+                         " Automatic calculation of cell subset percentages and absolute counts"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-bar"), " Statistical Comparisons:"),
+                         " Compare populations across experimental groups with appropriate statistical tests"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("palette"), " Custom Visualizations:"),
+                         " Bar plots, scatter plots, and heatmaps for multi-parameter analysis"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("download"), " Export Results:"),
+                         " Download gating results, statistics, and publication-ready figures"
+                     )
+                 )
+          )
         ),
       ),
       tabItem(tabName = "tablesFACS",
@@ -1901,27 +2182,114 @@ ui <- dashboardPage(
       #### BEGIN data analysis: IF ####
       tabItem(
         tabName = "uploadIF",
-        h2("Load IF data"),
+        tags$head(
+          tags$style(HTML("
+            .if-header-box {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 30px;
+              border-radius: 10px;
+              margin-bottom: 30px;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .if-description {
+              font-size: 16px;
+              line-height: 1.6;
+              margin-top: 15px;
+            }
+            .if-upload-box {
+              background: white;
+              padding: 30px;
+              border-radius: 10px;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+              border: 2px dashed #667eea;
+              transition: all 0.3s ease;
+            }
+            .if-upload-box:hover {
+              border-color: #764ba2;
+              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            }
+            .if-features {
+              margin-top: 20px;
+            }
+            .if-feature-item {
+              padding: 10px 0;
+              border-left: 3px solid #667eea;
+              padding-left: 15px;
+              margin: 10px 0;
+            }
+          "))
+        ),
+        div(class = "if-header-box",
+            h2(icon("microscope"), " Immunofluorescence (IF) Analysis", style = "margin-top: 0;"),
+            p(class = "if-description",
+              "Welcome to the IF analysis module! This tool enables comprehensive quantitative analysis of immunofluorescence microscopy data. 
+              Upload your Excel file containing fluorescence intensity measurements from different cellular compartments, experimental conditions, 
+              and biological replicates. The module will automatically compute statistics, perform comparative analyses, and generate publication-ready visualizations."
+            )
+        ),
         fluidRow(
-          column(9,
-                 fileInput(
-                   inputId = "IFImport",
-                   label = "",
-                   placeholder = "Select an Excel file.",
-                   width = "80%", 
-                   multiple = TRUE
+          column(12,
+                 div(class = "if-upload-box",
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     p(style = "color: #666; margin-bottom: 20px;",
+                       "Select one or more Excel files containing your IF quantification data. Each file should include experimental conditions, 
+                       cellular compartments, and measured fluorescence values."
+                     ),
+                     fluidRow(
+                       column(9,
+                              fileInput(
+                                inputId = "IFImport",
+                                label = "",
+                                placeholder = "Click to browse or drag files here...",
+                                width = "100%", 
+                                multiple = TRUE,
+                                accept = c(".xlsx", ".xls")
+                              )
+                       ),
+                       column(3,
+                              actionButton(
+                                label = "Load Data",
+                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                         border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                         border-radius: 5px; transition: all 0.3s ease;",
+                                icon = shiny::icon("upload"),
+                                inputId = "LoadIF_Button",
+                                class = "btn-primary"
+                              )
+                       )
+                     )
                  )
-          ),
-          column(2,
-                 actionButton(
-                   label = "Load",
-                   style = "margin-top: 20px; width: 100%;",
-                   icon = shiny::icon("upload"),
-                   inputId = "LoadIF_Button"
+          )
+        ),
+        fluidRow(
+          column(12,
+                 div(class = "if-features",
+                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("calculator"), " Automatic Calculations:"),
+                         " Compute mean, standard deviation, and percentage distributions across compartments"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("chart-bar"), " Statistical Testing:"),
+                         " Perform t-tests, ANOVA, and post-hoc pairwise comparisons with automatic test selection"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("palette"), " Customizable Plots:"),
+                         " Generate bar plots with error bars, significance annotations, and customizable aesthetics"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("filter"), " Flexible Filtering:"),
+                         " Select which significance levels to display (p < 0.001, p < 0.01, p < 0.05, or ns)"
+                     ),
+                     div(class = "if-feature-item",
+                         tags$strong(icon("download"), " Export Results:"),
+                         " Download publication-ready plots and comprehensive Excel reports with all statistics"
+                     )
                  )
-          ),
-          tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
-        )
+          )
+        ),
+        tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
       ),
       tabItem(tabName = "tablesIF",
               h2("Quantification"),
@@ -1977,6 +2345,15 @@ ui <- dashboardPage(
                     fluidRow(
                       column(
                         width = 12,
+                        tags$div(
+                          style = "background-color: #f0f8ff; padding: 10px; border-left: 4px solid #667eea; margin-bottom: 15px; border-radius: 4px;",
+                          tags$p(
+                            style = "margin: 0; color: #333;",
+                            icon("info-circle"), 
+                            tags$strong(" Tip: "),
+                            "Click on rows in the table below to select/deselect which comparisons to display in the plot. By default, all comparisons are shown."
+                          )
+                        ),
                         DTOutput("IFtable_ttest")
                       )
                     )

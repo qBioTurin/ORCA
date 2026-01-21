@@ -287,6 +287,9 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
       
       x = readxl::read_excel(filename, col_names = colname)
       x <- x[, !is.na(colnames(x))]
+      # check in the x columns, if the column is. a character than remove in the strings the with spaces at the end of the string
+      x <- x %>%
+        mutate(across(where(is.character), ~ stringi::stri_trim_right(. ) ) )
       
       # if (allDouble) {
       #   xstr = which(sapply(x, function(col) !is.numeric(col)))
@@ -2173,13 +2176,23 @@ generateLayerParameters <- function(plot) {
     data <- plot_build$data[[i]]
     default_params <- layer$aes_params
     
+    ##### da controllare che il mapping sia corretto in shape!!!!!
     if(!is.null(aes_mapping$colour)){
       colour_mapping<-rlang::quo_name(aes_mapping$colour)
-      data<-data %>% mutate(!!colour_mapping := plot_build$plot$data[[colour_mapping]])
+      sc <- plot_build$plot$scales$get_scales("colour")
+      levels_used <- sc$get_limits()                 # the values/levels from your data
+      cols_used   <- sc$palette(length(levels_used)) # the colours assigned
+      levels_used <- setNames( levels_used, cols_used)
+      data<-data %>% mutate(!!colour_mapping := levels_used[paste(data$colour)] )
     }
     if(!is.null(aes_mapping$shape)){
       shape_mapping<-rlang::quo_name(aes_mapping$shape)
-      data<-data %>% mutate(!!shape_mapping := plot_build$plot$data[[shape_mapping]])
+      scS <- plot_build$plot$scales$get_scales("shape")
+      shape_levels <- scS$get_limits()
+      shape_values <- scS$palette(length(shape_levels))
+      shape_levels = setNames(shape_levels,shape_values )
+      
+      data<-data %>% mutate(!!shape_mapping := shape_levels[paste(data$shape)] )
     }
     
     #Function to extract specific aesthetic values
@@ -2213,7 +2226,7 @@ generateLayerParameters <- function(plot) {
         # Common controls for all layers
         sliderInput(
           paste0("layerSize_", i), "Layer Size", 
-          min = 1, max = 5, value = extract_aes_value("size", 1,1)
+          min = 0.01, max = 5, value = extract_aes_value("size", 1,1)
         ),
         
         # Layer-specific customization
@@ -2406,12 +2419,12 @@ generateLayerParameters <- function(plot) {
             sliderInput(
               paste0("outlierSize_", i),
               "Outlier Size",
-              min = 1, max = 5, value = extract_aes_value("outlier.size", 2,1)
+              min = 0.01, max = 5, value = extract_aes_value("outlier.size", 2,1)
             ),
             sliderInput(
               paste0("boxWidth_", i),
               paste("Box Width"),
-              min = 0.1, max = 1, value = extract_aes_value("width", 0.5,1)
+              min = 0.01, max = 1, value = extract_aes_value("width", 0.5,1)
             )
           )
         } else {
@@ -2439,6 +2452,16 @@ customizePlot <- function(plot, input) {
       panel.background = element_rect(fill = backgroundColor, color = backgroundColor),
       plot.background = element_rect(fill = backgroundColor, color = backgroundColor)
     )
+  
+  # Apply x-axis reordering if provided
+  if (!is.null(input$sortable_x_axis) && length(input$sortable_x_axis) > 0) {
+    # Get the new order from the input
+    new_order <- input$sortable_x_axis
+    
+    # Apply the new order to the x-axis
+    updatedPlot <- updatedPlot + 
+      scale_x_discrete(limits = new_order)
+  }
   
   updatedPlot$layers <- list()
   plot_build=ggplot_build(plot)
@@ -2853,10 +2876,46 @@ generatePlotParameters <- function(plot) {
 
 generateSavePlotTab <- function() {
   tagList(
-    numericInput("plotWidth", "Plot Width (inches)", value = 10, min = 1, max = 20),
-    numericInput("plotHeight", "Plot Height (inches)", value = 4, min = 1, max = 20),
+    numericInput("plotWidth", "Plot Width (inches)", value = 10, min = 0, max = 20),
+    numericInput("plotHeight", "Plot Height (inches)", value = 4, min = 0, max = 20),
     numericInput("plotResolution", "Resolution (dpi)", value = 300, min = 72, max = 600)
   )
+}
+
+generateXAxisOrderTab <- function(plot) {
+  # Build plot to extract x-axis information
+  plot_build <- ggplot_build(plot)
+  
+  # Check if x-axis scale is discrete
+  x_scale <- plot_build$layout$panel_scales_x[[1]]
+  
+  if (inherits(x_scale, "ScaleDiscretePosition")) {
+    # Get current discrete values
+    x_levels <- x_scale$get_limits()
+    
+    if (length(x_levels) > 0) {
+      tagList(
+        h4("X-Axis Discrete Values Order"),
+        p("Drag and drop to reorder the x-axis values:"),
+        tags$div(
+                rank_list(text = "Drag the floors in the desired order",
+                          labels =  x_levels,
+                          input_id = "sortable_x_axis"
+                )
+        )
+      )
+    } else {
+      tagList(
+        h4("X-Axis Order"),
+        p("No discrete values found on the x-axis.")
+      )
+    }
+  } else {
+    tagList(
+      h4("X-Axis Order"),
+      p("The x-axis is not discrete. This feature only works with discrete x-axis scales.")
+    )
+  }
 }
 
 savePlotAsPNG <- function(plot, filePath, width, height, dpi) {
