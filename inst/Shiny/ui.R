@@ -37,16 +37,136 @@ ui <- dashboardPage(
                   tags$li(
                     class = "dropdown d-flex align-items-center",
                     tags$head(tags$link(rel = "shortcut icon", href = "ORCAlogo.png")),
-                    tags$style(".main-header {max-height: 60px;}
-                 .icon-container {
+                    tags$style("
+      /* ORCA Ocean Blue Theme */
+      .main-header {
+        max-height: 60px;
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
+      }
+      .main-header .logo {
+        background: linear-gradient(135deg, #0066cc 0%, #003d7a 100%) !important;
+        color: white !important;
+        font-weight: bold;
+        font-size: 24px;
+      }
+      .main-header .logo:hover {
+        background: linear-gradient(135deg, #0052a3 0%, #003366 100%) !important;
+      }
+      .main-header .navbar {
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
+      }
+      
+      /* Sidebar Styling */
+      .sidebar {
+        background: linear-gradient(180deg, #001a33 0%, #003d7a 100%) !important;
+      }
+      .sidebar-menu > li > a {
+        color: #e6f2ff !important;
+        border-left: 3px solid transparent;
+        transition: all 0.3s ease;
+      }
+      .sidebar-menu > li > a:hover {
+        background-color: #0052a3 !important;
+        border-left: 3px solid #00bfff;
+        color: white !important;
+      }
+      .sidebar-menu > li.active > a {
+        background-color: #0066cc !important;
+        border-left: 3px solid #00bfff;
+        color: white !important;
+        font-weight: bold;
+      }
+      .sidebar-menu .treeview-menu {
+        background: #001a33 !important;
+      }
+      .sidebar-menu .treeview-menu > li > a {
+        color: #b3d9ff !important;
+      }
+      .sidebar-menu .treeview-menu > li > a:hover {
+        background-color: #003366 !important;
+        color: white !important;
+      }
+      
+      /* Box Styling */
+      .box {
+        border-top-color: #0066cc !important;
+        box-shadow: 0 2px 4px rgba(0, 102, 204, 0.1);
+      }
+      .box-header {
+        background: linear-gradient(135deg, #e6f2ff 0%, #cce6ff 100%);
+        color: #003d7a;
+        font-weight: bold;
+      }
+      .box-primary {
+        border-top-color: #0066cc !important;
+      }
+      .box-info {
+        border-top-color: #00bfff !important;
+      }
+      
+      /* Button Styling */
+      .btn-primary {
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%);
+        border-color: #0052a3;
+        color: white;
+        transition: all 0.3s ease;
+      }
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #0052a3 0%, #003d7a 100%);
+        border-color: #003366;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3);
+      }
+      
+      /* Action Button Styling */
+      .btn-default {
+        background-color: #e6f2ff;
+        border-color: #0066cc;
+        color: #003d7a;
+      }
+      .btn-default:hover {
+        background-color: #cce6ff;
+        border-color: #0052a3;
+      }
+      
+      /* Data Table Styling */
+      .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
+        border-color: #0052a3 !important;
+        color: white !important;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+        background: #e6f2ff !important;
+        border-color: #0066cc !important;
+        color: #003d7a !important;
+      }
+      
+      /* Content Wrapper */
+      .content-wrapper {
+        background-color: #f5f9fc !important;
+      }
+      
+      /* Tab Styling */
+      .nav-tabs > li.active > a {
+        background-color: #0066cc !important;
+        color: white !important;
+        border-color: #0052a3 !important;
+      }
+      .nav-tabs > li > a:hover {
+        background-color: #e6f2ff !important;
+        color: #003d7a !important;
+      }
+      
+      /* Icon Container */
+      .icon-container {
         position: relative;
         display: inline-block;
       }
       .icon-container .icon-text {
         visibility: hidden;
-        width:400px;
-        background-color: #333;
-        color: #fff;
+        width: 400px;
+        background-color: #001a33;
+        color: #e6f2ff;
         text-align: center;
         border-radius: 6px;
         padding: 5px;
@@ -57,32 +177,54 @@ ui <- dashboardPage(
         transform: translateY(-50%);
         opacity: 0;
         transition: opacity 0.3s;
+        border: 1px solid #0066cc;
       }
       .icon-container:hover .icon-text {
         visibility: visible;
         opacity: 1;
       }
+      
       h3 {
-        padding-top: 0px; /* Adjust the top padding */
-        padding-bottom: 0px; /* Adjust the bottom padding */
-        margin-top: 0; /* Adjust the top margin */
-        margin-bottom: 0; /* Adjust the bottom margin */
-      }"
-                    )
+        padding-top: 0px;
+        padding-bottom: 0px;
+        margin-top: 0;
+        margin-bottom: 0;
+        color: #003d7a;
+      }
+      
+      h2 {
+        color: #003d7a;
+        border-bottom: 2px solid #0066cc;
+        padding-bottom: 10px;
+      }
+      
+      /* Progress bars */
+      .progress-bar {
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
+      }
+      
+      /* Info boxes */
+      .info-box {
+        box-shadow: 0 2px 4px rgba(0, 102, 204, 0.1);
+      }
+      .info-box-icon {
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
+      }
+    ")
                   ),
                   tags$li(a(onclick = "window.open('https://github.com/qBioTurin/ORCA')",
                             href = NULL,
                             icon("github"),
                             title = "GitHub",
-                            style = "cursor: pointer;"),
+                            style = "cursor: pointer; color: white;"),
                           class = "dropdown"),
                   tags$li(class = "dropdown",
-                          tags$style("#mydropdown {cursor: pointer; background-color: #852fb4; color: white; border: 1px solid #852fb4; height: 50px; left: 0;}"),
+                          tags$style("#mydropdown {cursor: pointer; background-color: #0066cc; color: white; border: 1px solid #0052a3; height: 50px; left: 0;}"),
                           dropdownButton(inputId = "mydropdown", label = "", right = TRUE, circle = FALSE, icon = icon("download"),
                                          tags$li(shinyjs::useShinyjs(),
-                                                 downloadButton(outputId = 'downloadReport', label = "Report", title = "Report generation", style = "cursor: pointer; width: 98%; text-align: center; vertical-align: middle; border: 1px solid #9809AF;", class = "dlButton")),
+                                                 downloadButton(outputId = 'downloadReport', label = "Report", title = "Report generation", style = "cursor: pointer; width: 98%; text-align: center; vertical-align: middle; border: 1px solid #0066cc; background-color: #e6f2ff; color: #003d7a;", class = "dlButton")),
                                          tags$li(shinyjs::useShinyjs(),
-                                                 downloadButton(outputId = 'downloadRDSwholeAnalysis', label = "RDs", title = "RDS storing the whole analysis", style = "cursor: pointer; width: 98%; text-align: center; vertical-align: middle; border: 1px solid #9809AF;", class = "dlButton"))
+                                                 downloadButton(outputId = 'downloadRDSwholeAnalysis', label = "RDs", title = "RDS storing the whole analysis", style = "cursor: pointer; width: 98%; text-align: center; vertical-align: middle; border: 1px solid #0066cc; background-color: #e6f2ff; color: #003d7a;", class = "dlButton"))
                           ),
                           block = TRUE)
   ),
@@ -169,7 +311,268 @@ ui <- dashboardPage(
                        )
                 )
               ),
-              p(img(src = "Logo_QBio.png", height = "15%", width = "15%", style = "margin:100px 0px"), align = "center")
+              div(class = "orca-logo-container",
+                  p(img(src = "Logo_QBio.png", height = "15%", width = "15%", 
+                        style = "margin:50px 0px; opacity: 0.8;"))
+              ),
+              tags$style(HTML("
+                .orca-welcome {
+                  background: linear-gradient(135deg, #0066cc 0%, #003d7a 100%);
+                  color: white;
+                  padding: 40px;
+                  border-radius: 15px;
+                  margin: 20px;
+                  box-shadow: 0 8px 16px rgba(0, 102, 204, 0.3);
+                }
+                .orca-subtitle {
+                  color: #e6f2ff;
+                  font-style: italic;
+                  margin-top: 10px;
+                }
+                .orca-feature-list {
+                  background: white;
+                  padding: 30px;
+                  border-radius: 10px;
+                  box-shadow: 0 4px 8px rgba(0, 102, 204, 0.15);
+                  margin: 20px;
+                }
+                .orca-logo-container {
+                  text-align: center;
+                  padding: 20px;
+                }
+                .analysis-cards-container {
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                  gap: 25px;
+                  padding: 20px;
+                  margin-top: 20px;
+                }
+                .analysis-card {
+                  background: white;
+                  border-radius: 12px;
+                  box-shadow: 0 4px 15px rgba(0, 102, 204, 0.15);
+                  overflow: hidden;
+                  transition: transform 0.3s ease, box-shadow 0.3s ease;
+                  border: 1px solid #e6f2ff;
+                }
+                .analysis-card:hover {
+                  transform: translateY(-5px);
+                  box-shadow: 0 8px 25px rgba(0, 102, 204, 0.25);
+                }
+                .analysis-card-header {
+                  background: linear-gradient(135deg, #0066cc 0%, #004d99 100%);
+                  color: white;
+                  padding: 20px;
+                  display: flex;
+                  align-items: center;
+                  gap: 15px;
+                }
+                .analysis-card-header i {
+                  font-size: 28px;
+                  opacity: 0.9;
+                }
+                .analysis-card-header h4 {
+                  margin: 0;
+                  font-size: 18px;
+                  font-weight: 600;
+                }
+                .analysis-card-body {
+                  padding: 20px;
+                }
+                .analysis-card-description {
+                  color: #555;
+                  font-size: 14px;
+                  line-height: 1.5;
+                  margin-bottom: 15px;
+                  padding-bottom: 15px;
+                  border-bottom: 1px solid #e6f2ff;
+                }
+                .analysis-card-features {
+                  list-style: none;
+                  padding: 0;
+                  margin: 0;
+                }
+                .analysis-card-features li {
+                  padding: 8px 0;
+                  color: #333;
+                  font-size: 13px;
+                  display: flex;
+                  align-items: flex-start;
+                  gap: 10px;
+                }
+                .analysis-card-features li i {
+                  color: #0066cc;
+                  font-size: 14px;
+                  margin-top: 2px;
+                  min-width: 16px;
+                }
+                .analysis-guide-header {
+                  text-align: center;
+                  padding: 30px 20px;
+                  background: linear-gradient(180deg, #f9fcff 0%, #f0f8ff 100%);
+                  border-radius: 10px;
+                  margin: 20px 0;
+                }
+                .analysis-guide-header h2 {
+                  color: #0066cc;
+                  margin-bottom: 10px;
+                }
+                .analysis-guide-header p {
+                  color: #666;
+                  font-size: 16px;
+                  max-width: 800px;
+                  margin: 0 auto;
+                }
+              ")),
+              
+              # ===== Analysis Features Summary Guide =====
+              div(class = "analysis-guide-header",
+                  h2(icon("chart-line"), " Analysis Features Summary Guide"),
+                  p("Explore the comprehensive analysis capabilities of ORCA. Click on any analysis section in the sidebar to get started.")
+              ),
+              
+              div(class = "analysis-cards-container",
+                  
+                  # ===== RT-qPCR Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("dna"),
+                          h4("RT-qPCR Gene Expression")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Reverse Transcription quantitative PCR analysis for gene expression quantification with ΔΔCt calculations and fold-change analysis."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                              tags$li(icon("calculator"), "ΔΔCt Method for relative expression"),
+                              tags$li(icon("balance-scale"), "Housekeeping gene normalization"),
+                              tags$li(icon("chart-line"), "Time course expression tracking"),
+                              tags$li(icon("chart-bar"), "Fold change visualization"),
+                              tags$li(icon("download"), "Export data & publication plots")
+                          )
+                      )
+                  ),
+                  
+                  # ===== BCA Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("flask"),
+                          h4("BCA Protein Assay")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Bicinchoninic Acid assay for protein quantification with automatic calibration curve fitting and concentration calculations."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                              tags$li(icon("chart-area"), "Polynomial regression calibration"),
+                              tags$li(icon("calculator"), "Concentration from absorbance"),
+                              tags$li(icon("chart-bar"), "Statistical analysis & CV"),
+                              tags$li(icon("palette"), "Interactive scatter plots"),
+                              tags$li(icon("download"), "Excel reports & high-res plots")
+                          )
+                      )
+                  ),
+                  
+                  # ===== ELISA Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("flask-vial"),
+                          h4("ELISA Analysis")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Enzyme-Linked ImmunoSorbent Assay analysis with 4-parameter logistic curve fitting and dilution factor corrections."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                              tags$li(icon("chart-area"), "4PL or polynomial curve fitting"),
+                              tags$li(icon("calculator"), "OD to concentration interpolation"),
+                              tags$li(icon("chart-bar"), "t-tests and ANOVA comparisons"),
+                              tags$li(icon("palette"), "Bar plots with error bars"),
+                              tags$li(icon("download"), "High resolution exports")
+                          )
+                      )
+                  ),
+                  
+                  # ===== Endocytosis Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("arrow-circle-down"),
+                          h4("Endocytosis Assay")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Endocytosis analysis for tracking cellular internalization dynamics with time-course measurements and normalization."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                              tags$li(icon("calculator"), "Internalization rate calculations"),
+                              tags$li(icon("balance-scale"), "Baseline normalization"),
+                              tags$li(icon("chart-bar"), "Statistical testing & ANOVA"),
+                              tags$li(icon("clock"), "Time-series dynamics plots"),
+                              tags$li(icon("download"), "Publication-ready figures")
+                          )
+                      )
+                  ),
+                  
+                  # ===== Cytotoxicity Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("virus"),
+                          h4("Cytotoxicity Assay")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Cell viability and cytotoxicity analysis with IC50 determination from dose-response curves."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                              tags$li(icon("percentage"), "Cell viability percentages"),
+                              tags$li(icon("chart-line"), "IC50 determination"),
+                              tags$li(icon("chart-bar"), "Multiple comparison corrections"),
+                              tags$li(icon("palette"), "Sigmoidal dose-response curves"),
+                              tags$li(icon("download"), "Viability data & IC50 export")
+                          )
+                      )
+                  ),
+                  
+                  # ===== Immunofluorescence Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("microscope"),
+                          h4("Immunofluorescence (IF)")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Quantitative analysis of immunofluorescence microscopy data with compartment distributions and statistical testing."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                              tags$li(icon("calculator"), "Automatic mean & SD calculations"),
+                              tags$li(icon("chart-bar"), "t-tests, ANOVA & post-hoc"),
+                              tags$li(icon("palette"), "Customizable bar plots"),
+                              tags$li(icon("filter"), "Significance level filtering"),
+                              tags$li(icon("download"), "Excel reports with statistics")
+                          )
+                      )
+                  ),
+                  
+                  # ===== Flow Cytometry Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("chart-area"),
+                          h4("Flow Cytometry (FACS)")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Flow cytometry analysis with hierarchical gating strategies and population frequency calculations."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                              tags$li(icon("project-diagram"), "Hierarchical gating strategy"),
+                              tags$li(icon("calculator"), "Population frequencies & counts"),
+                              tags$li(icon("chart-bar"), "Cross-group statistical tests"),
+                              tags$li(icon("palette"), "Heatmaps & multi-parameter plots"),
+                              tags$li(icon("download"), "Gating results & figures")
+                          )
+                      )
+                  )
+              )
       ),
       ###### BEGIN Computational Modeling ####
       ## BEGIN model integration: Omics ####
@@ -789,13 +1192,13 @@ ui <- dashboardPage(
                   p(class = "if-description",
                     "Reverse Transcription quantitative PCR (RT-qPCR) analysis for gene expression quantification. Upload your Excel file 
                     containing Ct values, gene names, samples, and time points. The module performs ΔΔCt calculations, fold-change analysis, 
-                    normalization to housekeeping genes, and generates comprehensive expression profiles with statistical testing."
+                    normalization to housekeeping genes, and generates comprehensive expression profiles."
                   )
               ),
               fluidRow(
                 column(12,
                        div(class = "if-upload-box",
-                           h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                           h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #0066cc; margin-top: 0;"),
                            p(style = "color: #666; margin-bottom: 20px;",
                              "Select one or more Excel files containing your RT-qPCR data. Files should include Ct values, gene identifiers, 
                              sample names, and experimental time points."
@@ -814,7 +1217,7 @@ ui <- dashboardPage(
                              column(3,
                                     actionButton(
                                       label = "Load Data",
-                                      style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                      style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
                                                border: none; padding: 12px; font-size: 16px; font-weight: bold;
                                                border-radius: 5px; transition: all 0.3s ease;",
                                       icon = shiny::icon("upload"),
@@ -825,33 +1228,7 @@ ui <- dashboardPage(
                        )
                 )
               ),
-              fluidRow(
-                column(12,
-                       div(class = "if-features",
-                           h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
-                           div(class = "if-feature-item",
-                               tags$strong(icon("calculator"), " ΔΔCt Method:"),
-                               " Automatic calculation of relative gene expression using the comparative Ct method"
-                           ),
-                           div(class = "if-feature-item",
-                               tags$strong(icon("balance-scale"), " Normalization:"),
-                               " Normalize to housekeeping genes and baseline experimental conditions"
-                           ),
-                           div(class = "if-feature-item",
-                               tags$strong(icon("chart-line"), " Time Course Analysis:"),
-                               " Track gene expression changes over time with dynamic line plots"
-                           ),
-                           div(class = "if-feature-item",
-                               tags$strong(icon("chart-bar"), " Fold Change:"),
-                               " Calculate and visualize fold-change values for all genes across conditions"
-                           ),
-                           div(class = "if-feature-item",
-                               tags$strong(icon("download"), " Comprehensive Export:"),
-                               " Download normalized data, fold-change tables, and publication-ready plots"
-                           )
-                       )
-                )
-              ),
+
               fluidRow(
                 box(
                   width = 12,
@@ -1223,7 +1600,7 @@ ui <- dashboardPage(
         fluidRow(
           column(12,
                  div(class = "if-upload-box",
-                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #0066cc; margin-top: 0;"),
                      p(style = "color: #666; margin-bottom: 20px;",
                        "Select one or more Excel files containing your BCA assay measurements. Files should include sample absorbance 
                        values, experimental conditions, and standard curve concentrations."
@@ -1242,7 +1619,7 @@ ui <- dashboardPage(
                        column(3,
                               actionButton(
                                 label = "Load Data",
-                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
                                          border: none; padding: 12px; font-size: 16px; font-weight: bold;
                                          border-radius: 5px; transition: all 0.3s ease;",
                                 icon = shiny::icon("upload"),
@@ -1253,33 +1630,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-        fluidRow(
-          column(12,
-                 div(class = "if-features",
-                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-area"), " Calibration Curves:"),
-                         " Automatic polynomial regression fitting with R² values and equation display"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("calculator"), " Concentration Calculations:"),
-                         " Determine protein concentrations from absorbance values using the standard curve"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-bar"), " Statistical Analysis:"),
-                         " Mean, standard deviation, and coefficient of variation across replicates"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("palette"), " Interactive Plots:"),
-                         " Publication-ready scatter plots with regression lines and confidence intervals"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("download"), " Export Results:"),
-                         " Download high-resolution plots and comprehensive Excel reports"
-                     )
-                 )
-          )
-        ),
+
         fluidRow(
           box(width = 12,
               title = "Assign experimental information to values:",
@@ -1436,7 +1787,7 @@ ui <- dashboardPage(
         fluidRow(
           column(12,
                  div(class = "if-upload-box",
-                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #0066cc; margin-top: 0;"),
                      p(style = "color: #666; margin-bottom: 20px;",
                        "Select one or more Excel files containing your ELISA measurements. Files should include sample absorbance values, 
                        experimental conditions, replicates, and standard curve data."
@@ -1455,7 +1806,7 @@ ui <- dashboardPage(
                        column(3,
                               actionButton(
                                 label = "Load Data",
-                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
                                          border: none; padding: 12px; font-size: 16px; font-weight: bold;
                                          border-radius: 5px; transition: all 0.3s ease;",
                                 icon = shiny::icon("upload"),
@@ -1466,33 +1817,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-        fluidRow(
-          column(12,
-                 div(class = "if-features",
-                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-area"), " Standard Curves:"),
-                         " Automatic 4-parameter logistic (4PL) or polynomial curve fitting"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("calculator"), " Concentration Interpolation:"),
-                         " Determine sample concentrations from OD values with dilution factor corrections"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-bar"), " Statistical Testing:"),
-                         " Comparative analysis across experimental groups with t-tests and ANOVA"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("palette"), " Visualization:"),
-                         " Bar plots with error bars, scatter plots, and calibration curve displays"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("download"), " Export Results:"),
-                         " Download calculated concentrations and plots in high resolution"
-                     )
-                 )
-          )
-        ),
+
         fluidRow(
           box(width = 12,
               title = "Assign experimental information to values:",
@@ -1626,7 +1951,7 @@ ui <- dashboardPage(
         fluidRow(
           column(12,
                  div(class = "if-upload-box",
-                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #0066cc; margin-top: 0;"),
                      p(style = "color: #666; margin-bottom: 20px;",
                        "Select one or more Excel files containing your endocytosis measurements. Files should include fluorescence values, 
                        experimental conditions, time points, and biological replicates."
@@ -1645,7 +1970,7 @@ ui <- dashboardPage(
                        column(3,
                               actionButton(
                                 label = "Load Data",
-                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
                                          border: none; padding: 12px; font-size: 16px; font-weight: bold;
                                          border-radius: 5px; transition: all 0.3s ease;",
                                 icon = shiny::icon("upload"),
@@ -1656,33 +1981,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-        fluidRow(
-          column(12,
-                 div(class = "if-features",
-                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("calculator"), " Internalization Rates:"),
-                         " Calculate percentage of internalized material over time"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("balance-scale"), " Normalization:"),
-                         " Normalize to baseline or control conditions for comparative analysis"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-bar"), " Statistical Testing:"),
-                         " T-tests, ANOVA, and post-hoc comparisons across experimental groups"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("clock"), " Time-Course Analysis:"),
-                         " Track endocytosis dynamics with customizable time-series plots"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("download"), " Export Results:"),
-                         " Download analysis results and publication-ready figures"
-                     )
-                 )
-          )
-        ),
+
         fluidRow(
           column(
             width = 10,offset = 1,
@@ -1796,7 +2095,7 @@ ui <- dashboardPage(
         fluidRow(
           column(12,
                  div(class = "if-upload-box",
-                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #0066cc; margin-top: 0;"),
                      p(style = "color: #666; margin-bottom: 20px;",
                        "Select one or more Excel files containing your cytotoxicity assay data. Files should include absorbance/fluorescence 
                        values, experimental conditions, concentrations, and replicate information."
@@ -1815,7 +2114,7 @@ ui <- dashboardPage(
                        column(3,
                               actionButton(
                                 label = "Load Data",
-                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
                                          border: none; padding: 12px; font-size: 16px; font-weight: bold;
                                          border-radius: 5px; transition: all 0.3s ease;",
                                 icon = shiny::icon("upload"),
@@ -1826,33 +2125,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-        fluidRow(
-          column(12,
-                 div(class = "if-features",
-                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("percentage"), " Viability Calculations:"),
-                         " Automatic calculation of cell viability percentages relative to controls"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-line"), " IC50 Determination:"),
-                         " Calculate half-maximal inhibitory concentrations from dose-response curves"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-bar"), " Statistical Analysis:"),
-                         " Compare treatments with t-tests, ANOVA, and multiple comparison corrections"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("palette"), " Dose-Response Curves:"),
-                         " Generate sigmoidal curve fits with confidence intervals"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("download"), " Comprehensive Export:"),
-                         " Download viability data, IC50 values, and publication-ready plots"
-                     )
-                 )
-          )
-        ),
+
         fluidRow(
           column(
             width = 10,offset = 1,
@@ -2015,7 +2288,7 @@ ui <- dashboardPage(
         fluidRow(
           column(12,
                  div(class = "if-upload-box",
-                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #0066cc; margin-top: 0;"),
                      p(style = "color: #666; margin-bottom: 20px;",
                        "Select one or more Excel files containing your flow cytometry data. Files should include gated population percentages, 
                        experimental conditions, and sample identifiers."
@@ -2034,7 +2307,7 @@ ui <- dashboardPage(
                        column(3,
                               actionButton(
                                 label = "Load Data",
-                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
                                          border: none; padding: 12px; font-size: 16px; font-weight: bold;
                                          border-radius: 5px; transition: all 0.3s ease;",
                                 icon = shiny::icon("upload"),
@@ -2045,33 +2318,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-        fluidRow(
-          column(12,
-                 div(class = "if-features",
-                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("project-diagram"), " Hierarchical Gating:"),
-                         " Define parental gates and calculate percentages at each level of the gating strategy"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("calculator"), " Population Frequencies:"),
-                         " Automatic calculation of cell subset percentages and absolute counts"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-bar"), " Statistical Comparisons:"),
-                         " Compare populations across experimental groups with appropriate statistical tests"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("palette"), " Custom Visualizations:"),
-                         " Bar plots, scatter plots, and heatmaps for multi-parameter analysis"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("download"), " Export Results:"),
-                         " Download gating results, statistics, and publication-ready figures"
-                     )
-                 )
-          )
-        ),
+
       ),
       tabItem(tabName = "tablesFACS",
               h2("Hierarchical gating"),
@@ -2185,38 +2432,42 @@ ui <- dashboardPage(
         tags$head(
           tags$style(HTML("
             .if-header-box {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              background: linear-gradient(135deg, #0066cc 0%, #003d7a 100%);
               color: white;
               padding: 30px;
               border-radius: 10px;
               margin-bottom: 30px;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+              box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
             }
             .if-description {
               font-size: 16px;
               line-height: 1.6;
               margin-top: 15px;
+              color: #e6f2ff;
             }
             .if-upload-box {
               background: white;
               padding: 30px;
               border-radius: 10px;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-              border: 2px dashed #667eea;
+              box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
+              border: 2px dashed #0066cc;
               transition: all 0.3s ease;
             }
             .if-upload-box:hover {
-              border-color: #764ba2;
-              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+              border-color: #003d7a;
+              box-shadow: 0 4px 12px rgba(0, 102, 204, 0.25);
+              transform: translateY(-2px);
             }
             .if-features {
               margin-top: 20px;
             }
             .if-feature-item {
               padding: 10px 0;
-              border-left: 3px solid #667eea;
+              border-left: 3px solid #0066cc;
               padding-left: 15px;
               margin: 10px 0;
+              background-color: #f5f9fc;
+              border-radius: 0 5px 5px 0;
             }
           "))
         ),
@@ -2231,7 +2482,7 @@ ui <- dashboardPage(
         fluidRow(
           column(12,
                  div(class = "if-upload-box",
-                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #667eea; margin-top: 0;"),
+                     h3(icon("cloud-upload-alt"), " Upload Your Data", style = "color: #0066cc; margin-top: 0;"),
                      p(style = "color: #666; margin-bottom: 20px;",
                        "Select one or more Excel files containing your IF quantification data. Each file should include experimental conditions, 
                        cellular compartments, and measured fluorescence values."
@@ -2250,7 +2501,7 @@ ui <- dashboardPage(
                        column(3,
                               actionButton(
                                 label = "Load Data",
-                                style = "margin-top: 0px; width: 100%; background-color: #667eea; color: white; 
+                                style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
                                          border: none; padding: 12px; font-size: 16px; font-weight: bold;
                                          border-radius: 5px; transition: all 0.3s ease;",
                                 icon = shiny::icon("upload"),
@@ -2262,33 +2513,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-        fluidRow(
-          column(12,
-                 div(class = "if-features",
-                     h4(icon("chart-line"), " Analysis Features", style = "color: #667eea;"),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("calculator"), " Automatic Calculations:"),
-                         " Compute mean, standard deviation, and percentage distributions across compartments"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("chart-bar"), " Statistical Testing:"),
-                         " Perform t-tests, ANOVA, and post-hoc pairwise comparisons with automatic test selection"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("palette"), " Customizable Plots:"),
-                         " Generate bar plots with error bars, significance annotations, and customizable aesthetics"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("filter"), " Flexible Filtering:"),
-                         " Select which significance levels to display (p < 0.001, p < 0.01, p < 0.05, or ns)"
-                     ),
-                     div(class = "if-feature-item",
-                         tags$strong(icon("download"), " Export Results:"),
-                         " Download publication-ready plots and comprehensive Excel reports with all statistics"
-                     )
-                 )
-          )
-        ),
+
         tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
       ),
       tabItem(tabName = "tablesIF",
@@ -2346,7 +2571,7 @@ ui <- dashboardPage(
                       column(
                         width = 12,
                         tags$div(
-                          style = "background-color: #f0f8ff; padding: 10px; border-left: 4px solid #667eea; margin-bottom: 15px; border-radius: 4px;",
+                          style = "background-color: #f0f8ff; padding: 10px; border-left: 4px solid #0066cc; margin-bottom: 15px; border-radius: 4px;",
                           tags$p(
                             style = "margin: 0; color: #333;",
                             icon("info-circle"), 
@@ -2435,6 +2660,10 @@ ui <- dashboardPage(
                   fluidRow(
                     column(10, offset = 1,
                            fluidRow(plotOutput("PlotStat")),
+                           fluidRow(
+                             actionButton("Customize_StatPlotButton", "Customize or Download Plot", 
+                                          icon = icon("paint-brush"), class = "btn-primary")
+                           ),
                            fluidRow(DTOutput("TabStat")),
                            fluidRow(DTOutput("TabBivTest")),
                            fluidRow(DTOutput("TabMulvTest")),
@@ -2562,4 +2791,5 @@ ui <- dashboardPage(
     )
   )
 )
+
 

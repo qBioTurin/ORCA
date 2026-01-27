@@ -34,6 +34,9 @@ server <- function(input, output, session) {
                                        FACS = list(),
                                        Flag = F)
   
+  # Reactive value to store the customizable statistical plot
+  statPlotResult <- reactiveValues(resplot = NULL)
+  
   DataIntegrationModule <- reactiveValues(WB = list(),
                                           PCR = list(),
                                           ELISA = list(),
@@ -1603,14 +1606,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButton_Regression <- downloadHandler(
     filename = function() {
-      paste0("plot_Regression_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_Regression_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(bcaResult$Regression$plot, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(bcaResult$Regression$plot, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -1999,14 +2004,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonIF_TT <- downloadHandler(
     filename = function() {
-      paste0("plot_IF_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_IF_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(ifResult$resplot, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(ifResult$resplot, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -2063,7 +2070,7 @@ server <- function(input, output, session) {
           path <- res$path
           post_hoc_pairs <- annotations <-length(0)
           main_test_txt <-  paste0("Test used is: ", path[length(path)])
-          main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
+          main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NULL
           
           if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && main_test_pvalue < 0.05) {
             PairwiseTest <- PairwiseTest %>%
@@ -2091,7 +2098,8 @@ server <- function(input, output, session) {
             
             test_to_show = PairwiseTest
             
-          } else if(!is.null(main_test_pvalue) && main_test_pvalue >= 0.05){
+          } 
+          else if(!is.null(main_test_pvalue) && main_test_pvalue >= 0.05){
             #to check
             test_to_show = MulvTest
           }else if(!is.null(BivTest)){
@@ -2572,17 +2580,19 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonWB1 <- downloadHandler(
     filename = function() {
-      paste0("plot_WB_image_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_WB_image_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
       if(!is.null(wbResult$TruncatedPlots))
-        savePlotAsPNG(wbResult$TruncatedPlots, file, width, height, dpi)
+        savePlot(wbResult$TruncatedPlots, file, width, height, dpi, format)
       else
-        savePlotAsPNG(wbResult$Plots, file, width, height, dpi)
+        savePlot(wbResult$Plots, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -3150,14 +3160,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotWbQuantification <- downloadHandler(
     filename = function() {
-      paste0("plot_WBQ_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_WBQ_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(wbquantResult$AdjRelDensityPlot, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(wbquantResult$AdjRelDensityPlot, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -3961,14 +3973,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonPCR_1 <- downloadHandler(
     filename = function() {
-      paste0("plot_PCR_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_PCR_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(pcrResult$PointPlot, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(pcrResult$PointPlot, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -4028,14 +4042,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonPCR_2 <- downloadHandler(
     filename = function() {
-      paste0("plot_PCR_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_PCR_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -4681,14 +4697,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonELISA <- downloadHandler(
     filename = function() {
-      paste0("plot_ELISA_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_ELISA_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(elisaResult$resPlot, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(elisaResult$resPlot, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -7075,332 +7093,387 @@ server <- function(input, output, session) {
     for(dpath in 1:length(datapaths)){
       mess <- readRDS(datapaths[dpath])
       names(mess) -> namesRes
-      if("Flags"%in% namesRes) namesRes = namesRes[ namesRes != "Flags"]
       
-      if(all(namesRes %in% names(wbquantResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensity %>% mutate(DataSet = dpath)
-      } else if(all(namesRes %in% names(pcrResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$PCR[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(endocResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$ENDOC[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(elisaResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$ELISA[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(cytotoxResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$CYTOTOX[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(ifResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$IF[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(facsResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$FACS[[dpath]]  <- mess
-      }else{
-        showAlert("Error", paste(mess[["message"]],"\n The file must be RDs saved through the Data Analysis module."), "error", 5000)
-        manageSpinner(FALSE)
-        return()
+      if("Flags" %in% namesRes) namesRes = namesRes[namesRes != "Flags"]
+      
+      # Define the mapping between DataAnalysisModule names and DataStatisticModule names
+      analysisTypeMap <- list(
+        wbquantResult = "WB",
+        pcrResult = "PCR", 
+        endocResult = "ENDOC",
+        elisaResult = "ELISA",
+        cytotoxResult = "CYTOTOX",
+        ifResult = "IF",
+        facsResult = "FACS"
+      )
+      
+      # Define expected names for each analysis type (for direct file matching)
+      expectedNames <- list(
+        WB = names(wbquantResult),
+        PCR = names(pcrResult),
+        ENDOC = names(endocResult),
+        ELISA = names(elisaResult),
+        CYTOTOX = names(cytotoxResult),
+        IF = names(ifResult),
+        FACS = names(facsResult)
+      )
+      
+      # Check if this is a combined DataAnalysisModule file (contains multiple analysis results)
+      dataAnalysisNames <- names(DataAnalysisModule)
+      matchingAnalyses <- namesRes[namesRes %in% dataAnalysisNames]
+      
+      if(length(matchingAnalyses) > 0) {
+        # This is a combined file - extract each matching analysis
+        for(analysisName in matchingAnalyses) {
+          if(analysisName %in% names(analysisTypeMap)) {
+            statModuleName <- analysisTypeMap[[analysisName]]
+            analysisData <- mess[[analysisName]]
+            
+            if(!is.null(analysisData)) {
+              if(statModuleName == "WB" && !is.null(analysisData$AdjRelDensity)) {
+                DataStatisticModule$WB[[paste0(dpath, "_", analysisName)]] <- 
+                  analysisData$AdjRelDensity %>% mutate(DataSet = dpath)
+              } else {
+                DataStatisticModule[[statModuleName]][[paste0(dpath, "_", analysisName)]] <- analysisData
+              }
+            }
+          }
+        }
+        DataStatisticModule$Flag <- TRUE
+      } else {
+        # This is a single analysis file - determine which type it is
+        analysisDetected <- FALSE
+        
+        for(statName in names(expectedNames)) {
+          expectedCols <- expectedNames[[statName]]
+          if(any(namesRes %in% expectedCols)) {
+            if(statName == "WB" && !is.null(mess$AdjRelDensity)) {
+              DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensity %>% mutate(DataSet = dpath)
+              analysisDetected <- TRUE
+              break
+            } else if(all(expectedCols %in% namesRes)) {
+              DataStatisticModule[[statName]][[dpath]] <- mess
+              analysisDetected <- TRUE
+              break
+            }
+          }
+        }
+        
+        if(!analysisDetected) {
+          showAlert("Error", "Unrecognized file format.\nThe file must be an RDs saved through the Data Analysis module.", "error", 5000)
+          manageSpinner(FALSE)
+          return()
+        }
+        DataStatisticModule$Flag <- TRUE
       }
-      DataStatisticModule$Flag <- TRUE
     }
     manageSpinner(FALSE)
     showAlert("Success", "The RDs files have been uploaded with success", "success", 2000)
     return(NULL)
   })
   
+  # Helper function to create the base statistical plot
+  createStatPlot <- function(stats, points, x_var, y_var, color_var, subtitle_txt, facet_var = NULL) {
+    p <- ggplot(stats, aes_string(x = x_var, y = "Mean")) + 
+      geom_bar(stat = "identity", color = "black", fill = "#BAE1FF", position = position_dodge()) +
+      geom_errorbar(aes(ymin = Mean - sd, ymax = Mean + sd), width = .2, position = position_dodge(.9)) +
+      geom_point(data = points, aes_string(x = x_var, y = y_var, color = color_var),
+                 position = position_jitter(width = 0.2), size = 3) +
+      theme_bw() +
+      labs(title = "Results", subtitle = subtitle_txt, y = y_var, x = x_var, color = "Experiments") +
+      annotate("text", x = Inf, y = Inf, 
+               label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n***: p <= 0.001", 
+               hjust = 1.1, vjust = 1.5, size = 5, color = "black")
+    
+    if (!is.null(facet_var)) {
+      p <- p + facet_wrap(as.formula(paste("~", facet_var)))
+    }
+    return(p)
+  }
+  
+  # Helper function to format the main test text
+  formatMainTestText <- function(MulvTest, PairwiseTest, path = NULL) {
+    main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
+    
+    if (!is.null(path)) {
+      return(paste0("Test used is: ", path[length(path)]))
+    }
+    
+    if (is.null(PairwiseTest) && !is.na(main_test_pvalue)) {
+      return(paste0("P value from main test = ", signif(main_test_pvalue, digits = 3)))
+    }
+    return("")
+  }
+  
   StatisticalAnalysisResults <- reactive({
-    if (!is.null(input$StatAnalysis) && input$StatAnalysis != "") {
-      results <- DataStatisticModule[[input$StatAnalysis]]
-      BivTest <- NULL
-      MulvTest <- NULL
-      PairwiseTest <- NULL
-      steps <- NULL
-      resplot <- NULL
-      stats <- NULL
-      path <- NULL
-      
-      switch(input$StatAnalysis, 
-             "WB" = {
-               do.call(rbind, results) -> results
-               points <- results %>%
-                 dplyr::select(DataSet, SampleName, AdjRelDensity) %>%
-                 dplyr::mutate(SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
-                               SampleName = trimws(SampleName),
-                               ColorSet = as.character(DataSet))
-               
-               stats <- points %>%
-                 group_by(SampleName) %>%
-                 dplyr::summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
-               
-               res <- testStat.function(points %>% select(SampleName, AdjRelDensity) %>% as_tibble())
-               BivTest <- res$BivTest
-               MulvTest <- res$MulvTest
-               PairwiseTest <- res$pairwise
-               steps <- res$steps
-               path <- res$path
-               
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               main_test_txt <- if (is.null(PairwiseTest)) {
-                 signif(main_test_pvalue, digits = 3) %>% paste0("P value from main test = ", .)
-               } else {
-                 ""
-               }
-               
-               resplot <- ggplot(stats, aes(x = SampleName, y = Mean)) + 
-                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = points, aes(x = SampleName, y = AdjRelDensity, color = ColorSet),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw() +
-                 labs(title = "Results", subtitle = main_test_txt, y = "AdjRelDensity", x = "SampleName", color = "Experiments") +
-                 annotate("text", x = Inf, y = Inf, label = "not showed: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-             },
-             "IF" = {
-               resultsNew <- do.call(rbind,
-                                     lapply(1:length(results),
-                                            function(l){
-                                              d = results[[l]]$SubStatData
-                                              d$File = l
-                                              d
-                                            } 
-                                     ) 
+    # Early return if no analysis selected
+    if (is.null(input$StatAnalysis) || input$StatAnalysis == "") {
+      return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL))
+    }
+    
+    # Get results for selected analysis
+    results <- DataStatisticModule[[input$StatAnalysis]]
+    
+    # Initialize result variables
+    testResults <- list(BivTest = NULL, MulvTest = NULL, PairwiseTest = NULL, steps = NULL, path = NULL)
+    stats <- NULL
+    resplot <- NULL
+    points <- NULL
+    
+    # Process data based on analysis type
+    switch(input$StatAnalysis,
+           
+           "WB" = {
+             # Combine and prepare data
+             results <- do.call(rbind, results)
+             points <- results %>%
+               dplyr::select(DataSet, SampleName, AdjRelDensity) %>%
+               dplyr::mutate(
+                 SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
+                 SampleName = trimws(SampleName),
+                 ColorSet = as.character(DataSet)
                )
-               
-               stats <- resultsNew %>%
-                 group_by(ExpCond) %>% 
-                 summarise(Mean = mean(Values), sd = sd(Values))
-               
-               res <- testStat.function(resultsNew[,c("ExpCond", "Values")] %>% as_tibble() )
-               BivTest <- res$BivTest
-               MulvTest <- res$test
-               PairwiseTest <- res$pairwise
-               steps <- res$steps
-               path <- res$path
-               
-               main_test_txt <-  paste0("Test used is: ", path[length(path)])
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               
-               resplot <- ggplot(stats, aes(x = ExpCond, y = Mean)) + 
-                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = resultsNew, aes(x = ExpCond, y = Values, color = as.factor(File)),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw()+
-                 labs(title = "Results", subtitle = main_test_txt, color = "Experiments") +
-                 annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-               
-               stats <- stats %>% rename(SampleName = ExpCond)
-               
-             },
-             "PCR" = {
-               req(input$stat_genHpcr)
-               
-               # Collect all tables from all results
-               all_tables <- lapply(1:length(results), function(res) {
-                 if (!is.null(results[[res]]$plotPCR)) {
-                   lapply(results[[res]]$plotPCR, function(x) {
-                     d = x$table 
-                     d$File = res
-                     d
-                     } )
-                 } else {
-                   NULL
-                 }
-               })
-               
-               # Flatten the nested list and remove NULLs/empty tables
-               all_tables_flat <- unlist(all_tables, recursive = FALSE)
-               valid_tables <- Filter(function(tbl) !is.null(tbl) && nrow(tbl) > 0, all_tables_flat)
-               
-               if (length(valid_tables) > 0) {
-                 combined_table <- bind_rows(valid_tables)
+             
+             # Calculate statistics
+             stats <- points %>%
+               group_by(SampleName) %>%
+               dplyr::summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
+             
+             # Run statistical tests
+             res <- testStat.function(points %>% select(SampleName, AdjRelDensity) %>% as_tibble())
+             testResults <- list(
+               BivTest = res$BivTest, MulvTest = res$MulvTest, 
+               PairwiseTest = res$pairwise, steps = res$steps, path = res$path
+             )
+             
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest)
+             resplot <- createStatPlot(stats, points, "SampleName", "AdjRelDensity", "ColorSet", subtitle_txt)
+           },
+           
+           "IF" = {
+             # Combine results from multiple files
+             resultsNew <- do.call(rbind, lapply(seq_along(results), function(l) {
+               d <- results[[l]]$SubStatData
+               d$File <- l
+               d
+             }))
+             
+             # Calculate statistics
+             stats <- resultsNew %>%
+               group_by(ExpCond) %>% 
+               summarise(Mean = mean(Values), sd = sd(Values), .groups = 'drop')
+             
+             # Run statistical tests
+             res <- testStat.function(resultsNew[, c("ExpCond", "Values")] %>% as_tibble())
+             testResults <- list(
+               BivTest = res$BivTest, MulvTest = res$test, 
+               PairwiseTest = res$pairwise, steps = res$steps, path = res$path
+             )
+             
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest, testResults$path)
+             points <- resultsNew %>% mutate(ColorSet = as.factor(File))
+             resplot <- createStatPlot(stats, points, "ExpCond", "Values", "ColorSet", subtitle_txt)
+             
+             # Rename for consistency
+             stats <- stats %>% rename(SampleName = ExpCond)
+           },
+           
+           "PCR" = {
+             req(input$stat_genHpcr)
+             
+             # Collect and flatten all tables from results
+             all_tables <- lapply(seq_along(results), function(res_idx) {
+               if (!is.null(results[[res_idx]]$plotPCR)) {
+                 lapply(results[[res_idx]]$plotPCR, function(x) {
+                   d <- x$table 
+                   d$File <- res_idx
+                   d
+                 })
                }
-               
-               resultsNew = combined_table %>% 
-                 rename(Q = `2^(-DDCT)` )
- 
-               
-               resultsNew <- as.data.frame(resultsNew) %>%
-                 mutate(Q = as.numeric(Q), GeneH = paste(Gene, ", Housekeeping: ", HousekGene))%>% 
-                 dplyr::filter(GeneH == input$stat_genHpcr )
-               
-               stats <- resultsNew %>%
-                 dplyr::group_by(Sample) %>% 
-                 dplyr::summarise(Mean = mean((Q)), sd = sd(Q))
-               
-               res <- testStat.function(resultsNew%>% dplyr::select(Sample, Q) %>% as_tibble()) 
-               
-               if(is.null(res)){ 
-                 showAlert("Error", "The number of values per group has to be greater than 2.", "error", 5000)
-                 steps = "The number of values per group has to be greater than 2."
-               }
-               
-               BivTest <- res$BivTest
-               MulvTest <- res$test
-               PairwiseTest <- res$pairwise
-               steps <- res$steps
-               path <- res$path
-               
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               main_test_txt <- if (is.null(PairwiseTest)) {
-                 signif(main_test_pvalue, digits = 3) %>% paste0("P value from main test = ", .)
-               } else {
-                 ""
-               }
-               
-               resplot <- ggplot(stats, aes(x = Sample, y = Mean)) + 
-                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = resultsNew, aes(x = Sample, y = Q, color = as.factor(File)),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw() +
-                 facet_wrap(~GeneH)+
-                 labs(title = "Results", subtitle = main_test_txt, y = "Q", x = "Sample", color = "Experiments") +
-                 annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-               
-               stats <- stats %>% rename(SampleName = Sample)
-             },
-             "FACS" = {
-               resultsNew <- do.call(rbind,
-                                     lapply(1:length(results), function(l) {
-                                       d <- results[[l]]$dataFinal
-                                       d <- d %>%
-                                         tidyr::gather(-Name, key = "Gate", value = "Perc") %>%
-                                         mutate(Perc = as.numeric(gsub("%", "", Perc)))
-                                       d$File <- l
-                                       d <- merge(d, results[[l]]$ExpConditionDF)
-                                       d
-                                     })
+             })
+             all_tables_flat <- unlist(all_tables, recursive = FALSE)
+             valid_tables <- Filter(function(tbl) !is.null(tbl) && nrow(tbl) > 0, all_tables_flat)
+             
+             if (length(valid_tables) == 0) return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL))
+             
+             combined_table <- bind_rows(valid_tables)
+             
+             # Prepare data
+             resultsNew <- combined_table %>% 
+               rename(Q = `2^(-DDCT)`) %>%
+               as.data.frame() %>%
+               mutate(
+                 Q = as.numeric(Q), 
+                 GeneH = paste(Gene, ", Housekeeping: ", HousekGene)
+               ) %>% 
+               dplyr::filter(GeneH == input$stat_genHpcr)
+             
+             # Calculate statistics
+             stats <- resultsNew %>%
+               dplyr::group_by(Sample) %>% 
+               dplyr::summarise(Mean = mean(Q), sd = sd(Q), .groups = 'drop')
+             
+             # Run statistical tests
+             res <- testStat.function(resultsNew %>% dplyr::select(Sample, Q) %>% as_tibble())
+             
+             if (is.null(res)) { 
+               showAlert("Error", "The number of values per group has to be greater than 2.", "error", 5000)
+               testResults$steps <- "The number of values per group has to be greater than 2."
+             } else {
+               testResults <- list(
+                 BivTest = res$BivTest, MulvTest = res$test, 
+                 PairwiseTest = res$pairwise, steps = res$steps, path = res$path
                )
-               
-               stats <- resultsNew %>%
-                 group_by(ExpCondition, Gate) %>%
-                 summarise(Mean = mean(Perc), sd = sd(Perc), .groups = 'drop')
-               
-               resList <- lapply(unique(resultsNew$Gate), function(g) {
-                 gate_results <- resultsNew %>% dplyr::filter(Gate == g)
-                 testStat.function(gate_results[, c("ExpCondition", "Perc")]  %>% as_tibble() )
-               })
-               
-               BivTest <- do.call(rbind, lapply(resList, function(res) res$BivTest))
-               MulvTest <- do.call(rbind, lapply(resList, function(res) res$test))
-               PairwiseTest <- do.call(rbind, lapply(resList, function(res) res$pairwise))
-               steps <- unlist(lapply(resList, function(res) res$steps))
-               paths <- lapply(resList, function(res) res$path)
-               
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               main_test_txt <- if (is.null(PairwiseTest)) {
-                 signif(main_test_pvalue, digits = 3) %>% paste0("P value from main test = ", .)
-               } else {
-                 ""
-               }
-               
-               resplot <- ggplot(stats, aes(x = ExpCondition, y = Mean)) + 
-                 geom_bar(stat = "identity", color = "black", fill = "#BAE1FF", position = position_dodge()) +
-                 geom_errorbar(aes(ymin = Mean - sd, ymax = Mean + sd), width = .2, position = position_dodge(.9)) +
-                 geom_point(data = resultsNew, aes(x = ExpCondition, y = Perc, color = as.factor(File)),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw() +
-                 labs(title = "Results", subtitle = main_test_txt, color = "File") +
-                 facet_wrap(~ Gate) +
-                 annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-               
-               stats <- stats %>% rename(SampleName = ExpCondition)
-               
              }
-      )
+             
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest)
+             points <- resultsNew %>% mutate(ColorSet = as.factor(File))
+             resplot <- createStatPlot(stats, points, "Sample", "Q", "ColorSet", subtitle_txt, facet_var = "GeneH")
+             
+             # Rename for consistency
+             stats <- stats %>% rename(SampleName = Sample)
+           },
+           
+           "FACS" = {
+             # Combine results from multiple files
+             resultsNew <- do.call(rbind, lapply(seq_along(results), function(l) {
+               d <- results[[l]]$dataFinal %>%
+                 tidyr::gather(-Name, key = "Gate", value = "Perc") %>%
+                 mutate(Perc = as.numeric(gsub("%", "", Perc)))
+               d$File <- l
+               merge(d, results[[l]]$ExpConditionDF)
+             }))
+             
+             # Calculate statistics
+             stats <- resultsNew %>%
+               group_by(ExpCondition, Gate) %>%
+               summarise(Mean = mean(Perc), sd = sd(Perc), .groups = 'drop')
+             
+             # Run statistical tests for each gate
+             resList <- lapply(unique(resultsNew$Gate), function(g) {
+               gate_results <- resultsNew %>% dplyr::filter(Gate == g)
+               testStat.function(gate_results[, c("ExpCondition", "Perc")] %>% as_tibble())
+             })
+             
+             # Combine test results
+             testResults <- list(
+               BivTest = do.call(rbind, lapply(resList, function(res) res$BivTest)),
+               MulvTest = do.call(rbind, lapply(resList, function(res) res$test)),
+               PairwiseTest = do.call(rbind, lapply(resList, function(res) res$pairwise)),
+               steps = unlist(lapply(resList, function(res) res$steps)),
+               path = lapply(resList, function(res) res$path)
+             )
+             
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest)
+             points <- resultsNew %>% mutate(ColorSet = as.factor(File))
+             resplot <- createStatPlot(stats, points, "ExpCondition", "Perc", "ColorSet", subtitle_txt, facet_var = "Gate")
+             
+             # Rename for consistency
+             stats <- stats %>% rename(SampleName = ExpCondition)
+           }
+    )
+    
+    # Add significance annotations to plot
+    resplot <- addSignificanceAnnotations(
+      resplot, stats, testResults$PairwiseTest, testResults$BivTest, testResults$MulvTest
+    )
+    
+    # Create decision tree
+    path <- if (is.list(testResults$path)) testResults$path[[1]] else testResults$path
+    decision_tree <- create_decision_tree(path)
+    
+    # Render outputs
+    output$decision_tree_plot <- renderPlot({ decision_tree })
+    output$analysis_output <- renderUI({
+      steps_formatted <- gsub("Step", "<br><br>Step", testResults$steps)
+      steps_formatted <- gsub("Group", "<br>&nbsp;&nbsp;&nbsp;&nbsp;Group", steps_formatted)
+      HTML(steps_formatted)
+    })
+    
+    return(list(
+      Table = stats, 
+      TableTests = list(
+        PairwiseTest = testResults$PairwiseTest, 
+        BivTest = testResults$BivTest, 
+        MulvTest = testResults$MulvTest
+      ), 
+      Plot = resplot, 
+      DecisionTree = decision_tree
+    ))
+  })
+  
+  # Helper function to add significance annotations to plot
+  addSignificanceAnnotations <- function(resplot, stats, PairwiseTest, BivTest, MulvTest) {
+    if (is.null(resplot) || is.null(stats)) return(resplot)
+    
+    main_test_pvalue <- if (!is.null(MulvTest)) {
+      if (is.data.frame(MulvTest)) MulvTest$pValue[1] else MulvTest$pValue
+    } else NA
+    
+    post_hoc_pairs <- list()
+    annotations <- c()
+    
+    # Determine which test results to use for annotations
+    test_data <- NULL
+    if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && !is.na(main_test_pvalue) && main_test_pvalue < 0.05) {
+      test_data <- PairwiseTest
+    } else if (!is.null(BivTest)) {
+      test_data <- BivTest
+    }
+    
+    if (!is.null(test_data) && nrow(test_data) > 0) {
+      test_data <- test_data %>%
+        separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
+        mutate(
+          group1 = trimws(group1), 
+          group2 = trimws(group2),
+          stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns"))
+        )
       
-      post_hoc_pairs = c()
-      annotations = c()
-      
-      if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && main_test_pvalue < 0.05) {
-        PairwiseTest <- PairwiseTest %>%
-          separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
-          mutate(group1 = trimws(group1), 
-                 group2 = trimws(group2),
-                 stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
-        
-        all_combinations <- combn(unique(stats$SampleName), 2, simplify = FALSE)
+      # Generate all pairwise combinations
+      sample_names <- unique(stats$SampleName)
+      if (length(sample_names) >= 2) {
+        all_combinations <- combn(sample_names, 2, simplify = FALSE)
         
         post_hoc_pairs <- lapply(all_combinations, function(pair) {
-          pair <- unlist(pair)
           c(trimws(pair[1]), trimws(pair[2]))
         })
         
         annotations <- sapply(post_hoc_pairs, function(pair) {
-          idx <- which((PairwiseTest$group1 == pair[1] & PairwiseTest$group2 == pair[2]) |
-                         (PairwiseTest$group1 == pair[2] & PairwiseTest$group2 == pair[1]))
-          if (length(idx) > 0) {
-            as.character(PairwiseTest$stars[idx])
-          } else {
-            "ns"
-          }
+          idx <- which(
+            (test_data$group1 == pair[1] & test_data$group2 == pair[2]) |
+            (test_data$group1 == pair[2] & test_data$group2 == pair[1])
+          )
+          if (length(idx) > 0) as.character(test_data$stars[idx[1]]) else "ns"
         })
-        
-      } 
-      else if(!is.null(BivTest)){
-        BivTest <- BivTest %>%
-          separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
-          mutate(group1 = trimws(group1), 
-                 group2 = trimws(group2),
-                 stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
-        
-        all_combinations <- combn(unique(stats$SampleName), 2, simplify = FALSE)
-        
-        post_hoc_pairs <- lapply(all_combinations, function(pair) {
-          pair <- unlist(pair)
-          c(trimws(pair[1]), trimws(pair[2]))
-        })
-        annotations <- sapply(post_hoc_pairs, function(pair) {
-          idx <- which((BivTest$group1 == pair[1] & BivTest$group2 == pair[2]) |
-                         (BivTest$group1 == pair[2] & BivTest$group2 == pair[1]))
-          if (length(idx) > 0) {
-            as.character(BivTest$stars[idx])
-          } else {
-            "ns"
-          }
-        })
-        
       }
-      else {
-        print("No pairwise comparisons to plot.")
-      }
+    }
+    
+    # Add significance bars to plot
+    if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
+      y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
+      y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
       
-      
-      
-      if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
-        y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
-        y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
-        
-        nspos = which(annotations != "ns")
-        if(length(nspos)>0)
-          resplot <- resplot + 
+      sig_positions <- which(annotations != "ns")
+      if (length(sig_positions) > 0) {
+        resplot <- resplot + 
           ggsignif::geom_signif(
-            comparisons = post_hoc_pairs[nspos],
-            y_position = y_pos[nspos],
-            annotations = annotations[nspos],
+            comparisons = post_hoc_pairs[sig_positions],
+            y_position = y_pos[sig_positions],
+            annotations = annotations[sig_positions],
             tip_length = 0.01,
             textsize = 8 / 1.5,
             vjust = 0.8
           )
-      } else {
-        print("No valid post-hoc comparisons or annotations to plot.")
       }
-      
-      decision_tree = create_decision_tree(path)
-      
-      output$decision_tree_plot <- renderPlot({ decision_tree })
-      
-      output$analysis_output <- renderUI({
-        steps_formatted <- gsub("Step", "<br><br>Step", steps)
-        steps_formatted <- gsub("Group", "<br>&nbsp;&nbsp;&nbsp;&nbsp;Group", steps_formatted)
-        HTML(steps_formatted)
-      })
-      
-      return(list(Table = stats, TableTests = list(PairwiseTest = PairwiseTest, BivTest = BivTest, MulvTest = MulvTest), Plot = resplot, DecisionTree = decision_tree ))
-    } else {
-      return(list(Table = NULL, TableTest = NULL, Plot = NULL, DecisionTree = NULL))
     }
-  })
+    
+    return(resplot)
+  }
   
   
   output$TabStat <- renderDT({
@@ -7413,7 +7486,65 @@ server <- function(input, output, session) {
   )
   
   output$PlotStat <- renderPlot({
-    StatisticalAnalysisResults()$Plot
+    # Store the plot in the reactive for customization
+    statPlotResult$resplot <- StatisticalAnalysisResults()$Plot
+    statPlotResult$resplot
+  })
+  
+  # Customize button for statistical plot
+  observeEvent(input$Customize_StatPlotButton, {
+    req(statPlotResult$resplot)
+    layer_tabs <- generateLayerParameters(statPlotResult$resplot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          generatePlotParameters(statPlotResult$resplot)
+        ),
+        tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(statPlotResult$resplot)
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab()
+        )
+      ),
+      footer = tagList(
+        actionButton("applyChangesStat", "Apply Changes"),
+        downloadButton("downloadPlotButtonStat", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  output$downloadPlotButtonStat <- downloadHandler(
+    filename = function() {
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_Statistical_", Sys.Date(), ".", format)
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(statPlotResult$resplot, file, width, height, dpi, format)
+      manageSpinner(FALSE)
+    }
+  )
+  
+  observeEvent(input$applyChangesStat, {
+    updatedPlot <- customizePlot(statPlotResult$resplot, input)
+    statPlotResult$resplot <- updatedPlot
+    output$PlotStat <- renderPlot({ updatedPlot })
+    removeModal()
   })
   
   output$TabMulvTest <- renderDT({

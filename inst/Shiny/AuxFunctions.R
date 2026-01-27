@@ -86,7 +86,7 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            result$data <- NULL
            result$PCRnorm <- NULL
            result$BaselineExp <- NULL
-           result$plotPRC <- NULL
+           result$plotPCR <- NULL
            result$NewPCR <- NULL
            result$AllGenesFoldChangePlot = NULL
            result$AllGenesFoldChangeTable = NULL
@@ -2194,6 +2194,14 @@ generateLayerParameters <- function(plot) {
       
       data<-data %>% mutate(!!shape_mapping := shape_levels[paste(data$shape)] )
     }
+    if(!is.null(aes_mapping$fill)){
+      fill_mapping<-rlang::quo_name(aes_mapping$fill)
+      scF <- plot_build$plot$scales$get_scales("fill")
+      fill_levels <- scF$get_limits()                 # the values/levels from your data
+      fills_used   <- scF$palette(length(fill_levels)) # the fill colours assigned
+      fill_levels <- setNames(fill_levels, fills_used)
+      data<-data %>% mutate(!!fill_mapping := fill_levels[paste(data$fill)] )
+    }
     
     #Function to extract specific aesthetic values
     extract_aes_value <- function(aesthetic, default,x_val) {
@@ -2204,6 +2212,10 @@ generateLayerParameters <- function(plot) {
         }
         else if (aesthetic == "shape") {
           filtered_data <- data[data[["shape"]] == x_val, ]
+          return(unique(filtered_data[[aesthetic]]))
+        }
+        else if (aesthetic == "fill") {
+          filtered_data <- data[data[["fill"]] == x_val, ]
           return(unique(filtered_data[[aesthetic]]))
         }
         else{
@@ -2266,7 +2278,8 @@ generateLayerParameters <- function(plot) {
               )
             }
           )
-        } else if (layer_type == "GeomLine") {
+        }
+        else if (layer_type == "GeomLine") {
           tagList(
             # Line Type
             if ("linetype" %in% names(aes_mapping)) {
@@ -2305,15 +2318,16 @@ generateLayerParameters <- function(plot) {
               )
             }
           )
-        } else if (layer_type == "GeomBar") {
+        } 
+        else if (layer_type == "GeomBar") {
           tagList(
             # Bar Fill Color
             if ("fill" %in% names(aes_mapping)) {
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["fill"]]), function(x_val) {
                 colourpicker::colourInput(
-                  paste0("barFillColor_", i, "_", x_val),
-                  paste("Bar Fill Color for Group", x_val),
-                  value = extract_aes_value("fill", "#FF9999",x_val)
+                  paste0("barFillColor_", i, "_", gsub("#", "", x_val)),
+                  paste0("Bar Fill Color for ", fill_mapping, " ", unique(data[data[["fill"]] == x_val, ][[fill_mapping]])),
+                  value = x_val
                 )
               })
             } else {
@@ -2328,11 +2342,11 @@ generateLayerParameters <- function(plot) {
               "Bar Width",
               min = 0.1, max = 1, value = extract_aes_value("width", 0.5)
             ),
-            if("color" %in% names(aes_mapping)){
+            if("colour" %in% names(aes_mapping)){
               lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
                   paste0("barColor_", i, "_",  gsub("#", "", x_val)),
-                  paste0("Bar Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  paste0("Bar Color for ", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
                   #value = extract_aes_value("colour", "#000000",x_val)
                   value = x_val
                 )
@@ -2380,11 +2394,11 @@ generateLayerParameters <- function(plot) {
             ),
             
             if ("fill" %in% names(aes_mapping)) {
-              lapply(unique(data[["group"]]), function(x_val) {
+              lapply(unique(data[["fill"]]), function(x_val) {
                 colourpicker::colourInput(
-                  paste0("boxFillColor_", i, "_", x_val),
-                  paste("Boxplot Fill Color for Group", x_val),
-                  value = extract_aes_value("fill", "#FF9999",x_val)
+                  paste0("boxFillColor_", i, "_", gsub("#", "", x_val)),
+                  paste0("Boxplot Fill Color for ", fill_mapping, " ", unique(data[data[["fill"]] == x_val, ][[fill_mapping]])),
+                  value = x_val
                 )
               })
             } else {
@@ -2399,7 +2413,7 @@ generateLayerParameters <- function(plot) {
               lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
                   paste0("boxOutlineColor_", i, "_",  gsub("#", "", x_val)),
-                  paste("Boxplot Outline Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  paste0("Boxplot Outline Color for ", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
                   #value = extract_aes_value("colour", "#000000",x_val)
                   value = x_val
                 )
@@ -2427,6 +2441,24 @@ generateLayerParameters <- function(plot) {
               min = 0.01, max = 1, value = extract_aes_value("width", 0.5,1)
             )
           )
+        } else if (layer_type == "GeomSignif") {
+          tagList(
+            sliderInput(
+              paste0("signifTextSize_", i),
+              "Significance Text Size",
+              min = 1, max = 15, value = extract_aes_value("textsize", 5, 1)
+            ),
+            colourpicker::colourInput(
+              paste0("signifColor_", i),
+              "Significance Line/Text Color",
+              value = extract_aes_value("colour", "#000000", 1)
+            ),
+            sliderInput(
+              paste0("signifTipLength_", i),
+              "Tip Length",
+              min = 0, max = 0.1, value = extract_aes_value("tip_length", 0.01, 1), step = 0.005
+            )
+          )
         } else {
           p("No specific customization available for this layer type.")
         }
@@ -2436,7 +2468,6 @@ generateLayerParameters <- function(plot) {
   
   return(layer_tabs)
 }
-
 
 customizePlot <- function(plot, input) {
   # General theme and title customization
@@ -2470,6 +2501,13 @@ customizePlot <- function(plot, input) {
     layer <- plot$layers[[i]]
     layer_type <- class(layer$geom)[1]
     current_mapping <- layer$mapping
+    
+    # Check if the layer has its own dataset
+    layer_data <- if (!is.null(layer$data) && !inherits(layer$data, "waiver")) {
+      layer$data
+    } else{
+      NULL
+    }
     
     # Determine if properties are mapped
     is_colour_mapped <- "colour" %in% names(current_mapping)
@@ -2507,6 +2545,7 @@ customizePlot <- function(plot, input) {
       if(!is_shape_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_point(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2519,6 +2558,7 @@ customizePlot <- function(plot, input) {
       else if(is_shape_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_point(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2530,6 +2570,7 @@ customizePlot <- function(plot, input) {
       else if(!is_shape_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_point(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2541,6 +2582,7 @@ customizePlot <- function(plot, input) {
       else if(is_shape_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_point(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2549,7 +2591,8 @@ customizePlot <- function(plot, input) {
           shape_scale
       }
       
-    } else if (layer_type == "GeomBar") {
+    } 
+    else if (layer_type == "GeomBar") {
       
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
@@ -2571,6 +2614,7 @@ customizePlot <- function(plot, input) {
       if(!is_fill_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_bar(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             stat = "identity",
@@ -2585,7 +2629,7 @@ customizePlot <- function(plot, input) {
       else if(is_fill_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_bar(
-            #data = layer$data,
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             stat = "identity",
@@ -2599,6 +2643,7 @@ customizePlot <- function(plot, input) {
       else if(!is_fill_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_bar(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             stat = "identity",
@@ -2612,6 +2657,7 @@ customizePlot <- function(plot, input) {
       else if(is_fill_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_bar(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             stat = "identity",
@@ -2622,7 +2668,8 @@ customizePlot <- function(plot, input) {
           fill_scale
       }
       
-    } else if (layer_type == "GeomLine") {
+    } 
+    else if (layer_type == "GeomLine") {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
@@ -2643,6 +2690,7 @@ customizePlot <- function(plot, input) {
       if(!is_linetype_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_line(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2655,6 +2703,7 @@ customizePlot <- function(plot, input) {
       else if(is_linetype_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_line(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2666,6 +2715,7 @@ customizePlot <- function(plot, input) {
       else if(!is_linetype_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_line(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2677,6 +2727,7 @@ customizePlot <- function(plot, input) {
       else if(is_linetype_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_line(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]]
@@ -2685,7 +2736,8 @@ customizePlot <- function(plot, input) {
           linetype_scale
       }
       
-    } else if (layer_type == "GeomBoxplot") {
+    } 
+    else if (layer_type == "GeomBoxplot") {
       
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
@@ -2707,6 +2759,7 @@ customizePlot <- function(plot, input) {
       if(!is_fill_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_boxplot(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2723,6 +2776,7 @@ customizePlot <- function(plot, input) {
       else if(is_fill_mapped&&!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_boxplot(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2738,6 +2792,7 @@ customizePlot <- function(plot, input) {
       else if(!is_fill_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_boxplot(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2753,6 +2808,7 @@ customizePlot <- function(plot, input) {
       else if(is_fill_mapped&&is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_boxplot(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2765,7 +2821,8 @@ customizePlot <- function(plot, input) {
           fill_scale
       }
       
-    } else if (layer_type == "GeomErrorbar") {
+    } 
+    else if (layer_type == "GeomErrorbar") {
       colour_scale <- if (is_colour_mapped) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
@@ -2778,6 +2835,7 @@ customizePlot <- function(plot, input) {
       if(!is_colour_mapped){
         updatedPlot <- updatedPlot +
           geom_errorbar(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2789,6 +2847,7 @@ customizePlot <- function(plot, input) {
       else{
         updatedPlot <- updatedPlot +
           geom_errorbar(
+            data = layer_data,
             mapping = layer$mapping,
             position = layer$position,
             size = input[[paste0("layerSize_", i)]],
@@ -2797,7 +2856,33 @@ customizePlot <- function(plot, input) {
           colour_scale
       }
       
-    } else {
+    } 
+    else if (layer_type == "GeomSignif") {
+      # Get signif-specific parameters with defaults
+      textsize <- input[[paste0("signifTextSize_", i)]] %||% 5
+      color <- input[[paste0("signifColor_", i)]] %||% "#000000"
+      tip_length <- input[[paste0("signifTipLength_", i)]] %||% 0.01
+      line_size <- input[[paste0("layerSize_", i)]] %||% 0.5
+      
+      # Extract comparisons and annotations from the original layer
+      layer_params <- layer$stat_params
+      comparisons <- layer_params$comparisons
+      annotations <- layer_params$annotations
+      y_position <- layer_params$y_position
+      
+      updatedPlot <- updatedPlot +
+        ggsignif::geom_signif(
+          comparisons = comparisons,
+          annotations = annotations,
+          y_position = y_position,
+          size = line_size,
+          textsize = textsize,
+          color = color,
+          tip_length = tip_length,
+          vjust = 0.8
+        )
+    } 
+    else {
       updatedPlot <- updatedPlot + layer
       warning(paste("No specific customizations applied for layer type:", layer_type, ". Layer copied as is."))
     }
@@ -2805,7 +2890,6 @@ customizePlot <- function(plot, input) {
   
   return(updatedPlot)
 }
-
 
 generatePlotParameters <- function(plot) {
   
@@ -2873,12 +2957,20 @@ generatePlotParameters <- function(plot) {
   )
 }
 
-
 generateSavePlotTab <- function() {
   tagList(
     numericInput("plotWidth", "Plot Width (inches)", value = 10, min = 0, max = 20),
     numericInput("plotHeight", "Plot Height (inches)", value = 4, min = 0, max = 20),
-    numericInput("plotResolution", "Resolution (dpi)", value = 300, min = 72, max = 600)
+    numericInput("plotResolution", "Resolution (dpi)", value = 300, min = 72, max = 600),
+    selectInput("plotFormat", "File Format",
+                choices = c("PNG" = "png", 
+                            "JPEG" = "jpeg", 
+                            "PDF" = "pdf", 
+                            "SVG" = "svg", 
+                            "TIFF" = "tiff",
+                            "EPS" = "eps",
+                            "BMP" = "bmp"),
+                selected = "png")
   )
 }
 
@@ -2918,17 +3010,33 @@ generateXAxisOrderTab <- function(plot) {
   }
 }
 
-savePlotAsPNG <- function(plot, filePath, width, height, dpi) {
+# General function to save plots in multiple formats
+savePlot <- function(plot, filePath, width, height, dpi, format = "png") {
   req(plot) # Require the plot to be present
   
-  ggsave(
-    filename = filePath,
-    plot = plot,
-    device = "png",
-    width = width,
-    height = height,
-    dpi = dpi
-  )
+  # Handle format-specific settings
+  if (format == "pdf" || format == "svg" || format == "eps") {
+    # Vector formats don't use dpi in the same way
+    ggsave(
+      filename = filePath,
+      plot = plot,
+      device = format,
+      width = width,
+      height = height,
+      limitsize = FALSE  # Allow large plot dimensions
+    )
+  } else {
+    # Raster formats use dpi
+    ggsave(
+      filename = filePath,
+      plot = plot,
+      device = format,
+      width = width,
+      height = height,
+      dpi = dpi,
+      limitsize = FALSE  # Allow large plot dimensions
+    )
+  }
 }
 
 
