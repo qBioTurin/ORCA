@@ -840,8 +840,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            # Se esiste anche TTestData e vuoi scriverlo su un altro foglio
            if (!is.null(ResultList$TTestData) && is.data.frame(ResultList$TTestData)) {
-             addWorksheet(wb, "T-Test Analysis")  # Aggiunge un foglio per l'analisi finale
-             writeDataTable(wb, ResultList$TTestData, sheet = "T-Test Analysis")  # Scrive i dati di analisi finale
+             addWorksheet(wb, "Statistical Analysis")  # Aggiunge un foglio per l'analisi finale
+             writeDataTable(wb, ResultList$TTestData, sheet = "Statistical Analysis")  # Scrive i dati di analisi finale
              print("TTestData scritto nel foglio Excel")
            } else {
              print("TTestData non disponibile o non è un data.frame")
@@ -2346,7 +2346,7 @@ generateLayerParameters <- function(plot) {
               lapply(unique(data[["colour"]]), function(x_val) {
                 colourpicker::colourInput(
                   paste0("barColor_", i, "_",  gsub("#", "", x_val)),
-                  paste0("Bar Color for ", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
+                  paste0("Bar Border Color for ", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
                   #value = extract_aes_value("colour", "#000000",x_val)
                   value = x_val
                 )
@@ -2354,7 +2354,7 @@ generateLayerParameters <- function(plot) {
             } else {
               colourpicker::colourInput(
                 paste0("barColor_", i),
-                "Bar Color",
+                "Bar Border Color",
                 value = extract_aes_value("colour", "#000000",1)
               )
             }

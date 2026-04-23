@@ -971,28 +971,51 @@ ui <- dashboardPage(
       
       ## BEGIN data analysis: WB  #######
       tabItem(tabName = "uploadIm",
-              h2("Upload Image"),
-              fluidRow(
-                column(9,
-                       fileInput(
-                         inputId = "imImport",
-                         label = "Select a tif file",
-                         placeholder = "Select a tif file",
-                         width = "90%"
-                       )
-                ),
-                column(2,
-                       actionButton(label = "Load",style = "margin-top: 20px;",
-                                    icon = shiny::icon("upload"),
-                                    inputId = "LoadingTif"
-                       )
-                ),
-                tags$style(type='text/css', "#LoadingTif { width:100%; margin-top: 20px;}")
+              div(class = "if-header-box",
+                  h2(icon("image"), " Western Blot Analysis - Image Analysis", style = "margin-top: 0;"),
+                  p(class = "if-description",
+                    "Western blotting enables the separation and identification of proteins based on their molecular weight by 
+                    gel electrophoresis. ORCA provides accurate quantification of proteins of interest, normalized to the loading 
+                    control, allowing reliable comparison of protein expression levels across different experimental conditions."
+                  ),
+                  hr(),
+                  p(class = "if-description",
+                    strong("Image Analysis: "),
+                    "This section enables precise and reproducible quantification of proteins of interest from Western 
+                    blot images. Users can upload the original TIFF file of the blot and select the bands corresponding to 
+                    the protein of interest. ORCA generates densitometric profiles (intensity plots) for each band, 
+                    allowing background noise removal. The area under each curve is then automatically calculated and 
+                    exported in Excel and RDS formats."
+                  )
               ),
               fluidRow(
-                column(9, offset = 1,
-                       tags$h5("In section «Upload Image», you have to upload the original file.tif and then you are directly redirected to «Protein Band» section.",
-                               style = "margin-top: 20px; text: center") # Stile aggiunto per un po' di margine
+                column(12,
+                       div(class = "if-upload-box",
+                           h3(icon("cloud-upload-alt"), " Upload Your Image", style = "color: #0066cc; margin-top: 0;"),
+                           p(style = "color: #666; margin-bottom: 20px;",
+                             "Select a TIFF file containing your Western blot image. After loading, you will be redirected to the Protein Band selection section."
+                           ),
+                           fluidRow(
+                             column(9,
+                                    fileInput(
+                                      inputId = "imImport",
+                                      label = "",
+                                      placeholder = "Click to browse or drag TIFF file here...",
+                                      width = "100%"
+                                    )
+                             ),
+                             column(3,
+                                    actionButton(
+                                      label = "Load Image",
+                                      style = "margin-top: 0px; width: 100%; background-color: #0066cc; color: white; 
+                                               border: none; padding: 12px; font-size: 16px; font-weight: bold;
+                                               border-radius: 5px; transition: all 0.3s ease;",
+                                      icon = shiny::icon("upload"),
+                                      inputId = "LoadingTif"
+                                    )
+                             )
+                           )
+                       )
                 )
               )
       ),
@@ -1080,7 +1103,17 @@ ui <- dashboardPage(
               )
       ),
       tabItem(tabName = "quantification",
-              h2("WB quantification"),
+              div(class = "if-header-box",
+                  h2(icon("calculator"), " Western Blot Quantification", style = "margin-top: 0;"),
+                  p(class = "if-description",
+                    "Users can upload the RDS files generated from the analysis of both the normalizer and the protein 
+                    of interest. ORCA automatically calculates the Relative Density (RD) and the Adjusted Relative 
+                    Density (AdjRD). Relative Density (RD) is obtained by dividing each area under the curve (AUC) of 
+                    the protein of interest by a single reference AUC from the normalizer. Adjusted Relative Density 
+                    (AdjRD) is calculated by dividing the AUCs of the protein of interest by their corresponding AUCs of 
+                    the normalizer, enabling lane-specific normalization."
+                  )
+              ),
               fluidRow(
                 box( width = 6,
                      title = tagList(shiny::icon("gear", verify_fa = FALSE), "Set the WB analysis as normalizer"),
@@ -1190,9 +1223,10 @@ ui <- dashboardPage(
               div(class = "if-header-box",
                   h2(icon("dna"), " RT-qPCR Gene Expression Analysis", style = "margin-top: 0;"),
                   p(class = "if-description",
-                    "Reverse Transcription quantitative PCR (RT-qPCR) analysis for gene expression quantification. Upload your Excel file 
-                    containing Ct values, gene names, samples, and time points. The module performs ΔΔCt calculations, fold-change analysis, 
-                    normalization to housekeeping genes, and generates comprehensive expression profiles."
+                    "Reverse Transcription quantitative Polymerase Chain Reaction (RT-qPCR) analysis for gene expression 
+                    quantification. Upload an Excel file containing Ct values, gene names, sample names, and time points (if 
+                    available). The module automatically performs ΔΔCt calculations, normalizes gene expression to 
+                    housekeeping genes, computes fold changes, and generates comprehensive gene expression profiles."
                   )
               ),
               fluidRow(
@@ -1590,11 +1624,13 @@ ui <- dashboardPage(
       tabItem(
         tabName = "uploadBCA",
         div(class = "if-header-box",
-            h2(icon("flask"), " BCA Protein Assay Analysis", style = "margin-top: 0;"),
+            h2(icon("flask"), " Protein Quantification Assay Analysis", style = "margin-top: 0;"),
             p(class = "if-description",
-              "Bicinchoninic Acid (BCA) assay module for protein quantification. Upload your Excel file containing absorbance 
-              measurements and standard curve data. The module automatically generates calibration curves using polynomial regression, 
-              calculates protein concentrations, and provides comprehensive statistical analysis with visualization."
+              "Bicinchoninic Acid (BCA) or Bradford assay data in Excel format can be uploaded into this module for 
+              protein quantification. The Excel file should contain absorbance measurements along with standard 
+              curve data. The module automatically generates calibration curves using polynomial regression, 
+              calculates protein concentrations, and delivers comprehensive statistical analysis with clear data 
+              visualization."
             )
         ),
         fluidRow(
@@ -1777,11 +1813,13 @@ ui <- dashboardPage(
       tabItem(
         tabName = "uploadELISA",
         div(class = "if-header-box",
-            h2(icon("vial"), " ELISA Assay Analysis", style = "margin-top: 0;"),
+            h2(icon("vial"), " ELISA Analysis", style = "margin-top: 0;"),
             p(class = "if-description",
-              "Enzyme-Linked Immunosorbent Assay (ELISA) quantification module. Upload your Excel file containing absorbance readings 
-              and standard curve concentrations. The module automatically fits calibration curves, determines sample concentrations, 
-              computes dilution factors, and performs statistical comparisons across experimental conditions."
+              "The Enzyme-Linked Immunosorbent Assay (ELISA) analysis module enables accurate and reproducible 
+              quantification of analytes. Users can upload an Excel file containing absorbance readings and standard 
+              curve concentrations. The module automatically fits calibration curves, calculates sample concentrations 
+              while accounting for dilution factors, and performs statistical comparisons across experimental conditions, 
+              providing a detailed and reliable quantification of the analyte of interest in the sample."
             )
         ),
         fluidRow(
@@ -1943,9 +1981,11 @@ ui <- dashboardPage(
         div(class = "if-header-box",
             h2(icon("exchange-alt"), " Endocytosis Analysis", style = "margin-top: 0;"),
             p(class = "if-description",
-              "Quantitative endocytosis assay analysis module. Upload your Excel file containing fluorescence intensity measurements 
-              from endocytosis experiments. The module calculates internalization rates, normalizes to control conditions, performs 
-              statistical comparisons, and generates time-course or dose-response visualizations."
+              "The Endocytosis Analysis module quantifies the percentage of surface proteins internalized over a given 
+              time frame. Users can upload an Excel file containing fluorescence intensity measurements from 
+              endocytosis experiments. The module calculates internalization rates, normalizes data to control conditions, 
+              performs statistical comparisons, and generates time-course or dose–response visualizations for 
+              comprehensive analysis."
             )
         ),
         fluidRow(
@@ -2087,9 +2127,10 @@ ui <- dashboardPage(
         div(class = "if-header-box",
             h2(icon("skull-crossbones"), " Cytotoxicity Assay Analysis", style = "margin-top: 0;"),
             p(class = "if-description",
-              "Cell viability and cytotoxicity assay analysis module. Upload your Excel file containing absorbance or fluorescence 
-              measurements from MTT, LDH, or similar viability assays. The module calculates cell viability percentages, determines 
-              IC50 values, performs dose-response analysis, and compares cytotoxic effects across different treatments."
+              "Cytotoxicity assays evaluate the proportion of cell death induced by a tested experimental compound. Users 
+              can upload an Excel file containing absorbance or fluorescence measurements from MTT, LDH, or similar 
+              cytotoxicity assays. ORCA calculates the percentage of dead cells, enabling IC₅₀ determination, dose–
+              response curve analysis, and comparison of cytotoxic effects across different treatments."
             )
         ),
         fluidRow(
@@ -2280,9 +2321,11 @@ ui <- dashboardPage(
         div(class = "if-header-box",
             h2(icon("dot-circle"), " Flow Cytometry Analysis", style = "margin-top: 0;"),
             p(class = "if-description",
-              "Flow cytometry data analysis module for cell population quantification. Upload your Excel file containing pre-gated 
-              cell population percentages or counts. The module supports hierarchical gating strategies, calculates population 
-              frequencies, performs comparative statistics across experimental conditions, and generates comprehensive visualizations."
+              "The Flow Cytometry Analysis module enables the separation and quantification of distinct cell populations 
+              starting from a heterogeneous sample. Users can upload an Excel file containing pre-gated cell population 
+              percentages or counts. The module supports hierarchical gating strategies, calculates population 
+              frequencies, performs statistical comparisons across experimental conditions, and generates detailed 
+              visualizations for comprehensive data analysis."
             )
         ),
         fluidRow(
@@ -2472,11 +2515,13 @@ ui <- dashboardPage(
           "))
         ),
         div(class = "if-header-box",
-            h2(icon("microscope"), " Immunofluorescence (IF) Analysis", style = "margin-top: 0;"),
+            h2(icon("microscope"), " Fluorescence Microscopy Analysis", style = "margin-top: 0;"),
             p(class = "if-description",
-              "Welcome to the IF analysis module! This tool enables comprehensive quantitative analysis of immunofluorescence microscopy data. 
-              Upload your Excel file containing fluorescence intensity measurements from different cellular compartments, experimental conditions, 
-              and biological replicates. The module will automatically compute statistics, perform comparative analyses, and generate publication-ready visualizations."
+              "Welcome to the Fluorescence Microscopy Analysis module. This tool enables robust and quantitative 
+              analysis of fluorescence microscopy data. Users can upload an Excel file containing fluorescence intensity 
+              measurements from different cellular compartments, experimental conditions, and biological replicates. 
+              The module automatically computes descriptive statistics, performs comparative analyses across conditions, 
+              and generates publication-ready visualizations."
             )
         ),
         fluidRow(

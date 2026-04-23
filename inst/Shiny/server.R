@@ -1811,7 +1811,8 @@ server <- function(input, output, session) {
   FlagsIF <- reactiveValues(norm=F, 
                             baseline = F,
                             IF_expcond = NULL,
-                            IF_TTestvariable = NULL)
+                            IF_TTestvariable = NULL,
+                            EXPcol = NULL)
   
   
   observeEvent(input$LoadIF_Button,{
@@ -1933,6 +1934,33 @@ server <- function(input, output, session) {
         ifResult$StatData = statisticData
         ifResult$FinalData = IFinalData
         
+        # Generate consistent color mapping for experimental conditions
+        unique_conditions <- unique(IFdata$ExpCond)
+        unique_conditions <- unique_conditions[!is.na(unique_conditions) & unique_conditions != ""]
+        
+        # Check if we need to generate new colors or update existing ones
+        if (is.null(FlagsIF$EXPcol) || !all(unique_conditions %in% names(FlagsIF$EXPcol))) {
+          # Generate a color palette with enough colors for all conditions
+          n_colors <- length(unique_conditions)
+          if (n_colors <= 8) {
+            # Use a qualitative palette for small number of conditions
+            color_palette <- RColorBrewer::brewer.pal(max(3, n_colors), "Set2")[1:n_colors]
+          } else {
+            # Use randomColor for larger number of conditions
+            color_palette <- randomcoloR::distinctColorPalette(n_colors)
+          }
+          names(color_palette) <- unique_conditions
+          FlagsIF$EXPcol <- color_palette
+        } else {
+          # Keep existing colors for known conditions, add new colors for new conditions
+          new_conditions <- setdiff(unique_conditions, names(FlagsIF$EXPcol))
+          if (length(new_conditions) > 0) {
+            new_colors <- randomcoloR::distinctColorPalette(length(new_conditions))
+            names(new_colors) <- new_conditions
+            FlagsIF$EXPcol <- c(FlagsIF$EXPcol, new_colors)
+          }
+        }
+        
         updateSelectInput("IF_TTestvariable",session = session, choices = unique(IFdataCalc$Vars))
         
         output$IFtable = renderDT({DT::datatable( IFinalData,
@@ -2048,13 +2076,31 @@ server <- function(input, output, session) {
         
         SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
         
-        resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
-          geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
+        # Get color mapping for current conditions
+        current_conditions <- unique(SubDataStat$ExpCond)
+        if (!is.null(FlagsIF$EXPcol) && all(current_conditions %in% names(FlagsIF$EXPcol))) {
+          color_mapping <- FlagsIF$EXPcol[current_conditions]
+        } else {
+          # Fallback to generating colors if mapping is not available
+          n_colors <- length(current_conditions)
+          if (n_colors <= 8) {
+            color_mapping <- RColorBrewer::brewer.pal(max(3, n_colors), "Set2")[1:n_colors]
+          } else {
+            color_mapping <- randomcoloR::distinctColorPalette(n_colors)
+          }
+          names(color_mapping) <- current_conditions
+        }
+        
+        resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean, fill = ExpCond)) + 
+          geom_bar(stat="identity", color="black", position=position_dodge()) +
           geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
           geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
                      position = position_jitter(width = 0.2), size = 3) +
+          scale_fill_manual(values = color_mapping) +
+          scale_color_manual(values = color_mapping) +
           theme_bw()+
           labs(color = "Experimental Condition", 
+               fill = "Experimental Condition",
                y = ifelse(plot_variable_base == "_Perc", "Percentages (%)", "Measured Values"), 
                x = "")
         
