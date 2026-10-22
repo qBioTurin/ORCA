@@ -1,13 +1,11 @@
 # ORCA — merged development copy
 
-Versione unificata di ORCA e ORCAv3, preparata il 22 ottobre 2026.
-Confronto, scelte di integrazione, test e limiti: [MERGE_REPORT.md](MERGE_REPORT.md).
+Merging ORCA e ORCAv3, 22 October 2026.
 
-Aprire questo progetto in una nuova sessione R e avviare:
 
 ```r
-pkgload::load_all()
-ORCA.run()
+install.packages("devtools")
+devtools::install_github("qBioTurin/ORCA", ref="merge/orca-unified", dependencies=TRUE)
 ```
 
 Test: `Rscript tests/manual/merged-features.R`.
