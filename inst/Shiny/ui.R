@@ -1,3 +1,4 @@
+library(flowCore)
 library(colourpicker)
 library(shinydashboard)
 library(shiny)
@@ -24,7 +25,6 @@ library(openxlsx)
 library(patchwork)
 library(stringr)
 library(dplyr)
-#library(flowCore)
 library(xml2)
 library(visNetwork)
 library(shinyFiles)  # Load shinyFiles package
@@ -256,13 +256,13 @@ ui <- dashboardPage(
                          menuItem('Cytotoxicity assay', tabName = 'cytotox',
                                   menuSubItem("Upload data", tabName = "uploadCYTOTOX"),
                                   menuSubItem("Quantification", tabName = "tablesCYTOTOX")),
-                         menuItem('Immunofluorescence analysis', tabName = 'if',
+                         menuItem('Fluorescence Microscopy analysis', tabName = 'if',
                                   menuSubItem("Upload data", tabName = "uploadIF"),
                                   menuSubItem("Quantification", tabName = "tablesIF")),
                          menuItem('Flow Cytometry analysis', tabName = 'facs',
-                                  #menuItem("Raw data", tabName = "RawFACS",
-                                  #         menuSubItem("Uppload data", tabName = "uploadRawFACS"),
-                                  #         menuSubItem("Raw data", tabName = "plotRawFACS")),
+                                  menuItem("Raw data", tabName = "RawFACS",
+                                            menuSubItem("Upload raw data", tabName = "uploadRawFACS"),
+                                            menuSubItem("Raw data", tabName = "plotRawFACS")),
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
                                   menuSubItem("Hierarchical gating", tabName = "tablesFACS"),
                                   menuSubItem("Statistics", tabName = "statFACS")) 
@@ -306,7 +306,7 @@ ui <- dashboardPage(
                          tags$li(h4(strong("Enzyme-Linked ImmunoSorbent Assay"), " (ELISA),")),
                          tags$li(h4(strong("Endocytosis"), ",")),
                          tags$li(h4(strong("Cytotoxicity experiments"), ",")),
-                         tags$li(h4(strong("Immunofluorescence"), ", and")),
+                         tags$li(h4(strong("Fluorescence Microscopy"), ", and")),
                          tags$li(h4(strong("Flow Cytometry analysis"), "."))
                        )
                 )
@@ -537,11 +537,11 @@ ui <- dashboardPage(
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
                           icon("microscope"),
-                          h4("Immunofluorescence (IF)")
+                          h4("Fluorescence Microscopy")
                       ),
                       div(class = "analysis-card-body",
                           p(class = "analysis-card-description",
-                            "Quantitative analysis of immunofluorescence microscopy data with compartment distributions and statistical testing."
+                            "Quantitative analysis of Fluorescence Microscopy data with compartment distributions and statistical testing."
                           ),
                           tags$ul(class = "analysis-card-features",
                               tags$li(icon("calculator"), "Automatic mean & SD calculations"),
@@ -1789,6 +1789,9 @@ ui <- dashboardPage(
                              actionButton(inputId = "confirmBCA_UGvalue", label= "Confirm")
                       )
                     ),
+                    selectInput("BCA_ratio_direction", "Ratio to calculate",
+                      choices = c("Target / baseline" = "target_over_baseline",
+                                  "Baseline / target" = "baseline_over_target")),
                     DTOutput("BCAtablesUG")
                 ),
                 box(width= 12,
@@ -2239,6 +2242,8 @@ ui <- dashboardPage(
                     title = "Quantification",
                     collapsible = TRUE,
                     collapsed = TRUE,
+                    selectInput("CYTOTOX_plot_customize_selection", "Plot selection", c("Plot 1", "Plot 2")),
+                    actionButton("Customize_plot_CYTOTOX", "Customize or Download Plot"),
                     plotOutput("CYTOTOXplots"),
                     DTOutput("CYTOTOXtables"),
                     fluidRow(
@@ -2286,15 +2291,16 @@ ui <- dashboardPage(
               fluidRow(
                 tags$head(
                   tags$style(HTML("
-                      #rawFACSmatrix { 
-                        float: center;
-                      }
-                    "))
+                #rawFACSmatrix {
+                  float: center;
+                }
+              "))
                 ),
                 column(12, 
                        tableOutput("rawFACSmatrix")          
                 )
               ),
+              fluidRow(
               box(width = 12,
                   fluidRow(
                     column(
@@ -2312,8 +2318,106 @@ ui <- dashboardPage(
                   ),
                   fluidRow(
                     plotOutput("facs_ChannelscatterPlot"),
-                    plotOutput("facs_autoPlot",height = "800px")
+                    #plotOutput("facs_autoPlot",height = "800px")
                   )
+              )),
+              fluidRow(
+                # Nuova sezione per la selezione gerarchica
+                box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
+                    fluidRow(
+                      column(4,
+                             selectInput("facs_sampleSelector",
+                                         "Select Sample (Name):",
+                                         choices = character(0),
+                                         selected = NULL)
+                      ),
+                      column(4,
+                             selectInput("facs_hierarchySelector",
+                                         "Hierarchical level:",
+                                         choices = character(0),
+                                         selected = NULL)
+                      )
+                    ),
+
+                    fluidRow(
+                      column(8,
+                             plotOutput("facs_previewPlot", height = "300px"),
+                             br(),
+                             actionButton("CustomizePlotFACS",
+                                          "Customize Plot",
+                                          icon = icon("paint-brush"),
+                                          class = "btn-secondary",
+                                          style = "width: 30%; margin-top: 10px;")
+                      ),
+                      column(4,
+                             br(),
+                             actionButton("facs_openSelectionModal",
+                                          "Open Interactive Selection",
+                                          class = "btn-info",
+                                          icon = icon("mouse-pointer"),
+                                          style = "width: 100%;"),
+                             actionButton("facs_clearSelection",
+                                          "Remove Level and Sons",
+                                          class = "btn-danger",
+                                          icon = icon("eraser"),
+                                          style = "width: 100%; margin-top: 10px;"),
+                             br(),
+                             div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
+                                 textInput("facs_hierarchyName", "Hierarchical Name", placeholder = "Enter hierarchy name", width = "70%"),
+                                 actionButton("facs_saveSelections", "Save", class = "btn-success", style = "width: 30%;")
+                             ),
+                             div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
+                                 uiOutput("facs_hierarchySelectorUI", style = "width: 70%;"),
+                                 actionButton("facs_loadSelections", "Apply", class = "btn-info", style = "width: 30%;")
+                             )
+                      )
+                    ),
+
+                    fluidRow(
+                      column(4,
+                             div(style = "margin-top: 10px;",
+                                 selectInput("facs_sampleSelector_to_norm",
+                                             "Select Sample (Name) to normalize:",
+                                             choices = character(0),
+                                             selected = NULL)
+                             )
+                      ),
+                      column(4,
+                             div(style = "margin-top: 10px;",
+                                 selectInput("facs_sampleSelector_normalizer",
+                                             "Select Sample (Name) of normalizer:",
+                                             choices = character(0),
+                                             selected = NULL)
+                             )
+                      ),
+                      column(3,
+                             actionButton("facs_normalizeButton",
+                                          "Normalize",
+                                          class = "btn-warning",
+                                          icon = icon("balance-scale"),
+                                          style = "width: 100%; margin-top: 35px;")
+                      )
+                    ),
+                    # Pannello informativo delle selezioni
+                    conditionalPanel(
+                      condition = "output.facs_hasSelections",
+                      hr(),
+                      h4("Selections Created:", style = "color: #337ab7;"),
+                      div(style = "background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 10px; overflow-x: auto;",
+                          tableOutput("facs_selectionsInfo")
+                      )
+                    )
+                ),
+                column(width = 12,
+                       div(style = "display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;",
+                           downloadButton(label = "Download Analysis & Excel",
+                                          outputId = "downloadRawFacsAnalysis",
+                                          icon = icon("download")),
+                           actionButton(inputId = "NextFacsHierarchicalGating",
+                                        label = 'Proceed to Hierarchical gating',
+                                        icon = shiny::icon("forward"))
+                       )
+                )
               )
       ),
       tabItem(

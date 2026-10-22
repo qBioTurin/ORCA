@@ -38,7 +38,7 @@ RUN R -e 'install.packages(c(\
               "shinyjs",\
               "randomcoloR",\
               "plotly",\
-              "flowCore"\
+              "colourpicker"\
             ), \
             repos="https://packagemanager.rstudio.com/cran/__linux__/focal/2022-08-01"\
           )'
@@ -59,7 +59,10 @@ RUN R -e 'install.packages("tidyverse")'
 RUN R -e 'install.packages(c("patchwork","BiocManager"))'
 RUN R -e 'install.packages("remotes")'
 
-RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="main"); '
+# Build from the merged project root, using this checkout rather than GitHub main.
+COPY . /opt/ORCA
+RUN R -e 'BiocManager::install("flowCore", ask=FALSE, update=FALSE)'
+RUN R -e 'remotes::install_local("/opt/ORCA", dependencies=TRUE, upgrade="never")'
 # copy the app directory into the image
 
 COPY ./inst/Shiny/* ./app/
@@ -73,4 +76,4 @@ EXPOSE 3838
 # Define default command.
 # CMD ["bash"]
 # run app on container start
-CMD R -e ' ORCA::ORCA.run(TRUE)'
+CMD R -e ' ORCA::ORCA.run(inDocker = TRUE)'

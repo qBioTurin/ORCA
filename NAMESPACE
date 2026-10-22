@@ -27,3 +27,5 @@ import(stringr)
 import(visNetwork)
 import(xml2)
 import(zoo)
+
+import(flowCore)

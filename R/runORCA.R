@@ -25,16 +25,11 @@ ORCA.run <-function(port = 3838, inDocker = FALSE)
   source(Appui)
   source(Appserver)
   
+  options(shiny.maxRequestSize = 1000*1024^2)
+  app <- shinyApp(ui, server)
   if(inDocker){
-    app <-shinyApp(ui, server,
-                   options =  options(shiny.maxRequestSize=1000*1024^2)
-    )
     host = '0.0.0.0'
   }else{
-    app <-shinyApp(ui, server,
-                   options =  options(shiny.maxRequestSize=1000*1024^2,
-                                      shiny.launch.browser = .rs.invokeShinyWindowExternal)
-    )
     host = getOption("shiny.host", "127.0.0.1")
   }
 

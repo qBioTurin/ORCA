@@ -1,6 +1,6 @@
 Package: ORCA
 Title: ORCA: Omni Reproducible Cell Analysis.
-Version: 2.0
+Version: 2.1.0.9000
 Authors@R: 
     c(person("Simone", "Pernice", , "simone.pernice@unito.it", role = c("cre"),
            comment = c(ORCID = "YOUR-ORCID-ID")),
@@ -39,7 +39,17 @@ Imports:
     ggraph,
     tidyverse,
     ggpubr,
-    shinybusy,
-    shinyalert,
     BiocManager,
-    colourpicker
+    colourpicker,
+    flowCore,
+    readxl,
+    ggsignif,
+    igraph,
+    sortable,
+    stringi,
+    httpuv,
+    rjson
+Suggests:
+    testthat,
+    pkgload,
+    ggcyto

@@ -1,3 +1,19 @@
+# ORCA — merged development copy
+
+Versione unificata di ORCA e ORCAv3, preparata il 22 ottobre 2026.
+Confronto, scelte di integrazione, test e limiti: [MERGE_REPORT.md](MERGE_REPORT.md).
+
+Aprire questo progetto in una nuova sessione R e avviare:
+
+```r
+pkgload::load_all()
+ORCA.run()
+```
+
+Test: `Rscript tests/manual/merged-features.R`.
+
+---
+
 # ORCA: Omni Reproducible Cell Analysis
 
 <p align="center">

@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# Local credentials and operating-system metadata
+inst/Data/.APIkey
+.DS_Store

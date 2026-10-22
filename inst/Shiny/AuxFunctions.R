@@ -353,6 +353,9 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
     "ExcelMulti" = {
       result <- list(data = list(), error = NULL)
       filenames <- filename
+      if (!isFileUploaded || length(filenames) == 0) {
+        return(list(message = "Please, select an Excel file", call = ""))
+      }
       
       for(filename in filenames){
         if(!isFileUploaded || !file.exists(filename)) {
@@ -381,6 +384,9 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
     },
     "fcs" = {
       filenames <- filename
+      if (!isFileUploaded || length(filenames) == 0) {
+        return(list(message = "Please select one or more FCS files.", call = ""))
+      }
       
       for(filename in filenames){
         if(is.null(filename) || !file.exists(filename)) {
@@ -390,9 +396,12 @@ readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = 
         } 
       }
       
-      # x = flowCore::read.flowSet(filenames,name.keyword = "$FIL",
-      #                            transformation = FALSE, truncate_max_range = FALSE)
-      # flowCore::sampleNames(x) = colname
+      x <- tryCatch({
+        result <- flowCore::read.flowSet(filenames, name.keyword = "$FIL",
+                                        transformation = FALSE, truncate_max_range = FALSE)
+        flowCore::sampleNames(result) <- make.unique(colname)
+        result
+      }, error = function(e) list(message = conditionMessage(e), call = ""))
       
       return(x) 
       
@@ -740,6 +749,17 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                         fileType = "tiff",
                         units = "in",
                         dpi = 600)
+           }
+         },
+         "RAWFACS" = {
+           wb <- createWorkbook("RAWFACS")
+
+           if (!is.null(ResultList) && is.data.frame(ResultList)) {
+             addWorksheet(wb, "Raw Data")  # Aggiunge un nuovo foglio al workbook
+             writeDataTable(wb, ResultList, sheet = "Raw Data")  # Scrive i dati nel foglio
+             print("Initdata scritto nel foglio Excel")
+           } else {
+             print("Errore: Initdata non disponibile o non è un data.frame")
            }
          },
          "FACS" = {
@@ -1982,7 +2002,7 @@ testStat.function <- function(data) {
   resPairwise <- NULL
   path <- c("shapiro.test")
   
-  if(is.tibble(data)) data = as.data.frame(data)
+  if(tibble::is_tibble(data)) data = as.data.frame(data)
   
   data$Value <- as.numeric(gsub("^\\s+|\\s+$", "", as.character(data[[2]])))
   
@@ -2901,7 +2921,7 @@ generatePlotParameters <- function(plot) {
   plot_theme <- plot$theme %||% list()
   theme_elements <- utils::modifyList(global_theme, plot_theme)
   
-  title_size <- theme_elements$plot.title$size %||% 14
+  title_size <- ggplot2::calc_element("plot.title", global_theme + plot$theme)$size %||% 14
   title_color <- theme_elements$plot.title$colour %||% "#000000"
   x_axis_size <- theme_elements$axis.text.x$size %||% 12
   y_axis_size <- theme_elements$axis.text.y$size %||% 12
