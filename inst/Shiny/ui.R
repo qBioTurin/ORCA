@@ -2291,7 +2291,7 @@ ui <- dashboardPage(
               fluidRow(
                 tags$head(
                   tags$style(HTML("
-                #rawFACSmatrix {
+                #rawFACSmatrix { 
                   float: center;
                 }
               "))
@@ -2326,33 +2326,33 @@ ui <- dashboardPage(
                 box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
                     fluidRow(
                       column(4,
-                             selectInput("facs_sampleSelector",
+                             selectInput("facs_sampleSelector", 
                                          "Select Sample (Name):",
                                          choices = character(0),
                                          selected = NULL)
                       ),
                       column(4,
-                             selectInput("facs_hierarchySelector",
+                             selectInput("facs_hierarchySelector", 
                                          "Hierarchical level:",
                                          choices = character(0),
                                          selected = NULL)
                       )
                     ),
-
+                    
                     fluidRow(
                       column(8,
                              plotOutput("facs_previewPlot", height = "300px"),
                              br(),
-                             actionButton("CustomizePlotFACS",
-                                          "Customize Plot",
-                                          icon = icon("paint-brush"),
+                             actionButton("CustomizePlotFACS", 
+                                          "Customize Plot", 
+                                          icon = icon("paint-brush"), 
                                           class = "btn-secondary",
                                           style = "width: 30%; margin-top: 10px;")
                       ),
                       column(4,
                              br(),
-                             actionButton("facs_openSelectionModal",
-                                          "Open Interactive Selection",
+                             actionButton("facs_openSelectionModal", 
+                                          "Open Interactive Selection", 
                                           class = "btn-info",
                                           icon = icon("mouse-pointer"),
                                           style = "width: 100%;"),
@@ -2372,11 +2372,11 @@ ui <- dashboardPage(
                              )
                       )
                     ),
-
+                    
                     fluidRow(
                       column(4,
                              div(style = "margin-top: 10px;",
-                                 selectInput("facs_sampleSelector_to_norm",
+                                 selectInput("facs_sampleSelector_to_norm", 
                                              "Select Sample (Name) to normalize:",
                                              choices = character(0),
                                              selected = NULL)
@@ -2384,17 +2384,17 @@ ui <- dashboardPage(
                       ),
                       column(4,
                              div(style = "margin-top: 10px;",
-                                 selectInput("facs_sampleSelector_normalizer",
+                                 selectInput("facs_sampleSelector_normalizer", 
                                              "Select Sample (Name) of normalizer:",
                                              choices = character(0),
                                              selected = NULL)
                              )
                       ),
                       column(3,
-                             actionButton("facs_normalizeButton",
-                                          "Normalize",
-                                          class = "btn-warning",
-                                          icon = icon("balance-scale"),
+                             actionButton("facs_normalizeButton", 
+                                          "Normalize", 
+                                          class = "btn-warning", 
+                                          icon = icon("balance-scale"), 
                                           style = "width: 100%; margin-top: 35px;")
                       )
                     ),
@@ -2410,7 +2410,7 @@ ui <- dashboardPage(
                 ),
                 column(width = 12,
                        div(style = "display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;",
-                           downloadButton(label = "Download Analysis & Excel",
+                           downloadButton(label = "Download Analysis & Excel", 
                                           outputId = "downloadRawFacsAnalysis",
                                           icon = icon("download")),
                            actionButton(inputId = "NextFacsHierarchicalGating",

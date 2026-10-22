@@ -62,7 +62,7 @@ RUN R -e 'install.packages("remotes")'
 # Build from the merged project root, using this checkout rather than GitHub main.
 COPY . /opt/ORCA
 RUN R -e 'BiocManager::install("flowCore", ask=FALSE, update=FALSE)'
-RUN R -e 'remotes::install_local("/opt/ORCA", dependencies=TRUE, upgrade="never")'
+RUN R -e 'remotes::install_local("/opt/ORCA", dependencies=TRUE, upgrade="never")' 
 # copy the app directory into the image
 
 COPY ./inst/Shiny/* ./app/

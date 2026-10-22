@@ -752,8 +752,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            }
          },
          "RAWFACS" = {
-           wb <- createWorkbook("RAWFACS")
-
+           wb <- createWorkbook("RAWFACS")  
+           
            if (!is.null(ResultList) && is.data.frame(ResultList)) {
              addWorksheet(wb, "Raw Data")  # Aggiunge un nuovo foglio al workbook
              writeDataTable(wb, ResultList, sheet = "Raw Data")  # Scrive i dati nel foglio

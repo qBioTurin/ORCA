@@ -1,9 +1,0 @@
-Validation — 2026-10-22
-Rscript tests/manual/merged-features.R: exit 0
-22 scenarios; 177 assertions; 0 test warnings; 0 failures.
-Navigation: 31 Shiny tabs.
-R CMD INSTALL --library=/tmp/orca-merged-library ORCA-merged: exit 0.
-Package import-name overlap warnings remain; installation succeeds.
-Installed package resolves its own AuxFunctions.R from outside the project: passed.
-Syntax parsing: 8 application/package R files passed.
-Browser interactions, Docker builds and Dataverse services were not tested.

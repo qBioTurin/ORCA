@@ -6364,7 +6364,7 @@ server <- function(input, output, session) {
   ### End CITOXICITY analysis ####
   
   #### RAW FACS analysis ####
-
+  
   rawfacsResult = reactiveValues(
     Initdata= NULL,
     tableSelections = NULL,
@@ -6383,21 +6383,21 @@ server <- function(input, output, session) {
   
   # Contenitore per più gerarchie salvate
   savedHierarchies <- reactiveValues(data = list())
-
+  
   mapping_sample <- reactiveValues(
     data = list()
   )
   # Reactive values per la gestione delle selezioni gerarchiche
   facsSelections = reactiveValues(
-    selections = list(),
+    selections = list(), 
     currentPlot = NULL,
-    polygonPoints = list()
+    polygonPoints = list()  
   )
-
+  
   rawFACSresultListen <- reactive({
     reactiveValuesToList(rawfacsResult)
   })
-
+  
   observeEvent(rawFACSresultListen(), {
     DataAnalysisModule$rawfacsResult = reactiveValuesToList(rawfacsResult)
     DataAnalysisModule$rawfacsResult$Flags = reactiveValuesToList(rawFlagsFACS)
@@ -6457,23 +6457,23 @@ server <- function(input, output, session) {
       updateSelectInput(session, "facs_xChannel", choices = channels, selected = channels[1])
       updateSelectInput(session, "facs_yChannel", choices = channels, selected = channels[2])
       
-      updateSelectInput(session, "facs_sampleSelector",
+      updateSelectInput(session, "facs_sampleSelector", 
                         choices = fileNames,
                         selected = fileNames[1])
-      updateSelectInput(session, "facs_hierarchySelector",
+      updateSelectInput(session, "facs_hierarchySelector", 
                         choices = "None",
                         selected = NULL)
-      updateSelectInput(session, "facs_sampleSelector_to_norm",
+      updateSelectInput(session, "facs_sampleSelector_to_norm", 
                         choices = fileNames,
                         selected = fileNames[1])
-      updateSelectInput(session, "facs_sampleSelector_normalizer",
+      updateSelectInput(session, "facs_sampleSelector_normalizer", 
                         choices = fileNames,
                         selected = fileNames[1])
-
-      facsSelections$selections <- list()
-      facsSelections$currentPlot <- NULL
+      
+      facsSelections$selections <- list()  
+      facsSelections$currentPlot <- NULL  
       facsSelections$polygonPoints <- list()  # Reset dei punti del poligono
-
+      
       removeModal()
       showAlert("Success", "The FCS file has been uploaded with success", "success", 2000)
       
@@ -6487,27 +6487,27 @@ server <- function(input, output, session) {
   # Observer per aggiornare il selettore gerarchico quando cambia il campione
   observeEvent(input$facs_sampleSelector, {
     req(input$facs_sampleSelector)
-
+    
     selectedSample <- input$facs_sampleSelector
-
+    
     # Trova tutte le selezioni disponibili per il campione selezionato
     availableSelections <- character(0)
-
+    
     if(!is.null(facsSelections$selections[[selectedSample]])) {
       availableSelections <- names(facsSelections$selections[[selectedSample]])
     }
-
-    updateSelectInput(session, "facs_hierarchySelector",
+    
+    updateSelectInput(session, "facs_hierarchySelector", 
                       choices = c("None",availableSelections),
                       selected = NULL)
   })
-
+  
   output$facs_previewPlot <- renderPlot({
     req(input$facs_sampleSelector, input$facs_hierarchySelector)
-
+    
     selectedSample <- input$facs_sampleSelector
     hierarchyLevel <- input$facs_hierarchySelector
-
+    
     # Determino da quale dataset partire
     data <- NULL
     if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0 || hierarchyLevel == "None") {
@@ -6519,23 +6519,23 @@ server <- function(input, output, session) {
         data <- rawfacsResult$Initdata
       }
     }
-
+    
     channelx <- input$facs_xChannel
     channely <- input$facs_yChannel
-
+    
     sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
     sample_expr$Name <- selectedSample
-
+    
     p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
       geom_point(alpha = 0.5, color = "blue", size = 0.8) +
       labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
       theme_minimal() +
       theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
-
+    
     # Disegna le selezioni precedenti per il campione corrente con parent == hierarchyLevel
     if (!is.null(facsSelections$selections[[selectedSample]])) {
       colors <- c("purple", "orange", "green", "brown", "pink", "cyan", "yellow", "gray")
-
+      
       sampleSelections <- facsSelections$selections[[selectedSample]]
       if (hierarchyLevel == "None" || is.null(hierarchyLevel) || hierarchyLevel == ""){
         validSelections <- names(sampleSelections)[
@@ -6546,22 +6546,22 @@ server <- function(input, output, session) {
           sapply(sampleSelections, function(sel) sel$parent == hierarchyLevel)
         ]
       }
-
+      
       for (i in seq_along(validSelections)) {
         sel_name <- validSelections[i]
         sel_data <- sampleSelections[[sel_name]]
-
+        
         if (!is.null(sel_data$polygon) &&
             !is.null(sel_data$channels) &&
             length(sel_data$channels) >= 2 &&
             sel_data$channels[1] == channelx &&
             sel_data$channels[2] == channely) {
-
+          
           sel_color <- colors[((i - 1) %% length(colors)) + 1]
-
+          
           if (nrow(sel_data$polygon) >= 3) {
             polygon_df_closed <- rbind(sel_data$polygon, sel_data$polygon[1, ])
-
+            
             p <- p +
               geom_polygon(data = sel_data$polygon, aes(x = x, y = y),
                            fill = sel_color, alpha = 0.15, color = sel_color, linewidth = 1.2) +
@@ -6569,10 +6569,10 @@ server <- function(input, output, session) {
                         color = sel_color, linewidth = 1.2, linetype = "dashed") +
               geom_point(data = sel_data$polygon, aes(x = x, y = y),
                          color = sel_color, size = 2.5, shape = 17)
-
+            
             centroid_x <- mean(sel_data$polygon$x)
             centroid_y <- mean(sel_data$polygon$y)
-
+            
             p <- p + annotate("text", x = centroid_x, y = centroid_y,
                               label = sel_name, color = sel_color,
                               size = 3, fontface = "bold", hjust = 0.5, vjust = 0.5, alpha = 0.8)
@@ -6580,38 +6580,38 @@ server <- function(input, output, session) {
         }
       }
     }
-
-
+    
+    
     # Aggiungi i punti del poligono corrente (in rosso, in primo piano)
     if(length(facsSelections$polygonPoints) > 0) {
       polygon_df <- data.frame(
         x = sapply(facsSelections$polygonPoints, function(p) p$x),
         y = sapply(facsSelections$polygonPoints, function(p) p$y)
       )
-
+      
       # Aggiungi i punti del poligono corrente
-      p <- p + geom_point(data = polygon_df, aes(x = x, y = y),
+      p <- p + geom_point(data = polygon_df, aes(x = x, y = y), 
                           color = "red", size = 3, shape = 16)
-
+      
       # Se ci sono almeno 2 punti, disegna le linee
       if(nrow(polygon_df) >= 2) {
-        p <- p + geom_path(data = polygon_df, aes(x = x, y = y),
+        p <- p + geom_path(data = polygon_df, aes(x = x, y = y), 
                            color = "red", linewidth = 1.5)
       }
-
+      
       # Se ci sono almeno 3 punti, chiudi il poligono
       if(nrow(polygon_df) >= 3) {
         polygon_df_closed <- rbind(polygon_df, polygon_df[1, ])
-        p <- p + geom_path(data = polygon_df_closed, aes(x = x, y = y),
+        p <- p + geom_path(data = polygon_df_closed, aes(x = x, y = y), 
                            color = "red", linewidth = 1.5) +
-          geom_polygon(data = polygon_df, aes(x = x, y = y),
+          geom_polygon(data = polygon_df, aes(x = x, y = y), 
                        fill = "red", alpha = 0.3)
       }
     }
     rawfacsResult$previewPlot <- p
     p
   })
-
+  
   observeEvent(input$CustomizePlotFACS, {
     layer_tabs <- generateLayerParameters(rawfacsResult$previewPlot)
     showModal(modalDialog(
@@ -6639,7 +6639,7 @@ server <- function(input, output, session) {
       easyClose = FALSE
     ))
   })
-
+  
   output$downloadPlotButtonRAWFACS <- downloadHandler(
     filename = function() {
       paste0("plot_RAWFACS_image_", Sys.Date(), ".png")
@@ -6653,15 +6653,15 @@ server <- function(input, output, session) {
       manageSpinner(FALSE)
     }
   )
-
-
+  
+  
   observeEvent(input$applyChangesRAWFACS, {
     updatedPlot<-customizePlot(rawfacsResult$previewPlot ,input)
     rawfacsResult$previewPlot<- updatedPlot
     output$facs_previewPlot <- renderPlot({updatedPlot})
     removeModal()
   })
-
+  
   observeEvent(input$facs_plotChannelButton, {
     req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel)
     
@@ -6692,23 +6692,23 @@ server <- function(input, output, session) {
       ggcyto::autoplot(data, channelx,channely)
     })
   })
-
+  
   # Gestione del bottone per aprire il modal di selezione
   observeEvent(input$facs_openSelectionModal, {
     req(input$facs_sampleSelector)
-
+    
     selectedSample <- input$facs_sampleSelector
     hierarchyLevel <- input$facs_hierarchySelector
-
+    
     # Reset dei punti del poligono quando si apre il modal
     facsSelections$polygonPoints <- list()
-
+    
     if(is.null(hierarchyLevel) || hierarchyLevel == "") {
       plotTitle <- paste("Sample:", selectedSample)
     } else {
       plotTitle <- paste("Selection:", hierarchyLevel, "- Sample:", selectedSample)
     }
-
+    
     showModal(modalDialog(
       title = plotTitle,
       size = "l",
@@ -6716,11 +6716,11 @@ server <- function(input, output, session) {
       footer = tagList(
         div(style = "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;",
             div(style = "display: flex; align-items: center; gap: 10px;",
-                textInput("facs_selectionName", "Name of the new selection:",
+                textInput("facs_selectionName", "Name of the new selection:", 
                           value = "", width = "250px"),
-                actionButton("facs_clearPolygon", "Delete Polygon",
+                actionButton("facs_clearPolygon", "Delete Polygon", 
                              class = "btn-warning"),
-                actionButton("facs_confirmSelection", "Confirm Selection",
+                actionButton("facs_confirmSelection", "Confirm Selection", 
                              class = "btn-primary"),
                 modalButton("Cancel")
             ),
@@ -6734,12 +6734,12 @@ server <- function(input, output, session) {
                div(style = "text-align: center; margin-bottom: 10px;",
                    strong("Click on the plot to add points to the polygon. The polygon will close automatically."),
                    br(),
-                   span("Previous selections are shown with different colors and dotted lines.",
+                   span("Previous selections are shown with different colors and dotted lines.", 
                         style = "font-size: 12px; color: #666; font-style: italic;"),
                    br(),
                    div(class = "icon-container", style = "margin-top: 5px;",
                        h4("Polygon creation instructions: ", icon("info-circle")),
-                       div(class = "icon-text",
+                       div(class = "icon-text", 
                            "Start from a vertex and create the polygon by clicking points in either clockwise or counter-clockwise order."
                        )
                    )
@@ -6750,14 +6750,14 @@ server <- function(input, output, session) {
         )
       )
     ))
-
+    
     # Renderizza il plot nel modal
     output$facs_modalPlot <- renderPlot({
       req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel, input$facs_sampleSelector)
-
+      
       selectedSample <- input$facs_sampleSelector
       hierarchyLevel <- input$facs_hierarchySelector
-
+      
       # Determino da quale dataset partire
       data <- NULL
       if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0 || hierarchyLevel == "None") {
@@ -6769,23 +6769,23 @@ server <- function(input, output, session) {
           data <- rawfacsResult$Initdata
         }
       }
-
+      
       channelx <- input$facs_xChannel
       channely <- input$facs_yChannel
-
+      
       sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
       sample_expr$Name <- selectedSample
-
+      
       p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
         geom_point(alpha = 0.5, color = "blue", size = 0.8) +
         labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
         theme_minimal() +
         theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
-
+      
       # Disegna le selezioni precedenti per il campione corrente con parent == hierarchyLevel
       if (!is.null(facsSelections$selections[[selectedSample]])) {
         colors <- c("purple", "orange", "green", "brown", "pink", "cyan", "yellow", "gray")
-
+        
         sampleSelections <- facsSelections$selections[[selectedSample]]
         if (hierarchyLevel == "None" || is.null(hierarchyLevel) || hierarchyLevel == ""){
           validSelections <- names(sampleSelections)[
@@ -6796,22 +6796,22 @@ server <- function(input, output, session) {
             sapply(sampleSelections, function(sel) sel$parent == hierarchyLevel)
           ]
         }
-
+        
         for (i in seq_along(validSelections)) {
           sel_name <- validSelections[i]
           sel_data <- sampleSelections[[sel_name]]
-
+          
           if (!is.null(sel_data$polygon) &&
               !is.null(sel_data$channels) &&
               length(sel_data$channels) >= 2 &&
               sel_data$channels[1] == channelx &&
               sel_data$channels[2] == channely) {
-
+            
             sel_color <- colors[((i - 1) %% length(colors)) + 1]
-
+            
             if (nrow(sel_data$polygon) >= 3) {
               polygon_df_closed <- rbind(sel_data$polygon, sel_data$polygon[1, ])
-
+              
               p <- p +
                 geom_polygon(data = sel_data$polygon, aes(x = x, y = y),
                              fill = sel_color, alpha = 0.15, color = sel_color, linewidth = 1.2) +
@@ -6819,10 +6819,10 @@ server <- function(input, output, session) {
                           color = sel_color, linewidth = 1.2, linetype = "dashed") +
                 geom_point(data = sel_data$polygon, aes(x = x, y = y),
                            color = sel_color, size = 2.5, shape = 17)
-
+              
               centroid_x <- mean(sel_data$polygon$x)
               centroid_y <- mean(sel_data$polygon$y)
-
+              
               p <- p + annotate("text", x = centroid_x, y = centroid_y,
                                 label = sel_name, color = sel_color,
                                 size = 3, fontface = "bold", hjust = 0.5, vjust = 0.5, alpha = 0.8)
@@ -6830,54 +6830,54 @@ server <- function(input, output, session) {
           }
         }
       }
-
-
+      
+      
       # Aggiungi i punti del poligono corrente (in rosso, in primo piano)
       if(length(facsSelections$polygonPoints) > 0) {
         polygon_df <- data.frame(
           x = sapply(facsSelections$polygonPoints, function(p) p$x),
           y = sapply(facsSelections$polygonPoints, function(p) p$y)
         )
-
+        
         # Aggiungi i punti del poligono corrente
-        p <- p + geom_point(data = polygon_df, aes(x = x, y = y),
+        p <- p + geom_point(data = polygon_df, aes(x = x, y = y), 
                             color = "red", size = 3, shape = 16)
-
+        
         # Se ci sono almeno 2 punti, disegna le linee
         if(nrow(polygon_df) >= 2) {
-          p <- p + geom_path(data = polygon_df, aes(x = x, y = y),
+          p <- p + geom_path(data = polygon_df, aes(x = x, y = y), 
                              color = "red", linewidth = 1.5)
         }
-
+        
         # Se ci sono almeno 3 punti, chiudi il poligono
         if(nrow(polygon_df) >= 3) {
           polygon_df_closed <- rbind(polygon_df, polygon_df[1, ])
-          p <- p + geom_path(data = polygon_df_closed, aes(x = x, y = y),
+          p <- p + geom_path(data = polygon_df_closed, aes(x = x, y = y), 
                              color = "red", linewidth = 1.5) +
-            geom_polygon(data = polygon_df, aes(x = x, y = y),
+            geom_polygon(data = polygon_df, aes(x = x, y = y), 
                          fill = "red", alpha = 0.3)
         }
       }
-
+      
       p
     })
-
+    
     # Info sui punti del poligono
     output$facs_polygonInfo <- renderText({
       n_points <- length(facsSelections$polygonPoints)
       selectedSample <- input$facs_sampleSelector
-
+      
       # Conta le selezioni precedenti per questo campione
       n_prev_selections <- 0
       if(!is.null(facsSelections$selections[[selectedSample]])) {
         n_prev_selections <- length(facsSelections$selections[[selectedSample]])
       }
-
+      
       info_text <- ""
       if(n_prev_selections > 0) {
         info_text <- paste("Existing selections:", n_prev_selections, "| ")
       }
-
+      
       if(n_points == 0) {
         paste0(info_text, "No points selected")
       } else if(n_points < 3) {
@@ -6887,70 +6887,70 @@ server <- function(input, output, session) {
       }
     })
   })
-
+  
   # Elimina i livelli gerarchici
   observeEvent(input$facs_clearSelection, {
     manageSpinner(TRUE)
     req(input$facs_hierarchySelector, input$facs_sampleSelector)
-
+    
     selectedLevel <- input$facs_hierarchySelector
     selectedSample <- input$facs_sampleSelector
-
-    if (is.null(facsSelections$selections[[selectedSample]]) ||
+    
+    if (is.null(facsSelections$selections[[selectedSample]]) || 
         length(facsSelections$selections[[selectedSample]]) == 0) {
       showAlert("Error", "No selection found for this sample", "error", 3000)
       return()
     }
-    if (is.null(selectedLevel) || selectedLevel == "None" || selectedLevel == "" ||
+    if (is.null(selectedLevel) || selectedLevel == "None" || selectedLevel == "" || 
         !selectedLevel %in% names(facsSelections$selections[[selectedSample]])) {
       showAlert("Error", "Select a valid level to eliminate", "error", 3000)
       return()
     }
-
+    
     selectionToDelete <- facsSelections$selections[[selectedSample]][[selectedLevel]]
     selectionFullName <- selectionToDelete$name
-
+    
     selectionsToRemove <- c()
-
+    
     findDescendants <- function(parentName, parentFullName, allSelections) {
       descendants <- c()
       for (selName in names(allSelections)) {
         sel <- allSelections[[selName]]
         if (sel$parent == parentName || sel$parent == parentFullName) {
           descendants <- c(descendants, selName)
-
+          
           descendants <- c(descendants, findDescendants(selName, sel$name, allSelections)) # Chiamata ricorsiva
         }
       }
       return(descendants)
     }
-
+    
     selectionsToRemove <- c(selectionsToRemove, selectedLevel)
-
+    
     descendants <- findDescendants(selectedLevel, selectionFullName, facsSelections$selections[[selectedSample]])
     selectionsToRemove <- c(selectionsToRemove, descendants)
-
+    
     # Rimuove le selezioni identificate
     for (selToRemove in selectionsToRemove) {
       if (selToRemove %in% names(facsSelections$selections[[selectedSample]])) {
         facsSelections$selections[[selectedSample]][[selToRemove]] <- NULL
       }
     }
-
+    
     if (length(facsSelections$selections[[selectedSample]]) == 0) {
       facsSelections$selections[[selectedSample]] <- NULL
     }
-
+    
     # Aggiorna il selettore gerarchico
     remainingSelections <- character(0)
     if (!is.null(facsSelections$selections[[selectedSample]])) {
       remainingSelections <- names(facsSelections$selections[[selectedSample]])
     }
-
+    
     updateSelectInput(session, "facs_hierarchySelector",
                       choices = c("None", remainingSelections),
                       selected = "None")
-
+    
     numRemoved <- length(selectionsToRemove)
     manageSpinner(FALSE)
     if (numRemoved == 1) {
@@ -6959,23 +6959,23 @@ server <- function(input, output, session) {
       showAlert("Success", paste("Level", selectedLevel, "and", numRemoved-1, "descendants eliminated"), "success", 2000)
     }
   })
-
-
+  
+  
   # Gestione dei click per aggiungere punti al poligono
   observeEvent(input$facs_plot_click, {
     req(input$facs_plot_click)
-
+    
     # Aggiungi il punto cliccato alla lista
-    facsSelections$polygonPoints <- append(facsSelections$polygonPoints,
-                                           list(list(x = input$facs_plot_click$x,
+    facsSelections$polygonPoints <- append(facsSelections$polygonPoints, 
+                                           list(list(x = input$facs_plot_click$x, 
                                                      y = input$facs_plot_click$y)))
   })
-
+  
   # Cancella il poligono
   observeEvent(input$facs_clearPolygon, {
     facsSelections$polygonPoints <- list()
   })
-
+  
   # Conferma la selezione e crea una nuova entry nella gerarchia
   observeEvent(input$facs_confirmSelection, {
     req(input$facs_sampleSelector)
@@ -6986,18 +6986,18 @@ server <- function(input, output, session) {
         showAlert("Error", "Servono almeno 3 punti per creare una selezione poligonale", "error", 3000)
         return()
       }
-
+      
       selectionName <- input$facs_selectionName
       selectedSample <- input$facs_sampleSelector
-
+      
       if(selectionName == "" || (!is.null(facsSelections$selections[[selectedSample]]) && selectionName %in% names(facsSelections$selections[[selectedSample]]))) {
         showAlert("Error", "Nome della selezione non valido o già esistente per questo campione", "error", 3000)
         return()
       }
-
+      
       hierarchyLevel <- input$facs_hierarchySelector
       currentData <- NULL
-
+      
       if(is.null(hierarchyLevel) || hierarchyLevel == "" || length(hierarchyLevel) == 0 || hierarchyLevel == "None") {
         currentData <- rawfacsResult$Initdata
       } else {
@@ -7007,36 +7007,36 @@ server <- function(input, output, session) {
           currentData <- rawfacsResult$Initdata
         }
       }
-
+      
       channelx <- input$facs_xChannel
       channely <- input$facs_yChannel
-
+      
       # Crea il poligono dalle coordinate
       polygon_coords <- data.frame(
         x = sapply(facsSelections$polygonPoints, function(p) p$x),
         y = sapply(facsSelections$polygonPoints, function(p) p$y)
       )
-
+      
       filteredData <- filterFACSDataByPolygon(currentData, polygon_coords, channelx, channely, selectedSample)
-
+      
       if(is.null(filteredData)) {
         showAlert("Error", "Nessun dato nella selezione effettuata", "error", 3000)
         return()
       }
-
+      
       if(is.null(facsSelections$selections[[selectedSample]])) {
         facsSelections$selections[[selectedSample]] <- list()
       }
-
+      
       facsSelections$selections[[selectedSample]][[selectionName]] <- list(
         data = filteredData,
         parent = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) selectedSample else hierarchyLevel,
         polygon = polygon_coords,
         channels = c(channelx, channely),
         sample = selectedSample,
-        depth = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) ">" else
+        depth = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) ">" else 
           paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$depth, ">"),
-        name = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) paste0(selectedSample, "/", selectionName) else
+        name = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) paste0(selectedSample, "/", selectionName) else 
           paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$name, "/", selectionName),
         n_cells = nrow(exprs(filteredData@frames[[selectedSample]])),
         statistic = if (hierarchyLevel=="None") {
@@ -7046,15 +7046,15 @@ server <- function(input, output, session) {
               nrow(exprs(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data@frames[[selectedSample]])) ) * 100
         }
       )
-
+      
       availableSelections <- names(facsSelections$selections[[selectedSample]])
-      updateSelectInput(session, "facs_hierarchySelector",
+      updateSelectInput(session, "facs_hierarchySelector", 
                         choices = c("None",availableSelections),
                         selected = selectionName)
-
+      
       # Reset dei punti del poligono
       facsSelections$polygonPoints <- list()
-
+      
       removeModal()
       manageSpinner(FALSE)
       showAlert("Success", paste("Selezione", selectionName, "creata con successo per il campione", selectedSample), "success", 2000)
@@ -7064,46 +7064,46 @@ server <- function(input, output, session) {
     }
   })
 
-
+  
   # Salva le selezioni di un sample
-  saveSampleSelections <- function(sampleName) {
-    if (!is.null(facsSelections$selections[[sampleName]])){
-      return(facsSelections$selections[[sampleName]])
-    } else {
-      return(NULL)
-    }
+  saveSampleSelections <- function(sampleName) { 
+    if (!is.null(facsSelections$selections[[sampleName]])){ 
+      return(facsSelections$selections[[sampleName]]) 
+    } else { 
+      return(NULL) 
+    } 
   }
-
-  # Applica selezioni salvate a un nuovo sample
-  applySelectionsToSample <- function(savedSelections, newSample, data) {
-    if (is.null(savedSelections) || length(savedSelections) == 0)
+  
+  # Applica selezioni salvate a un nuovo sample 
+  applySelectionsToSample <- function(savedSelections, newSample, data) { 
+    if (is.null(savedSelections) || length(savedSelections) == 0) 
       return(NULL)
-
+    
     newSelections <- list()
     savedSelections <- savedSelections[order(vapply(savedSelections, function(sel) nchar(sel$depth), integer(1)))]
-    for (selName in names(savedSelections)){
-      sel <- savedSelections[[selName]]
-
+    for (selName in names(savedSelections)){ 
+      sel <- savedSelections[[selName]] 
+      
       is_root <- identical(sel$parent, sel$sample)
       if (!is_root && is.null(newSelections[[sel$parent]])) next
       parent_data <- if (is_root) data else newSelections[[sel$parent]]$data
       filteredData <- filterFACSDataByPolygon(
         parent_data,
-        sel$polygon,
-        sel$channels[1],
-        sel$channels[2],
+        sel$polygon, 
+        sel$channels[1], 
+        sel$channels[2], 
         newSample
-      )
-
-      if (!is.null(filteredData)) {
-        newSelections[[selName]] <- list(
-          data = filteredData,
-          parent = if(sel$parent == sel$sample) newSample else sel$parent,
-          polygon = sel$polygon,
-          channels = sel$channels,
-          sample = newSample,
-          depth = sel$depth,
-          name = gsub(sel$sample, newSample, sel$name, fixed = TRUE),
+      ) 
+      
+      if (!is.null(filteredData)) { 
+        newSelections[[selName]] <- list( 
+          data = filteredData, 
+          parent = if(sel$parent == sel$sample) newSample else sel$parent, 
+          polygon = sel$polygon, 
+          channels = sel$channels, 
+          sample = newSample, 
+          depth = sel$depth, 
+          name = gsub(sel$sample, newSample, sel$name, fixed = TRUE), 
           n_cells = nrow(exprs(filteredData@frames[[newSample]])),
           statistic = if (is.null(newSelections[[sel$parent]])) {
             (nrow(exprs(filteredData@frames[[newSample]])) / nrow(exprs(rawfacsResult$Initdata@frames[[newSample]]))) * 100
@@ -7111,18 +7111,18 @@ server <- function(input, output, session) {
             ( nrow(exprs(filteredData@frames[[newSample]])) /
                 nrow(exprs(newSelections[[sel$parent]]$data@frames[[newSample]])) ) * 100
           }
-        )
-      }
-    }
-
-    return(newSelections)
+        ) 
+      } 
+    } 
+    
+    return(newSelections) 
   }
 
   observeEvent(input$facs_saveSelections, {
     manageSpinner(TRUE)
     req(input$facs_sampleSelector, input$facs_hierarchyName)
     sel <- saveSampleSelections(input$facs_sampleSelector)
-
+    
     if (is.null(sel)) {
       manageSpinner(FALSE)
       showAlert("Error", "No selections available to save for this sample", "error", 3000)
@@ -7135,72 +7135,72 @@ server <- function(input, output, session) {
       # Salva la gerarchia con il nome scelto
       savedHierarchies$data[[input$facs_hierarchyName]] <- sel
       mapping_sample$data[[input$facs_sampleSelector]] <- input$facs_hierarchyName
-
+      
       manageSpinner(FALSE)
       showAlert("Success", paste("Hierarchy saved as", input$facs_hierarchyName), "success", 2000)
     }
     updateTextInput(session, "facs_hierarchyName", value = "")
   })
-
+  
   observeEvent(input$facs_loadSelections, {
     manageSpinner(TRUE)
     req(input$facs_hierarchySelector_saved, input$facs_sampleSelector, rawfacsResult$Initdata)
-
+    
     if (input$facs_hierarchySelector_saved == "None") {
       manageSpinner(FALSE)
       showAlert("Error", "Please select a valid hierarchy", "error", 3000)
       return(NULL)
     }
-
+    
     selectedHierarchy <- savedHierarchies$data[[input$facs_hierarchySelector_saved]]
     newSample <- input$facs_sampleSelector
     
     newSel <- applySelectionsToSample(selectedHierarchy, newSample, rawfacsResult$Initdata)
-
+    
     if (is.null(newSel)) {
       manageSpinner(FALSE)
       showAlert("Error", "Could not apply saved hierarchy to this sample", "error", 3000)
     } else {
       facsSelections$selections[[newSample]] <- newSel
-      updateSelectInput(session, "facs_hierarchySelector",
+      updateSelectInput(session, "facs_hierarchySelector", 
                         choices = c("None", names(facsSelections$selections[[newSample]])),
                         selected = NULL)
-
+      
       mapping_sample$data[[input$facs_sampleSelector]] <- input$facs_hierarchySelector_saved
-
+      
       manageSpinner(FALSE)
-      showAlert("Success", paste("Hierarchy", input$facs_hierarchySelector_saved,
+      showAlert("Success", paste("Hierarchy", input$facs_hierarchySelector_saved, 
                                  "applied to sample", newSample), "success", 2000)
-
+      
     }
   })
   
   output$facs_hierarchySelectorUI <- renderUI({
     choices <- c("None", names(savedHierarchies$data))
-
+    
     # Se ci sono nuove gerarchie, seleziona l'ultima salvata
     selected_choice <- if (length(names(savedHierarchies$data)) > 0) {
       tail(names(savedHierarchies$data), 1)
     } else {
       "None"
     }
-
+    
     selectInput("facs_hierarchySelector_saved", "Select Hierarchy",
                 choices = choices,
                 selected = selected_choice)
   })
-
+  
   observeEvent(input$facs_normalizeButton,{
     req(input$facs_sampleSelector_to_norm,input$facs_sampleSelector_normalizer)
     manageSpinner(TRUE)
-
-    if(is.null(mapping_sample$data[[input$facs_sampleSelector_to_norm]]) || is.null(mapping_sample$data[[input$facs_sampleSelector_normalizer]])
+    
+    if(is.null(mapping_sample$data[[input$facs_sampleSelector_to_norm]]) || is.null(mapping_sample$data[[input$facs_sampleSelector_normalizer]]) 
        || mapping_sample$data[[input$facs_sampleSelector_to_norm]] != mapping_sample$data[[input$facs_sampleSelector_normalizer]]){
       manageSpinner(FALSE)
       showAlert("Error", "Both samples must belong to the same saved hierarchy selection to perform normalization", "error", 3000)
       return(NULL)
     }
-
+    
     #divide the number of cells of every level of to norm by n_cell of that level of normalizer
     sampleToNorm <- input$facs_sampleSelector_to_norm
     sampleNormalizer <- input$facs_sampleSelector_normalizer
@@ -7209,14 +7209,14 @@ server <- function(input, output, session) {
       showAlert("Error", "Both samples must have selections to perform normalization", "error", 3000)
       return(NULL)
     }
-
-
+    
+    
     for(nameList in names(facsSelections$selections[[sampleToNorm]])) {
-
+      
       selToNorm <- facsSelections$selections[[sampleToNorm]][[nameList]]
       selNormalizer <- facsSelections$selections[[sampleNormalizer]][[nameList]]
       sample_depth <- facsSelections$selections[[sampleToNorm]][[nameList]]$depth
-
+      
       facsSelections$selections[[sampleToNorm]][[nameList]]$n_cells <- round((selToNorm$n_cells / selNormalizer$n_cells) * 100,0)
       if (sample_depth==">") {
         facsSelections$selections[[sampleToNorm]][[nameList]]$statistic <- (facsSelections$selections[[sampleToNorm]][[nameList]]$n_cells / nrow(exprs(rawfacsResult$Initdata@frames[[sampleToNorm]]))) * 100
@@ -7228,16 +7228,16 @@ server <- function(input, output, session) {
     }
     manageSpinner(FALSE)
   })
-
+  
   # Output per verificare se ci sono selezioni
   output$facs_hasSelections <- reactive({
     length(facsSelections$selections) > 0 || !is.null(facsSelections$currentPlot)
   })
   outputOptions(output, "facs_hasSelections", suspendWhenHidden = FALSE)
-
+  
   # Output informativo sulle selezioni create
   facsSelectionTable <- reactive({
-
+    
     all_selections <- data.frame(
       Depth = character(),
       Name = character(),
@@ -7245,8 +7245,8 @@ server <- function(input, output, session) {
       Cells = numeric(),
       stringsAsFactors = FALSE
     )
-
-    # Aggiungi i livelli "None"
+    
+    # Aggiungi i livelli "None" 
     if (!is.null(rawfacsResult$Initdata)) {
       sampleNames_data <- sampleNames(rawfacsResult$Initdata)
       for (sampleName in sampleNames_data) {
@@ -7260,7 +7260,7 @@ server <- function(input, output, session) {
         ))
       }
     }
-
+    
     # Aggiungi le selezioni create
     if (length(facsSelections$selections) > 0) {
       for (sampleName in names(facsSelections$selections)) {
@@ -7281,57 +7281,57 @@ server <- function(input, output, session) {
   })
   output$facs_selectionsInfo <- renderTable(facsSelectionTable())
   observe({ rawfacsResult$tableSelections <- facsSelectionTable() })
-
-
+  
+  
   # Funzione per verificare se un punto è dentro un poligono (algoritmo ray casting)
   pointInPolygon <- function(x, y, polygon) {
     n <- nrow(polygon)
     inside <- FALSE
-
+    
     j <- n
     for(i in 1:n) {
       if(((polygon[i, "y"] > y) != (polygon[j, "y"] > y)) &&
-         (x < (polygon[j, "x"] - polygon[i, "x"]) * (y - polygon[i, "y"]) /
+         (x < (polygon[j, "x"] - polygon[i, "x"]) * (y - polygon[i, "y"]) / 
           (polygon[j, "y"] - polygon[i, "y"]) + polygon[i, "x"])) {
         inside <- !inside
       }
       j <- i
     }
-
+    
     return(inside)
   }
-
+  
   # Filtra i dati basandosi sulla selezione del poligono per il campione specifico
   filterFACSDataByPolygon <- function(data, polygon_coords, channelx, channely, selectedSample) {
     tryCatch({
       filtered_frames <- list()
-
+      
       if(!selectedSample %in% sampleNames(data)) {
         return(NULL)
       }
-
+      
       frame <- data@frames[[selectedSample]]
       expr_data <- exprs(frame)
-
+      
       # Controlla ogni punto per vedere se è dentro il poligono
       mask <- logical(nrow(expr_data))
       for(i in 1:nrow(expr_data)) {
         mask[i] <- pointInPolygon(expr_data[i, channelx], expr_data[i, channely], polygon_coords)
       }
-
+      
       # Crea il nuovo frame filtrato
       filtered_expr <- expr_data[mask, , drop = FALSE]
-
+      
       if(ncol(filtered_expr) > 0) {
         filtered_frame <- flowCore::flowFrame(
           exprs = filtered_expr,
           parameters = parameters(frame),
           description = flowCore::keyword(frame)
         )
-
+        
         filtered_frames[[selectedSample]] <- filtered_frame
         filtered_flowset <- flowCore::flowSet(filtered_frames)
-
+        
         return(filtered_flowset)
       } else {
         return(NULL)
@@ -7341,58 +7341,58 @@ server <- function(input, output, session) {
       return(NULL)
     })
   }
-
-
+  
+  
   output$downloadRawFacsAnalysis <- downloadHandler(
     filename = function() {
       paste('RawFacsanalysis-', Sys.Date(), '.zip', sep='')
     },
     content = function(file) {
       manageSpinner(TRUE)
-
+      
       tempDir <- tempdir()
       nomeRDS <- paste0("RawFacs_analysis-", Sys.Date(), ".rds")
       nomeXLSX <- paste0("RawFacs_analysis-", Sys.Date(), ".xlsx")
-
+      
       tempRdsPath <- file.path(tempDir, nomeRDS)
       tempXlsxPath <- file.path(tempDir, nomeXLSX)
-
+      
       saveRDS(rawfacsResult$tableSelections, file = tempRdsPath)
-
+      
       saveExcel(filename = tempXlsxPath, ResultList=rawfacsResult$tableSelections, analysis = "RAWFACS")
-
+      
       zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
       manageSpinner(FALSE)
-    }
+    } 
   )
-
+  
   observeEvent(input$NextFacsHierarchicalGating,{
     if(!is.null(rawfacsResult$tableSelections)){
       alert$alertContext <- ""
       FlagsFACS$actualLevel <- NULL
-
-      for(nameList in names(facsResult0))
+      
+      for(nameList in names(facsResult0)) 
         facsResult[[nameList]] <- facsResult0[[nameList]]
-
+      
       mess = rawfacsResult$tableSelections
-
+      
       if (setequal(names(mess), c("message", "call"))) {
         showAlert("Error", mess[["message"]], "error", 5000)
       } else {
         if (nrow(mess) > 1) {
-          data <- mess
+          data <- mess  
           facsResult$Initdata <- data
-
+          
           facsResult$depth <- vector("list", nrow(data))
           facsResult$depthCount <- numeric(nrow(data))
           facsResult$name <- vector("list", nrow(data))
           facsResult$statistics <- vector("list", nrow(data))
           facsResult$cells <- vector("list", nrow(data))
           facsResult$originalName <- vector("list", nrow(data))
-
+          
           for (i in 1:nrow(data)) {
             x <- data[i, 1]
-
+            
             if (is.na(x)) {
               facsResult$depth[i] <- NA
               facsResult$depthCount[i] <- 0
@@ -7400,26 +7400,26 @@ server <- function(input, output, session) {
               facsResult$statistics[i] <- data[i, 3]
               facsResult$cells[i] <- data[i, 4]
             } else {
-              x_cleaned <- gsub(" ", "", x)
-              facsResult$depth[i] <- x
+              x_cleaned <- gsub(" ", "", x)  
+              facsResult$depth[i] <- x 
               facsResult$depthCount[i] <- str_count(x_cleaned, fixed(">"))
               facsResult$name[i] <- data[i, 2]
               facsResult$statistics[i] <- data[i, 3]
               facsResult$cells[i] <- data[i, 4]
             }
           }
-
+          
           removeModal()
           maxDepth <- max(facsResult$depthCount, na.rm = TRUE)
           showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
-
+          
           output$dynamicSelectize <- renderUI({
             updateSelectizeUI(maxDepth)
           })
-
+          
           FlagsFACS$actualLevel <- 0
           updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
-
+          
         }
       }
     }
@@ -7427,12 +7427,12 @@ server <- function(input, output, session) {
     updateTabsetPanel(session, "SideTabs",
                       selected = "tablesFACS")
   })
-
-
-
+  
+  
+  
   #### END RAW FACS analysis ####
   
-
+  
   #### FACS analysis ####
   facsResult = reactiveValues(
     Initdata= NULL,
@@ -8325,7 +8325,7 @@ server <- function(input, output, session) {
              # Run statistical tests
              res <- testStat.function(resultsNew[, c("ExpCond", "Values")] %>% as_tibble())
              testResults <- list(
-               BivTest = res$BivTest, MulvTest = res$MulvTest,
+               BivTest = res$BivTest, MulvTest = res$MulvTest, 
                PairwiseTest = res$pairwise, steps = res$steps, path = res$path
              )
              
@@ -8381,7 +8381,7 @@ server <- function(input, output, session) {
                testResults$steps <- "The number of values per group has to be greater than 2."
              } else {
                testResults <- list(
-                 BivTest = res$BivTest, MulvTest = res$MulvTest,
+                 BivTest = res$BivTest, MulvTest = res$MulvTest, 
                  PairwiseTest = res$pairwise, steps = res$steps, path = res$path
                )
              }
