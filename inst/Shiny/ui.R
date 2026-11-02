@@ -1630,20 +1630,21 @@ ui <- dashboardPage(
       ),
       tabItem(tabName = "plotRawFACS",
               h2("Raw FACS data analysis"),
+              # fluidRow(
+              #   tags$head(
+              #     tags$style(HTML("
+              #   #rawFACSmatrix { 
+              #     float: center;
+              #   }
+              # "))
+              #   ),
+              #   column(12, 
+              #          tableOutput("rawFACSmatrix")          
+              #   )
+              # ),
               fluidRow(
-                tags$head(
-                  tags$style(HTML("
-                #rawFACSmatrix { 
-                  float: center;
-                }
-              "))
-                ),
-                column(12, 
-                       tableOutput("rawFACSmatrix")          
-                )
-              ),
-              fluidRow(
-              box(width = 12,
+              box(width = 12,collapsible = T,
+                  title = "Whole overview", status = "primary", solidHeader = TRUE,
                   fluidRow(
                     column(
                       4,
@@ -1652,16 +1653,20 @@ ui <- dashboardPage(
                     column(
                       4,
                       selectInput("facs_yChannel", "Y-axis Channel", choices = NULL)
-                    ),
-                    column(
-                      3,
-                      actionButton("facs_plotChannelButton", "Plot")
                     )
                   ),
                   fluidRow(
-                    plotOutput("facs_ChannelscatterPlot"),
-                    #plotOutput("facs_autoPlot",height = "800px")
-                  )
+                    column(6, selectInput("facs_overviewGate", "Overview population / gate",
+                                          choices = c("All cells" = ""))),
+                    column(3, checkboxInput("facs_overviewShowGates", "Show gate outlines", TRUE)),
+                    column(3, actionButton("facs_plotChannelButton", "Plot") )
+                  ),
+                  helpText("All samples keep their position. Samples without the selected gate have an empty panel. Outlines are shown only for gates defined on the selected channels."),
+                  fluidRow(
+                    column(12, uiOutput("facs_overviewPlotUI", width = "100%"))
+                  ),
+                  actionButton("CustomizeOverviewFACS", "Customize or Download Overview",
+                               icon = icon("paint-brush"))
               )),
               fluidRow(
                 # Nuova sezione per la selezione gerarchica
@@ -1680,7 +1685,6 @@ ui <- dashboardPage(
                                          selected = NULL)
                       )
                     ),
-                    
                     fluidRow(
                       column(8,
                              plotOutput("facs_previewPlot", height = "300px"),
@@ -1709,8 +1713,11 @@ ui <- dashboardPage(
                                  actionButton("facs_saveSelections", "Save", class = "btn-success", style = "width: 30%;")
                              ),
                              div(style = "display: flex; gap: 10px; align-items: center; margin-top: 10px;",
-                                 uiOutput("facs_hierarchySelectorUI", style = "width: 70%;"),
-                                 actionButton("facs_loadSelections", "Apply", class = "btn-info", style = "width: 30%;")
+                                 uiOutput("facs_hierarchySelectorUI", style = "flex: 1; min-width: 0;"),
+                                 div(style = "display: flex; flex-direction: column; gap: 5px;",
+                                     actionButton("facs_loadSelections", "Apply", class = "btn-info"),
+                                     actionButton("facs_loadSelectionsAll", "Apply to all", class = "btn-info")
+                                 )
                              )
                       )
                     ),

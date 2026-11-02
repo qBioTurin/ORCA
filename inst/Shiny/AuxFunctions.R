@@ -1330,17 +1330,22 @@ updateTable <- function(analysis, info, color_code, result, flag, session) {
   return(paste("Updated values: ", new_value))
 }
 
-updateSelectizeUI <- function(maxDepth) {
+facsGateInputId <- function(level, generation = NULL) {
+  paste0("FACScell_", level, if (length(generation) && generation > 0) paste0("_run", generation) else "")
+}
+
+updateSelectizeUI <- function(maxDepth, generation = NULL, firstChoices = character(0)) {
   rowContent <- fluidRow(
-    lapply(1:maxDepth, function(i) {
+    lapply(seq_len(maxDepth), function(i) {
       column(
         2, offset = 1,
-        tags$div(style = "display: none;", id = paste("div_FACScell", i, sep = ""),
+        tags$div(style = if (i == 1L) "display: block;" else "display: none;",
+                  id = paste0("div_", facsGateInputId(i, generation)),
                  selectizeInput(
-                   inputId = paste("FACScell", i, sep = "_"),
+                   inputId = facsGateInputId(i, generation),
                    label = paste("Gate", i),
-                   choices = c(),
-                   options = list(placeholder = 'Select the next gate', create = TRUE)
+                   choices = if (i == 1L) firstChoices else character(0), selected = character(0),
+                   options = list(placeholder = 'Select the next gate', create = FALSE)
                  )
         )
       )
@@ -1370,8 +1375,8 @@ loadDrop <- function(facsResult, FlagsFACS, session) {
     short_names <- "no valid names found"
   }
   
-  nextInputId <- paste("FACScell", targetLevel, sep = "_")
-  nextDivId <- paste("div_FACScell", targetLevel, sep = "")
+  nextInputId <- facsGateInputId(targetLevel, FlagsFACS$generation)
+  nextDivId <- paste0("div_", nextInputId)
   
   if (length(short_names) == 0) {
     updateSelectInput(session, nextInputId, choices = list("No choices available" = ""), selected = "")
@@ -2206,7 +2211,8 @@ generateLayerParameters <- function(plot) {
         # Common controls for all layers
         sliderInput(
           paste0("layerSize_", i), "Layer Size", 
-          min = 1, max = 5, value = extract_aes_value("size", 1,1)
+          min = 0, max = max(5, extract_aes_value("size", 1, 1)),
+          step = 0.1, value = extract_aes_value("size", 1, 1)
         ),
         
         # Layer-specific customization
@@ -2857,3 +2863,98 @@ savePlotAsPNG <- function(plot, filePath, width, height, dpi) {
 
 
 
+
+# Size the on-screen overview without changing the user's export dimensions.
+facsOverviewHeight <- function(plot) {
+  if (is.null(plot)) return(400L)
+  # Factor levels retain panels for samples with an empty selected population.
+  sampleCount <- nlevels(plot$data$Name)
+  columns <- plot$facet$params$ncol
+  rows <- max(1L, ceiling(sampleCount / columns))
+  # Reserve space for the title/axes and 150 pixels for every row of samples.
+  100L + 150L * rows
+}
+
+# Relative paths distinguish identically named gates under different parents.
+facsOverviewGatePaths <- function(selections, sample) {
+  vapply(names(selections), function(key) {
+    path <- selections[[key]]$name
+    prefix <- paste0(sample, "/")
+    if (length(path) == 1L && startsWith(path, prefix)) {
+      substring(path, nchar(prefix) + 1L)
+    } else key
+  }, character(1))
+}
+
+buildFACSOverview <- function(data, selections, channelx, channely,
+                              gate = "", showGates = TRUE, settings = list()) {
+  samples <- flowCore::sampleNames(data)
+  points <- list()
+  outlines <- list()
+  for (sample in samples) {
+    sampleSelections <- selections[[sample]]
+    paths <- facsOverviewGatePaths(sampleSelections, sample)
+    selectedKey <- if (nzchar(gate)) names(paths)[paths == gate] else character(0)
+    if (nzchar(gate) && length(selectedKey) != 1L) next
+    frame <- if (nzchar(gate)) {
+      selectedData <- sampleSelections[[selectedKey]]$data
+      if (is.null(selectedData) || !sample %in% flowCore::sampleNames(selectedData)) next
+      selectedData[[sample]]
+    } else data[[sample]]
+    values <- flowCore::exprs(frame)
+    if (!all(c(channelx, channely) %in% colnames(values))) next
+    points[[sample]] <- data.frame(x = values[, channelx], y = values[, channely],
+                                  Name = rep(sample, nrow(values)))
+    if (!showGates) next
+    for (key in names(sampleSelections)) {
+      selection <- sampleSelections[[key]]
+      # Show the selected boundary and its children (root gates for all cells).
+      parent <- if (nzchar(gate)) selectedKey else sample
+      if (!identical(key, selectedKey) && !identical(selection$parent, parent)) next
+      polygon <- selection$polygon
+      if (is.null(polygon) || nrow(polygon) < 3L || length(selection$channels) < 2L) next
+      if (identical(unname(selection$channels[1:2]), c(channelx, channely))) {
+        coords <- polygon[, c("x", "y")]
+      } else if (identical(unname(selection$channels[1:2]), c(channely, channelx))) {
+        coords <- data.frame(x = polygon$y, y = polygon$x)
+      } else next
+      coords <- rbind(coords, coords[1, , drop = FALSE])
+      coords$Name <- sample
+      coords$Gate <- paths[[key]]
+      outlines[[length(outlines) + 1L]] <- coords
+    }
+  }
+  if (!length(samples)) return(NULL)
+  defaults <- list(title = "", color = "blue", size = 0.8, alpha = 0.5,
+                   fontSize = 12, columns = 3)
+  style <- utils::modifyList(defaults, settings)
+  expr <- if (length(points)) do.call(rbind, points) else {
+    data.frame(x = numeric(0), y = numeric(0), Name = character(0))
+  }
+  expr$Name <- factor(expr$Name, levels = samples)
+  title <- if (nzchar(style$title)) style$title else {
+    if (nzchar(gate)) paste("Population:", gate) else "All samples"
+  }
+  plot <- ggplot2::ggplot(expr, ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_point(alpha = style$alpha, color = style$color, size = style$size) +
+    ggplot2::labs(x = channelx, y = channely, title = title) +
+    ggplot2::theme_minimal(base_size = style$fontSize) +
+    ggplot2::facet_wrap(~Name, ncol = style$columns, drop = FALSE)
+  # A layout-only layer also keeps every panel when no sample has this gate.
+  if (nrow(expr) == 0L) {
+    plot <- plot + ggplot2::geom_blank(
+      data = data.frame(Name = factor(samples, levels = samples)), inherit.aes = FALSE)
+  }
+  if (length(outlines)) {
+    polygons <- do.call(rbind, outlines)
+    polygons$Name <- factor(polygons$Name, levels = samples)
+    plot <- plot + ggplot2::geom_path(
+      data = polygons, ggplot2::aes(x = x, y = y, group = Gate),
+      inherit.aes = FALSE, color = "purple", linewidth = 0.6, linetype = "dashed") +
+      ggplot2::geom_text(data = polygons[!duplicated(polygons[c("Name", "Gate")]), ],
+                        ggplot2::aes(x = x, y = y, label = Gate),
+                        inherit.aes = FALSE, color = "purple", size = 3,
+                        hjust = 0, vjust = -0.5, check_overlap = TRUE)
+  }
+  plot
+}

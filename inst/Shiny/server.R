@@ -6019,7 +6019,8 @@ server <- function(input, output, session) {
           # Common controls for all layers
           sliderInput(
             paste0("layerSize_", i), "Layer Size", 
-            min = 1, max = 5, value = extract_aes_value("size", 1,1)
+            min = 0, max = max(5, extract_aes_value("size", 1, 1)),
+          step = 0.1, value = extract_aes_value("size", 1, 1)
           ),
           
           # Layer-specific customization
@@ -6787,7 +6788,7 @@ server <- function(input, output, session) {
                       selected = NULL)
   })
   
-  output$facs_previewPlot <- renderPlot({
+  facsPreviewPlot <- reactive({
     req(input$facs_sampleSelector, input$facs_hierarchySelector)
     
     selectedSample <- input$facs_sampleSelector
@@ -6809,7 +6810,7 @@ server <- function(input, output, session) {
     channely <- input$facs_yChannel
     
     sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
-    sample_expr$Name <- selectedSample
+    sample_expr$Name <- rep(selectedSample, nrow(sample_expr))
     
     p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
       geom_point(alpha = 0.5, color = "blue", size = 0.8) +
@@ -6893,9 +6894,11 @@ server <- function(input, output, session) {
                        fill = "red", alpha = 0.3)
       }
     }
-    rawfacsResult$previewPlot <- p
     p
   })
+
+  observe({ rawfacsResult$previewPlot <- facsPreviewPlot() })
+  output$facs_previewPlot <- renderPlot({ req(rawfacsResult$previewPlot) })
   
   observeEvent(input$CustomizePlotFACS, {
     layer_tabs <- generateLayerParameters(rawfacsResult$previewPlot)
@@ -6943,40 +6946,97 @@ server <- function(input, output, session) {
   observeEvent(input$applyChangesRAWFACS, {
     updatedPlot<-customizePlot(rawfacsResult$previewPlot ,input)
     rawfacsResult$previewPlot<- updatedPlot
-    output$facs_previewPlot <- renderPlot({updatedPlot})
     removeModal()
   })
   
+  facsOverviewSettings <- reactiveVal(list())
+
+  observe({
+    samples <- if (is.null(rawfacsResult$Initdata)) character(0) else sampleNames(rawfacsResult$Initdata)
+    paths <- unique(unlist(lapply(samples, function(sample) {
+      facsOverviewGatePaths(facsSelections$selections[[sample]], sample)
+    }), use.names = FALSE))
+    current <- isolate(input$facs_overviewGate)
+    selected <- if (length(current) == 1L && current %in% paths) current else ""
+    updateSelectInput(session, "facs_overviewGate",
+                      choices = c("All cells" = "", setNames(paths, paths)), selected = selected)
+  })
+
   observeEvent(input$facs_plotChannelButton, {
     req(rawfacsResult$Initdata, input$facs_xChannel, input$facs_yChannel)
-    
     facsSelections$currentPlot <- TRUE
-    data = rawfacsResult$Initdata
-    
-    # Extract expression matrix
-    expr = do.call(rbind,
-                   lapply(sampleNames(data), function(name){ 
-                     df = as.data.frame(exprs(data@frames[[name]])) 
-                     df$Name = name
-                     return(df)
-                   })
-    )
-    
-    channelx = input$facs_xChannel
-    channely = input$facs_yChannel
-    
-    output$facs_ChannelscatterPlot <- renderPlot({
-      ggplot(expr, aes(x = !!sym(channelx),  y = !!sym(channely) )) +
-        geom_point(alpha = 0.5, color = "blue") +
-        labs(x = channelx, y = channely) +
-        theme_minimal()+facet_wrap(~Name)
-    })
-    
-    output$facs_autoPlot <- renderPlot({
-      ggcyto::autoplot(data, channelx,channely)
-    })
   })
-  
+
+  facsOverviewPlot <- reactive({
+    req(facsSelections$currentPlot, rawfacsResult$Initdata,
+        input$facs_xChannel, input$facs_yChannel)
+    gate <- input$facs_overviewGate
+    if (is.null(gate)) gate <- ""
+    plot <- buildFACSOverview(rawfacsResult$Initdata, facsSelections$selections,
+                              input$facs_xChannel, input$facs_yChannel,
+                              gate, isTRUE(input$facs_overviewShowGates), facsOverviewSettings())
+    #validate(need(!is.null(plot), "No samples contain this gate and the selected channels."))
+    plot
+  })
+
+  output$facs_overviewPlotUI <- renderUI({
+    plotOutput("facs_ChannelscatterPlot", width = "100%",
+               height = paste0(facsOverviewHeight(facsOverviewPlot()), "px"))
+  })
+
+  output$facs_ChannelscatterPlot <- renderPlot({ facsOverviewPlot() })
+
+  observeEvent(input$CustomizeOverviewFACS, {
+    req(facsOverviewPlot())
+    settings <- utils::modifyList(list(title = "", color = "blue", size = 0.8,
+                                       alpha = 0.5, fontSize = 12, columns = 3), facsOverviewSettings())
+    showModal(modalDialog(
+      title = "Customize or Download Overview",
+      tabsetPanel(
+        tabPanel("Appearance",
+                 textInput("facsOverviewTitle", "Title (blank = automatic)", settings$title),
+                 colourpicker::colourInput("facsOverviewColor", "Point color", settings$color),
+                 sliderInput("facsOverviewSize", "Point size", min = 0.1, max = 5, value = settings$size),
+                 sliderInput("facsOverviewAlpha", "Point opacity", min = 0, max = 1, value = settings$alpha),
+                 numericInput("facsOverviewFont", "Font size", settings$fontSize, min = 6, max = 30),
+                 numericInput("facsOverviewColumns", "Panels per row", settings$columns, min = 1, max = 10)),
+        tabPanel("Save Plot", generateSavePlotTab())
+      ),
+      footer = tagList(actionButton("applyChangesOverviewFACS", "Apply Changes"),
+                       downloadButton("downloadOverviewFACS", "Download Plot"), modalButton("Close")),
+      easyClose = FALSE
+    ))
+  })
+
+  observeEvent(input$applyChangesOverviewFACS, {
+    req(input$facsOverviewColor, input$facsOverviewSize, input$facsOverviewFont,
+        input$facsOverviewColumns)
+    if (is.null(input$facsOverviewAlpha) || input$facsOverviewAlpha < 0 || input$facsOverviewAlpha > 1 ||
+        input$facsOverviewSize <= 0 || input$facsOverviewFont < 6 || input$facsOverviewFont > 30 ||
+        input$facsOverviewColumns < 1 || input$facsOverviewColumns > 10 ||
+        input$facsOverviewColumns != as.integer(input$facsOverviewColumns)) {
+      showAlert("Error", "Please enter valid appearance settings", "error", 3000)
+      return()
+    }
+    facsOverviewSettings(list(title = input$facsOverviewTitle, color = input$facsOverviewColor,
+                             size = input$facsOverviewSize, alpha = input$facsOverviewAlpha,
+                             fontSize = input$facsOverviewFont, columns = input$facsOverviewColumns))
+  })
+
+  output$downloadOverviewFACS <- downloadHandler(
+    filename = function() paste0("FACS_overview_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png"),
+    content = function(file) {
+      plot <- facsOverviewPlot()
+      req(input$plotWidth, input$plotHeight, input$plotResolution)
+      shiny::validate(shiny::need(all(is.finite(c(input$plotWidth, input$plotHeight, input$plotResolution))) &&
+                      min(input$plotWidth, input$plotHeight, input$plotResolution) > 0,
+                    "Plot dimensions and resolution must be positive."))
+      manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
+      savePlotAsPNG(plot, file, input$plotWidth, input$plotHeight, input$plotResolution)
+    }
+  )
+
   # Gestione del bottone per aprire il modal di selezione
   observeEvent(input$facs_openSelectionModal, {
     req(input$facs_sampleSelector)
@@ -7058,7 +7118,7 @@ server <- function(input, output, session) {
       channely <- input$facs_yChannel
       
       sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
-      sample_expr$Name <- selectedSample
+      sample_expr$Name <- rep(selectedSample, nrow(sample_expr))
       
       p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
         geom_point(alpha = 0.5, color = "blue", size = 0.8) +
@@ -7265,6 +7325,7 @@ server <- function(input, output, session) {
     req(input$facs_sampleSelector)
     if(input$facs_selectionName != ""){
       manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
       # Verifica che ci siano almeno 3 punti per formare un poligono
       if(length(facsSelections$polygonPoints) < 3) {
         showAlert("Error", "Servono almeno 3 punti per creare una selezione poligonale", "error", 3000)
@@ -7304,7 +7365,7 @@ server <- function(input, output, session) {
       filteredData <- filterFACSDataByPolygon(currentData, polygon_coords, channelx, channely, selectedSample)
       
       if(is.null(filteredData)) {
-        showAlert("Error", "Nessun dato nella selezione effettuata", "error", 3000)
+        showAlert("Error", "Impossibile applicare il gate: verificare campione, canali e poligono", "error", 3000)
         return()
       }
       
@@ -7323,12 +7384,8 @@ server <- function(input, output, session) {
         name = if(is.null(facsSelections$selections[[selectedSample]][[hierarchyLevel]])) paste0(selectedSample, "/", selectionName) else 
           paste0(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$name, "/", selectionName),
         n_cells = nrow(exprs(filteredData@frames[[selectedSample]])),
-        statistic = if (hierarchyLevel=="None") {
-          (nrow(exprs(filteredData@frames[[selectedSample]])) / nrow(exprs(rawfacsResult$Initdata@frames[[selectedSample]]))) * 100
-        } else {
-          ( nrow(exprs(filteredData@frames[[selectedSample]])) /
-              nrow(exprs(facsSelections$selections[[selectedSample]][[hierarchyLevel]]$data@frames[[selectedSample]])) ) * 100
-        }
+        statistic = facsGatePercentage(nrow(exprs(filteredData[[selectedSample]])),
+                                       nrow(exprs(currentData[[selectedSample]])))
       )
       
       availableSelections <- names(facsSelections$selections[[selectedSample]])
@@ -7358,45 +7415,43 @@ server <- function(input, output, session) {
     } 
   }
   
-  # Applica selezioni salvate a un nuovo sample 
-  applySelectionsToSample <- function(savedSelections, newSample, data) { 
-    if (is.null(savedSelections) || length(savedSelections) == 0) 
-      return(NULL)
-    
-    newSelections <- list() 
-    
-    for (selName in names(savedSelections)){ 
-      sel <- savedSelections[[selName]] 
-      
-      filteredData <- filterFACSDataByPolygon(
-        data, 
-        sel$polygon, 
-        sel$channels[1], 
-        sel$channels[2], 
-        newSample
-      ) 
-      
-      if (!is.null(filteredData)) { 
-        newSelections[[selName]] <- list( 
-          data = filteredData, 
-          parent = if(sel$parent == sel$sample) newSample else sel$parent, 
-          polygon = sel$polygon, 
-          channels = sel$channels, 
-          sample = newSample, 
-          depth = sel$depth, 
-          name = gsub(sel$sample, newSample, sel$name, fixed = TRUE), 
-          n_cells = nrow(exprs(filteredData@frames[[newSample]])),
-          statistic = if (is.null(newSelections[[sel$parent]])) {
-            (nrow(exprs(filteredData@frames[[newSample]])) / nrow(exprs(rawfacsResult$Initdata@frames[[newSample]]))) * 100
-          } else {
-            ( nrow(exprs(filteredData@frames[[newSample]])) /
-                nrow(exprs(newSelections[[sel$parent]]$data@frames[[newSample]])) ) * 100
-          }
-        ) 
-      } 
-    } 
-    
-    return(newSelections) 
+  facsGatePercentage <- function(count, parentCount) {
+    if (!is.finite(parentCount) || parentCount <= 0) return(0)
+    100 * count / parentCount
+  }
+
+  # Apply parents before children, retaining empty populations and their gates.
+  applySelectionsToSample <- function(savedSelections, newSample, data) {
+    if (length(savedSelections) == 0) return(NULL)
+    newSelections <- list()
+    pending <- names(savedSelections)
+    while (length(pending)) {
+      ready <- pending[vapply(pending, function(key) {
+        sel <- savedSelections[[key]]
+        identical(sel$parent, sel$sample) || sel$parent %in% names(newSelections)
+      }, logical(1))]
+      if (!length(ready)) return(NULL)
+      for (selName in ready) {
+        sel <- savedSelections[[selName]]
+        root <- identical(sel$parent, sel$sample)
+        parentData <- if (root) data else newSelections[[sel$parent]]$data
+        filteredData <- filterFACSDataByPolygon(parentData, sel$polygon,
+                                                sel$channels[1], sel$channels[2], newSample)
+        if (is.null(filteredData)) return(NULL)
+        count <- nrow(exprs(filteredData[[newSample]]))
+        parentCount <- nrow(exprs(parentData[[newSample]]))
+        newSelections[[selName]] <- list(
+          data = filteredData,
+          parent = if (root) newSample else sel$parent,
+          polygon = sel$polygon, channels = sel$channels, sample = newSample,
+          depth = if (root) ">" else paste0(newSelections[[sel$parent]]$depth, ">"),
+          name = paste0(if (root) newSample else newSelections[[sel$parent]]$name, "/", selName),
+          n_cells = count, statistic = facsGatePercentage(count, parentCount)
+        )
+      }
+      pending <- setdiff(pending, ready)
+    }
+    newSelections
   }
 
   observeEvent(input$facs_saveSelections, {
@@ -7423,39 +7478,98 @@ server <- function(input, output, session) {
     updateTextInput(session, "facs_hierarchyName", value = "")
   })
   
-  observeEvent(input$facs_loadSelections, {
+  pendingFACSHierarchy <- reactiveVal(NULL)
+
+  applyFACSHierarchyRequest <- function(request) {
+    if (!identical(request$data, rawfacsResult$Initdata)) {
+      showAlert("Error", "The loaded samples have changed. Please apply the hierarchy again.", "error", 4000)
+      return(invisible(NULL))
+    }
     manageSpinner(TRUE)
-    req(input$facs_hierarchySelector_saved, input$facs_sampleSelector, rawfacsResult$Initdata)
-    
-    if (input$facs_hierarchySelector_saved == "None") {
-      manageSpinner(FALSE)
-      showAlert("Error", "Please select a valid hierarchy", "error", 3000)
-      return(NULL)
+    on.exit(manageSpinner(FALSE), add = TRUE)
+    applied <- character(0)
+    failed <- character(0)
+    for (sampleName in request$samples) {
+      newSel <- applySelectionsToSample(request$hierarchy, sampleName, request$data)
+      if (length(newSel) == 0) {
+        failed <- c(failed, sampleName)
+      } else {
+        # Replace the entire previous hierarchy, including obsolete gate names.
+        facsSelections$selections[[sampleName]] <- newSel
+        mapping_sample$data[[sampleName]] <- request$name
+        applied <- c(applied, sampleName)
+      }
     }
-    
-    selectedHierarchy <- savedHierarchies$data[[input$facs_hierarchySelector_saved]]
-    newSample <- input$facs_sampleSelector
-    
-    newSel <- applySelectionsToSample(selectedHierarchy, newSample, rawfacsResult$Initdata)
-    
-    if (is.null(newSel)) {
-      manageSpinner(FALSE)
-      showAlert("Error", "Could not apply saved hierarchy to this sample", "error", 3000)
+    if (length(input$facs_sampleSelector) == 1 && input$facs_sampleSelector %in% applied) {
+      facsSelections$polygonPoints <- list()
+      updateSelectInput(session, "facs_hierarchySelector",
+                        choices = c("None", names(facsSelections$selections[[input$facs_sampleSelector]])),
+                        selected = "None")
+    }
+    message <- paste("Hierarchy", request$name, "applied to", length(applied), "of", length(request$samples), "samples.")
+    if (length(failed)) {
+      showAlert("Warning", paste(message, "No selections obtained; previous gates were kept for:",
+                                 paste(failed, collapse = ", ")), "warning", 6000)
     } else {
-      facsSelections$selections[[newSample]] <- newSel
-      updateSelectInput(session, "facs_hierarchySelector", 
-                        choices = c("None", names(facsSelections$selections[[newSample]])),
-                        selected = NULL)
-      
-      mapping_sample$data[[input$facs_sampleSelector]] <- input$facs_hierarchySelector_saved
-      
-      manageSpinner(FALSE)
-      showAlert("Success", paste("Hierarchy", input$facs_hierarchySelector_saved, 
-                                 "applied to sample", newSample), "success", 2000)
-      
+      showAlert("Success", message, "success", 3000)
     }
+  }
+
+  requestFACSHierarchy <- function(samples) {
+    req(rawfacsResult$Initdata, input$facs_hierarchySelector_saved, samples)
+    pendingFACSHierarchy(NULL)
+    hierarchyName <- input$facs_hierarchySelector_saved
+    hierarchy <- savedHierarchies$data[[hierarchyName]]
+    if (hierarchyName == "None" || length(hierarchy) == 0) {
+      showAlert("Error", "Please select a valid hierarchy", "error", 3000)
+      return(invisible(NULL))
+    }
+    request <- list(name = hierarchyName, hierarchy = hierarchy, samples = samples,
+                    data = rawfacsResult$Initdata)
+    existing <- samples[vapply(samples, function(sample) {
+      length(facsSelections$selections[[sample]]) > 0 || length(mapping_sample$data[[sample]]) > 0
+    }, logical(1))]
+    if (length(existing)) {
+      pendingFACSHierarchy(request)
+      showModal(modalDialog(
+        title = "Replace existing hierarchy?",
+        tags$p(paste("Apply hierarchy", shQuote(hierarchyName), "to", length(samples), "sample(s)?")),
+        tags$p("Existing gates will be replaced for the following samples:"),
+        tags$div(style = "max-height: 200px; overflow-y: auto;",
+                 tags$ul(lapply(existing, tags$li))),
+        tags$p("If no selections can be obtained for a sample, its previous gates will be kept and a warning will be shown."),
+        footer = tagList(actionButton("facs_cancelHierarchyReplace", "Cancel"),
+                         actionButton("facs_confirmHierarchyReplace", "Replace and apply", class = "btn-primary")),
+        easyClose = FALSE
+      ))
+    } else {
+      applyFACSHierarchyRequest(request)
+    }
+  }
+
+  observeEvent(input$facs_loadSelections, {
+    req(input$facs_sampleSelector)
+    requestFACSHierarchy(input$facs_sampleSelector)
   })
-  
+
+  observeEvent(input$facs_loadSelectionsAll, {
+    req(rawfacsResult$Initdata)
+    requestFACSHierarchy(sampleNames(rawfacsResult$Initdata))
+  })
+
+  observeEvent(input$facs_cancelHierarchyReplace, {
+    pendingFACSHierarchy(NULL)
+    removeModal()
+  })
+
+  observeEvent(input$facs_confirmHierarchyReplace, {
+    request <- pendingFACSHierarchy()
+    req(request)
+    pendingFACSHierarchy(NULL)
+    removeModal()
+    applyFACSHierarchyRequest(request)
+  })
+
   output$facs_hierarchySelectorUI <- renderUI({
     choices <- c("None", names(savedHierarchies$data))
     
@@ -7517,7 +7631,7 @@ server <- function(input, output, session) {
   outputOptions(output, "facs_hasSelections", suspendWhenHidden = FALSE)
   
   # Output informativo sulle selezioni create
-  output$facs_selectionsInfo <- renderTable({
+  rawFACSSummary <- reactive({
     
     all_selections <- data.frame(
       Depth = character(),
@@ -7558,10 +7672,10 @@ server <- function(input, output, session) {
         }
       }
     }
-    rawfacsResult$tableSelections <- all_selections
-    
     all_selections
   })
+  observe({ rawfacsResult$tableSelections <- rawFACSSummary() })
+  output$facs_selectionsInfo <- renderTable({ rawFACSSummary() })
   
   
   # Funzione per verificare se un punto è dentro un poligono (algoritmo ray casting)
@@ -7594,29 +7708,24 @@ server <- function(input, output, session) {
       frame <- data@frames[[selectedSample]]
       expr_data <- exprs(frame)
       
-      # Controlla ogni punto per vedere se è dentro il poligono
-      mask <- logical(nrow(expr_data))
-      for(i in 1:nrow(expr_data)) {
-        mask[i] <- pointInPolygon(expr_data[i, channelx], expr_data[i, channely], polygon_coords)
-      }
-      
-      # Crea il nuovo frame filtrato
-      filtered_expr <- expr_data[mask, , drop = FALSE]
-      
-      if(nrow(filtered_expr) > 0) {
-        filtered_frame <- flowCore::flowFrame(
-          exprs = filtered_expr,
-          parameters = parameters(frame),
-          description = description(frame)
-        )
-        
-        filtered_frames[[selectedSample]] <- filtered_frame
-        filtered_flowset <- flowCore::flowSet(filtered_frames)
-        
-        return(filtered_flowset)
-      } else {
+      if (!all(c(channelx, channely) %in% colnames(expr_data)) ||
+          !all(c("x", "y") %in% names(polygon_coords)) || nrow(polygon_coords) < 3L ||
+          !all(is.finite(as.matrix(polygon_coords[, c("x", "y")])))) {
         return(NULL)
       }
+      mask <- logical(nrow(expr_data))
+      for (i in seq_len(nrow(expr_data))) {
+        if (all(is.finite(expr_data[i, c(channelx, channely)]))) {
+          mask[i] <- pointInPolygon(expr_data[i, channelx], expr_data[i, channely], polygon_coords)
+        }
+      }
+      # Subset an existing flowSet: constructing one from a zero-row frame can
+      # trigger an invalid FCS round-trip in flowCore. Preserve channel metadata.
+      filtered_flowset <- data[selectedSample]
+      filtered_frame <- frame
+      flowCore::exprs(filtered_frame) <- expr_data[mask, , drop = FALSE]
+      filtered_flowset[[selectedSample]] <- filtered_frame
+      filtered_flowset
     }, error = function(e) {
       print(paste("Errore nel filtraggio:", e$message))
       return(NULL)
@@ -7647,68 +7756,39 @@ server <- function(input, output, session) {
     } 
   )
   
-  observeEvent(input$NextFacsHierarchicalGating,{
-    if(!is.null(rawfacsResult$tableSelections)){
-      alert$alertContext <- ""
-      
-      for(nameList in names(facsResult0)) 
-        facsResult[[nameList]] <- facsResult0[[nameList]]
-      
-      mess = rawfacsResult$tableSelections
-      
-      if (setequal(names(mess), c("message", "call"))) {
-        showAlert("Error", mess[["message"]], "error", 5000)
-      } else {
-        if (nrow(mess) > 1) {
-          data <- mess[-1, , drop = FALSE]  
-          facsResult$Initdata <- data
-          
-          facsResult$depth <- vector("list", nrow(data))
-          facsResult$depthCount <- numeric(nrow(data))
-          facsResult$name <- vector("list", nrow(data))
-          facsResult$statistics <- vector("list", nrow(data))
-          facsResult$cells <- vector("list", nrow(data))
-          facsResult$originalName <- vector("list", nrow(data))
-          
-          for (i in 1:nrow(data)) {
-            x <- data[i, 1]
-            
-            if (is.na(x)) {
-              facsResult$depth[i] <- NA
-              facsResult$depthCount[i] <- 0
-              facsResult$name[i] <- data[i, 2]
-              facsResult$statistics[i] <- data[i, 3]
-              facsResult$cells[i] <- data[i, 4]
-            } else {
-              x_cleaned <- gsub(" ", "", x)  
-              facsResult$depth[i] <- x 
-              facsResult$depthCount[i] <- str_count(x_cleaned, fixed(">"))
-              facsResult$name[i] <- data[i, 2]
-              facsResult$statistics[i] <- data[i, 3]
-              facsResult$cells[i] <- data[i, 4]
-            }
-          }
-          
-          removeModal()
-          maxDepth <- max(facsResult$depthCount, na.rm = TRUE)
-          showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
-          
-          output$dynamicSelectize <- renderUI({
-            updateSelectizeUI(maxDepth)
-          })
-          
-          updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
-          
-        }
-      }
-    }
+  observeEvent(input$NextFacsHierarchicalGating, {
+    req(rawfacsResult$Initdata)
+    data <- rawFACSSummary()
+    req(nrow(data) > 0)
+    alert$alertContext <- ""
+    generation <- if (is.null(FlagsFACS$generation)) 1L else FlagsFACS$generation + 1L
 
-    updateTabsetPanel(session, "SideTabs",
-                      selected = "tablesFACS")
+    # Rebuild the downstream analysis, even when the raw data are unchanged.
+    for (field in names(facsResult)) facsResult[[field]] <- NULL
+    for (field in names(FlagsFACS)) FlagsFACS[[field]] <- NULL
+    FlagsFACS$generation <- generation
+    FlagsFACS$actualLevel <- 0L
+    FlagsFACS$actualPath <- ""
+    facsResult$Initdata <- data
+    facsResult$depth <- data$Depth
+    facsResult$depthCount <- stringr::str_count(data$Depth, stringr::fixed(">"))
+    facsResult$name <- data$Name
+    facsResult$statistics <- data$Statistic
+    facsResult$cells <- data$Cells
+    for (id in c("FACSresult", "FACScolumnNameUpdate", "FACSstat_tab")) output[[id]] <- NULL
+    output$FACSexpcond_plot <- NULL
+    updateSelectizeInput(session, "selectBaseGate", choices = character(0), selected = character(0))
+    firstChoices <- unique(vapply(strsplit(data$Name[facsResult$depthCount == 1L], "/", fixed = TRUE),
+                                   function(path) tail(path, 1), character(1)))
+    maxDepth <- max(facsResult$depthCount, 0L)
+    output$dynamicSelectize <- renderUI({
+      updateSelectizeUI(maxDepth, generation, firstChoices)
+    })
+    updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
+    showAlert("Success", "Hierarchical gating reinitialized from the current raw gates. Previous results have been cleared.",
+              "success", 3000)
   })
-  
-  
-  
+
   #### END RAW FACS analysis ####
   
   
@@ -7838,7 +7918,7 @@ server <- function(input, output, session) {
         showAlert("Success", "The Excel has been uploaded with success", "success", 2000)
         
         output$dynamicSelectize <- renderUI({
-          updateSelectizeUI(maxDepth)
+          updateSelectizeUI(maxDepth, FlagsFACS$generation)
         })
         
         updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
@@ -7853,8 +7933,9 @@ server <- function(input, output, session) {
     }
   }, ignoreInit = TRUE)  
   
-  observeEvent(FlagsFACS$actualLevel, {
-    currentInputId <- paste("FACScell", FlagsFACS$actualLevel, sep = "_")
+  observeEvent(list(FlagsFACS$actualLevel, FlagsFACS$generation), {
+    req(!is.null(FlagsFACS$actualLevel))
+    currentInputId <- facsGateInputId(FlagsFACS$actualLevel, FlagsFACS$generation)
     
     if (FlagsFACS$actualLevel == 0) {
       valid_indices <- facsResult$depthCount == FlagsFACS$actualLevel
@@ -7919,15 +8000,16 @@ server <- function(input, output, session) {
       })
     } else {
       selected_item <- input[[currentInputId]]
+      req(length(selected_item) == 1L, nzchar(selected_item))
       path_components <- strsplit(FlagsFACS$actualPath, "/")[[1]]
       if (length(path_components) >= FlagsFACS$actualLevel) {
-        path_components <- path_components[1:(FlagsFACS$actualLevel - 1)]
+        path_components <- path_components[seq_len(FlagsFACS$actualLevel - 1)]
       }
       path_components <- c(path_components, selected_item)
       FlagsFACS$actualPath <- paste(path_components, collapse = "/")
       
       if (ncol(FlagsFACS$data) > length(path_components) + 1) {  
-        FlagsFACS$data <- FlagsFACS$data[, c(1, (2:length(path_components) + 1)), drop = FALSE]
+        FlagsFACS$data <- FlagsFACS$data[, seq_len(length(path_components) + 1L), drop = FALSE]
       }
       
       new_column_name <- tail(path_components, n = 1)  
@@ -7938,7 +8020,7 @@ server <- function(input, output, session) {
         index <- which(facsResult$name == new_path)
         
         if (length(index) == 1) {
-          new_column_data[i] <- sprintf("%.2f%%", facsResult$statistics[index])
+          new_column_data[i] <- sprintf("%.2f%%", as.numeric(facsResult$statistics[index]))
         } else {
           new_column_data[i] <- NA
         }
@@ -7947,7 +8029,7 @@ server <- function(input, output, session) {
       maxLevels <- max(facsResult$depthCount, na.rm = TRUE)
       if (FlagsFACS$actualLevel < maxLevels) {
         lapply((FlagsFACS$actualLevel + 1):maxLevels, function(level) {
-          updateSelectizeInput(session, paste("FACScell", level, sep = "_"), choices = list())
+          updateSelectizeInput(session, facsGateInputId(level, FlagsFACS$generation), choices = list())
         })
       }
       
@@ -7975,39 +8057,33 @@ server <- function(input, output, session) {
     )
   })
   
-  observe({
-    if (is.null(facsResult$depthCount) || length(facsResult$depthCount) == 0) {
-      numLevels <- 0
-    } else {
-      numLevels <- max(facsResult$depthCount, na.rm = TRUE)
-    }
-    
-    if (numLevels > 0) {
-      if (exists("levelObservers", envir = .GlobalEnv)) {
-        lapply(levelObservers, function(observer) {
-          observer$destroy()
-        })
-      }
-      
-      levelObservers <<- lapply(1:numLevels, function(level) {
-        observeEvent(input[[paste("FACScell", level, sep = "_")]], {
-          selectedValue <- input[[paste("FACScell", level, sep = "_")]]
-          if (!is.null(selectedValue) && nzchar(selectedValue) && selectedValue != "no valid names found") {
-            FlagsFACS$actualLevel <- 0
-            FlagsFACS$actualLevel <- level
-          }
-        }, ignoreInit = TRUE)
-      })
-    } else {
-      if (exists("levelObservers", envir = .GlobalEnv)) {
-        lapply(levelObservers, function(observer) {
-          observer$destroy()
-        })
-      }
-      levelObservers <<- list()  
-    }
-  })
-  
+  # Observer handles belong to this session only; never recover them from .GlobalEnv.
+  facsGateObservers <- new.env(parent = emptyenv())
+  facsGateObservers$items <- list()
+
+  observeEvent(list(facsResult$depthCount, FlagsFACS$generation), {
+    lapply(facsGateObservers$items, function(observer) observer$destroy())
+    facsGateObservers$items <- list()
+
+    depths <- facsResult$depthCount
+    depths <- depths[is.finite(depths) & depths >= 0]
+    numLevels <- if (length(depths)) as.integer(max(depths)) else 0L
+    if (numLevels == 0L) return()
+
+    generation <- FlagsFACS$generation
+    facsGateObservers$items <- lapply(seq_len(numLevels), function(level) {
+      inputId <- facsGateInputId(level, generation)
+      observeEvent(input[[inputId]], {
+        selectedValue <- input[[inputId]]
+        if (length(selectedValue) == 1L && !is.na(selectedValue) &&
+            nzchar(selectedValue) && selectedValue != "no valid names found") {
+          FlagsFACS$actualLevel <- 0
+          FlagsFACS$actualLevel <- level
+        }
+      }, ignoreInit = TRUE, domain = session, autoDestroy = TRUE)
+    })
+  }, ignoreNULL = FALSE, domain = session)
+
   convert_percent_to_final <- function(data_row, selected_gate) {
     last_percentage_name <- paste(names(data_row)[length(data_row)], selected_gate, sep = "/")
     
@@ -8044,7 +8120,7 @@ server <- function(input, output, session) {
       return()
     }
     
-    current_data <- FlagsFACS$data[, c(1, 2, selected_gate_index:ncol(FlagsFACS$data)), drop = FALSE]
+    current_data <- FlagsFACS$data[, unique(c(1, 2, selected_gate_index:ncol(FlagsFACS$data))), drop = FALSE]
     
     processed_data <- lapply(split(current_data, seq(nrow(current_data))), function(row) {
       convert_percent_to_final(row, selected_gate)

@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
+data/processed/validation/
+codex-instructions.md
