@@ -35,4 +35,6 @@ Imports:
     flowCore, 
     xml2, 
     visNetwork,
-    shinyFiles
+    shinyFiles,
+    sortable,
+    svglite

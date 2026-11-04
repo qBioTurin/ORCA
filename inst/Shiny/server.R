@@ -6,7 +6,14 @@ Sys.setenv("DATAVERSE_SERVER" = "dataverse.harvard.edu")
 APIkey_path = system.file("Data",".APIkey", package = "ORCA")
 
 
-source(system.file("Shiny","AuxFunctions.R", package = "ORCA"))
+source_paths <- Filter(Negate(is.null), lapply(sys.frames(), function(frame) frame$ofile))
+server_source <- if (length(source_paths)) tail(source_paths, 1)[[1]] else NULL
+aux_file <- if (!is.null(server_source)) {
+  file.path(dirname(normalizePath(server_source)), "AuxFunctions.R")
+} else {
+  system.file("Shiny", "AuxFunctions.R", package = "ORCA")
+}
+source(aux_file)
 #source("./inst/Shiny/AuxFunctions.R")
 
 
@@ -48,7 +55,14 @@ server <- function(input, output, session) {
   names(MapAnalysisNames) =c("wbResult", "wbquantResult", "endocResult", "elisaResult", "pcrResult", "cytotoxResult", "facsResult","bcaResult","ifResult") 
   
   
+  statPlotResult <- reactiveValues(resplot = NULL)
+
   #### DATA INTEGRATION ####
+  observeEvent(input$NextDataOmicsQuantif,{
+    updateTabsetPanel(session, "SideTabs",
+                      selected = "DataIntegration_tab")
+  })
+
   ### Omics ####
   
   Omics = reactiveValues(DefaultInit = NULL,
@@ -1717,7 +1731,8 @@ server <- function(input, output, session) {
     resplot = NULL,
     TTestData = NULL,
     IF_expcond = NULL,
-    IF_TTestvariable = NULL
+    IF_TTestvariable = NULL,
+    plot_variable_base = NULL
   )
   ifResult0 = reactiveValues(
     Initdata = NULL,
@@ -1729,7 +1744,8 @@ server <- function(input, output, session) {
     resplot = NULL,
     TTestData = NULL,
     IF_expcond = NULL,
-    IF_TTestvariable = NULL
+    IF_TTestvariable = NULL,
+    plot_variable_base = NULL
     )
   
   # save everytime there is a change in the results
@@ -1754,7 +1770,8 @@ server <- function(input, output, session) {
   FlagsIF <- reactiveValues(norm=F, 
                             baseline = F,
                             IF_expcond = NULL,
-                            IF_TTestvariable = NULL)
+                            IF_TTestvariable = NULL,
+                            EXPcol = NULL)
   
   
   observeEvent(input$LoadIF_Button,{
@@ -1789,7 +1806,7 @@ server <- function(input, output, session) {
     )
     
     
-    if (!is.null(mess$message) && mess$call == "") {
+    if (setequal(names(mess), c("message", "call"))) {
       showAlert("Error", mess$message, "error", 5000)
       return()
     }
@@ -1807,10 +1824,15 @@ server <- function(input, output, session) {
                       selected = "tablesIF")
   }
   
-  observeEvent(input$IF_expcond,{
+
+################ WARNING COLONNA SELEZIONATA SIA UNA STRINGA ######################
+
+  observe({
+    IF_expcond = req(input$IF_expcond)
+    input$IF_calc_perc
     tryCatch({
-      if( !is.null(ifResult$Initdata) && input$IF_expcond != ""){
-        selectIFcolumns = input$IF_expcond
+      if( !is.null(ifResult$Initdata) && IF_expcond != ""){
+        selectIFcolumns = IF_expcond
         selectIFcolumns = selectIFcolumns[selectIFcolumns!= ""]
         
         IFdata = ifResult$Initdata
@@ -1818,58 +1840,108 @@ server <- function(input, output, session) {
         colNames[ colNames == selectIFcolumns] = "ExpCond"
         colnames(IFdata) = colNames
         
-        IFdataCalc = IFdata %>%
-          group_by(ExpCond) %>%
-          mutate(nRow = 1:n()) %>%
-          ungroup() %>%
-          tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars") %>%
-          group_by(ExpCond,nRow) %>%
-          mutate(Tot = sum(Values), Perc =  Values/Tot*100)
-        
-        IFinalData = IFdataCalc  %>%
-          tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
-                              values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
-        
-        statisticData = IFdataCalc %>% 
-          group_by(ExpCond,Vars) %>%
-          summarise(MeanValues = mean(Values),
-                    sdValues = sd(Values),
-                    MeanPerc = mean(Perc),
-                    sdPerc = sd(Perc),
-                    MeanTot = mean(Tot),
-                    sdTot = sd(Tot)) %>%
-          tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}", 
-                              values_from = c(MeanValues, sdValues,MeanPerc,sdPerc)) %>% ungroup()
-        
+
+        if (input$IF_calc_perc) {
+          IFdataCalc = IFdata %>%
+            group_by(ExpCond) %>%
+            mutate(nRow = 1:n()) %>%
+            ungroup() %>%
+            tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars") %>%
+            group_by(ExpCond,nRow) %>%
+            mutate(Tot = sum(Values), Perc =  Values/Tot*100)
+
+          IFinalData = IFdataCalc  %>%
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}",
+                                values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
+
+          statisticData = IFdataCalc %>%
+            group_by(ExpCond,Vars) %>%
+            summarise(MeanValues = mean(Values),
+                      sdValues = sd(Values),
+                      MeanPerc = mean(Perc),
+                      sdPerc = sd(Perc),
+                      MeanTot = mean(Tot),
+                      sdTot = sd(Tot)) %>%
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}",
+                                values_from = c(MeanValues, sdValues,MeanPerc,sdPerc)) %>% ungroup()
+
+          ifResult$plot_variable_base <- "_Perc" # Plotta le percentuali
+
+        } else {
+          # Trattato vs Non-Trattato
+          IFdataCalc = IFdata %>%
+            group_by(ExpCond) %>%
+            mutate(nRow = 1:n()) %>%
+            ungroup() %>%
+            tidyr::gather(-ExpCond,-nRow, value = "Values", key = "Vars")
+          # No Tot o Perc
+
+          IFinalData = IFdataCalc  %>%
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}",
+                                values_from = c(Values)) %>% ungroup() %>% select(-nRow)
+
+          statisticData = IFdataCalc %>%
+            group_by(ExpCond,Vars) %>%
+            summarise(MeanValues = mean(Values),
+                      sdValues = sd(Values)) %>%
+            tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}",
+                                values_from = c(MeanValues, sdValues)) %>% ungroup()
+
+          ifResult$plot_variable_base <- "_Values"
+        }
+
         ifResult$StatData = statisticData
         ifResult$FinalData = IFinalData
         
+        # Generate consistent color mapping for experimental conditions
+        unique_conditions <- unique(IFdata$ExpCond)
+        unique_conditions <- unique_conditions[!is.na(unique_conditions) & unique_conditions != ""]
+
+        # Check if we need to generate new colors or update existing ones
+        if (is.null(FlagsIF$EXPcol) || !all(unique_conditions %in% names(FlagsIF$EXPcol))) {
+          # Generate a color palette with enough colors for all conditions
+          n_colors <- length(unique_conditions)
+          if (n_colors <= 8) {
+            # Use a qualitative palette for small number of conditions
+            color_palette <- RColorBrewer::brewer.pal(max(3, n_colors), "Set2")[1:n_colors]
+          } else {
+            # Use randomColor for larger number of conditions
+            color_palette <- randomcoloR::distinctColorPalette(n_colors)
+          }
+          names(color_palette) <- unique_conditions
+          FlagsIF$EXPcol <- color_palette
+        } else {
+          # Keep existing colors for known conditions, add new colors for new conditions
+          new_conditions <- setdiff(unique_conditions, names(FlagsIF$EXPcol))
+          if (length(new_conditions) > 0) {
+            new_colors <- randomcoloR::distinctColorPalette(length(new_conditions))
+            names(new_colors) <- new_conditions
+            FlagsIF$EXPcol <- c(FlagsIF$EXPcol, new_colors)
+          }
+        }
+
         updateSelectInput("IF_TTestvariable",session = session, choices = unique(IFdataCalc$Vars))
         
         output$IFtable = renderDT({DT::datatable( IFinalData,
                                                   selection = 'none',
-                                                  # editable = list(target = "cell",
-                                                  #                 disable = list(columns = 0:2) ),
                                                   rownames= FALSE,
                                                   options = list(scrollX = TRUE,
                                                                  searching = FALSE,
-                                                                 dom = 't' # Only display the table
+                                                                 dom = 't'
                                                   )
-                                  )
-                            })
-        
+        )
+        })
+
 
         output$IFtable_stat = renderDT({DT::datatable( statisticData,
                                                        selection = 'none',
-                                                       # editable = list(target = "cell",
-                                                       #                 disable = list(columns = 0:2) ),
                                                        rownames= FALSE,
                                                        options = list(scrollX = TRUE,
                                                                       searching = FALSE,
-                                                                      dom = 't' # Only display the table
+                                                                      dom = 't'
                                                        )
-                                            )
-                                      })
+        )
+        })
         
         ifResult$IF_expcond = selectIFcolumns
         ifResult$IF_TTestvariable = unique(IFdataCalc$Vars)
@@ -1877,9 +1949,7 @@ server <- function(input, output, session) {
       else{
         
         updateSelectInput("IF_TTestvariable",session = session, choices = "",selected = "")
-        
         output$IFtable = renderDT({ NULL })
-        
         output$IFtable_stat = renderDT({ NULL })
       }
     }, error = function(e) {
@@ -1902,8 +1972,12 @@ server <- function(input, output, session) {
           generatePlotParameters(ifResult$resplot)
         ),
         tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(ifResult$resplot)
+        ),
+        tabPanel(
           "Save Plot",
-          generateSavePlotTab()
+          generateSavePlotTab(formats = TRUE)
         )
       ),
       footer = tagList(
@@ -1917,14 +1991,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonIF_TT <- downloadHandler(
     filename = function() {
-      paste0("plot_IF_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_IF_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(ifResult$resplot, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(ifResult$resplot, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -1938,62 +2014,224 @@ server <- function(input, output, session) {
   })
   
   
-  observeEvent(input$IF_TTestvariable,{
-    ifResult$FinalData -> IFinalData
-    input$IF_TTestvariable -> varSel
-    
-    if(varSel != "" && !is.null(IFinalData)){
-      IFinalData[,c("ExpCond", paste0(varSel,"_Perc"))] -> SubData
-      colnames(SubData) = c("ExpCond", "Values")
-      
-      SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
-      
-      BivTest = testStat.function(SubData)
-      
-      resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean)) + 
-        geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-        geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-        geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
-                   position = position_jitter(width = 0.2), size = 3) +
-        theme_bw()+
-        labs(color = "Experimental Condition", y = "Percentages (%)" , x = "")
-      annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-               hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-      
-      
-      output$IFsummarise_plot = renderPlot({resplot})
+  observe({
+    req(ifResult$FinalData) -> IFinalData
+    req(input$IF_TTestvariable) -> varSel
+    input$IF_calc_perc
 
-      output$IFsummariseMean = renderDT({
-        DT::datatable(SubDataStat,
-                      selection = 'none',
-                      rownames= FALSE,
-                      options = list(scrollX = TRUE,
-                                     searching = FALSE,
-                                     dom = 't' # Only display the table
-                      )
-        )
-      })
-      
-      output$IFtable_ttest = renderDT({
-        DT::datatable(BivTest$BivTest,
-                      selection = 'none',
-                      rownames= FALSE,
-                      options = list(scrollX = TRUE,
-                                     searching = FALSE,
-                                     dom = 't' # Only display the table
-                      )
-        )
-      })
-      
-      ifResult$SubStatData = SubDataStat
-      ifResult$TTestData = BivTest
-      ifResult$resplot = resplot
-    }else{
-      output$IFsummarise_plot = renderPlot({NULL})
-      output$IFsummariseMean = renderDT({ NULL })
-    }
-    
+    isolate({
+      plot_variable_base <- ifResult$plot_variable_base # (Perc o Values)
+
+      if(varSel != "" && !is.null(IFinalData) && !is.null(plot_variable_base)){
+        plot_col_name <- paste0(varSel, plot_variable_base)
+        if (!plot_col_name %in% colnames(IFinalData)) {
+          showAlert("Error",
+                    paste("Column", plot_col_name, "not found. Please re-load data or check analysis type."),
+                    "error", 5000)
+          return()
+        }
+        IFinalData[,c("ExpCond", plot_col_name)] -> SubData
+        colnames(SubData) = c("ExpCond", "Values")
+
+        SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
+
+        # Get color mapping for current conditions
+        current_conditions <- unique(SubDataStat$ExpCond)
+        if (!is.null(FlagsIF$EXPcol) && all(current_conditions %in% names(FlagsIF$EXPcol))) {
+          color_mapping <- FlagsIF$EXPcol[current_conditions]
+        } else {
+          # Fallback to generating colors if mapping is not available
+          n_colors <- length(current_conditions)
+          if (n_colors <= 8) {
+            color_mapping <- RColorBrewer::brewer.pal(max(3, n_colors), "Set2")[1:n_colors]
+          } else {
+            color_mapping <- randomcoloR::distinctColorPalette(n_colors)
+          }
+          names(color_mapping) <- current_conditions
+        }
+
+        resplot <- ggplot(SubDataStat, aes(x = ExpCond, y = Mean, fill = ExpCond)) +
+          geom_bar(stat="identity", color="black", position=position_dodge()) +
+          geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
+          geom_point(data = SubData, aes(x = ExpCond, y = Values, color = ExpCond),
+                     position = position_jitter(width = 0.2), size = 3) +
+          scale_fill_manual(values = color_mapping) +
+          scale_color_manual(values = color_mapping) +
+          theme_bw()+
+          labs(color = "Experimental Condition",
+               fill = "Experimental Condition",
+               y = ifelse(plot_variable_base == "_Perc", "Percentages (%)", "Measured Values"),
+               x = "")
+
+        post_hoc_pairs <- list()
+        annotations <- character(0)
+        test_to_show <- NULL
+        if(any(!is.finite(SubDataStat$sd) | SubDataStat$sd == 0) ||
+           n_distinct(SubData$ExpCond) < 2 || any(table(SubData$ExpCond) < 3)) {
+          showAlert("Warning", "Standard Deviation is zero for at least one group. Statistical test cannot be performed.", "warning", 5000)
+          test_to_show = BivTest = NULL
+        }else{
+          res = testStat.function(SubData)
+          BivTest <- res$BivTest
+          MulvTest <- res$MulvTest
+          PairwiseTest <- res$pairwise
+          steps <- res$steps
+          path <- res$path
+          post_hoc_pairs <- list()
+          annotations <- character(0)
+          main_test_txt <-  paste0("Test used is: ", path[length(path)])
+          main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NULL
+
+          if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && main_test_pvalue < 0.05) {
+            PairwiseTest <- PairwiseTest %>%
+              separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
+              mutate(group1 = trimws(group1),
+                     group2 = trimws(group2),
+                     stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
+
+            all_combinations <- combn(unique(SubDataStat$ExpCond), 2, simplify = FALSE)
+
+            post_hoc_pairs <- lapply(all_combinations, function(pair) {
+              pair <- unlist(pair)
+              c(trimws(pair[1]), trimws(pair[2]))
+            })
+
+            annotations <- sapply(post_hoc_pairs, function(pair) {
+              idx <- which((PairwiseTest$group1 == pair[1] & PairwiseTest$group2 == pair[2]) |
+                             (PairwiseTest$group1 == pair[2] & PairwiseTest$group2 == pair[1]))
+              if (length(idx) > 0) {
+                as.character(PairwiseTest$stars[idx])
+              } else {
+                "ns"
+              }
+            })
+
+            test_to_show = PairwiseTest
+
+          }
+          else if(!is.null(main_test_pvalue) && main_test_pvalue >= 0.05){
+            #to check
+            test_to_show = MulvTest
+          }else if(!is.null(BivTest)){
+            BivTest <- BivTest %>%
+              separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
+              mutate(group1 = trimws(group1),
+                     group2 = trimws(group2),
+                     stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
+
+            all_combinations <- combn(unique(SubDataStat$ExpCond), 2, simplify = FALSE)
+
+            post_hoc_pairs <- lapply(all_combinations, function(pair) {
+              pair <- unlist(pair)
+              c(trimws(pair[1]), trimws(pair[2]))
+            })
+            annotations <- sapply(post_hoc_pairs, function(pair) {
+              idx <- which((BivTest$group1 == pair[1] & BivTest$group2 == pair[2]) |
+                             (BivTest$group1 == pair[2] & BivTest$group2 == pair[1]))
+              if (length(idx) > 0) {
+                as.character(BivTest$stars[idx])
+              } else {
+                "ns"
+              }
+            })
+
+            test_to_show = BivTest
+          }
+          else {
+            print("No pairwise comparisons to plot.")
+          }
+
+          # Store data for reactive plotting
+          ifResult$post_hoc_pairs <- post_hoc_pairs
+          ifResult$annotations <- annotations
+        }
+
+        output$IFsummariseMean = renderDT({
+          DT::datatable(SubDataStat,
+                        selection = 'none',
+                        rownames= FALSE,
+                        options = list(scrollX = TRUE,
+                                       searching = FALSE,
+                                       dom = 't'
+                        )
+          )
+        })
+
+        output$IFtable_ttest = renderDT({
+          DT::datatable(test_to_show,
+                        selection = 'multiple',
+                        rownames= FALSE,
+                        options = list(scrollX = TRUE,
+                                       searching = FALSE,
+                                       dom = 't'
+                        )
+          )
+        })
+
+        ifResult$post_hoc_pairs <- post_hoc_pairs
+        ifResult$annotations <- annotations
+        ifResult$SubStatData = SubDataStat
+        ifResult$TTestData = test_to_show
+        ifResult$basePlot = resplot
+      }else{
+        output$IFsummarise_plot = renderPlot({NULL})
+        output$IFsummariseMean = renderDT({ NULL })
+      }
+    })
+
+
   })
+
+  observe({
+    plot_to_show <- req(ifResult$basePlot)
+    SubDataStat <- req(ifResult$SubStatData)
+    test_to_show = ifResult$TTestData
+
+    selected_rows <- input$IFtable_ttest_rows_selected
+
+    isolate({
+    # Get stored data
+    post_hoc_pairs <- ifResult$post_hoc_pairs
+    annotations <- ifResult$annotations
+
+    # If there are pairs and annotations available
+    if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
+      # If no rows selected, show all by default
+      if (is.null(selected_rows) || length(selected_rows) == 0) {
+        filtered_pairs <- post_hoc_pairs
+        filtered_annotations <- annotations
+      } else {
+        test_to_show[selected_rows, , drop = FALSE] -> selected_tests
+        # Filter based on selected rows
+        selected_tests %>% select(group1,group2) -> selected_conditions
+        lapply(seq_len(nrow(selected_conditions)), function(i) {
+          c(selected_conditions$group1[i], selected_conditions$group2[i])
+        }) -> filtered_pairs
+        filtered_annotations <- selected_tests$stars
+      }
+
+      if (length(filtered_pairs) > 0 && length(filtered_annotations) > 0) {
+        y_max <- max(SubDataStat$Mean + SubDataStat$sd, na.rm = TRUE)
+        stepsize <- 0.1 * y_max
+        y_pos <- seq(y_max + stepsize, y_max + stepsize + stepsize * length(filtered_pairs), length.out = length(filtered_pairs))
+
+        plot_to_show <- plot_to_show +
+          ggsignif::geom_signif(
+            comparisons = filtered_pairs,
+            y_position = y_pos,
+            annotations = filtered_annotations,
+            tip_length = 0.01,
+            textsize = 8 / 1.5,
+            vjust = 0.2
+          )
+      }
+    }
+
+    ifResult$resplot <- plot_to_show
+    })
+
+  })
+
   
   
   observe({
@@ -2024,6 +2262,8 @@ server <- function(input, output, session) {
     },
   )
   
+  output$IFsummarise_plot <- renderPlot({ req(ifResult$resplot) })
+
   #### END IF analysis ####
   
   ### WB analysis ####
@@ -3114,7 +3354,8 @@ server <- function(input, output, session) {
   observeEvent(input$shinyalert, {
     removeModal()
     if (input$shinyalert && alert$alertContext == "PCR-reset") {  
-      resetPanel("PCR", flags = FlagsPCR, result = pcrResult)
+      resetPanel("PCR", flags = FlagsPCR, result = pcrResult,output = output, session = session)
+      for (name in names(reactiveValuesToList(selected_baselines))) selected_baselines[[name]] <- NULL
       loadExcelFilePCR()
     }
   })
@@ -3129,7 +3370,7 @@ server <- function(input, output, session) {
       colname = F
     )
     
-    if (!is.null(mess$message) && mess$call == "") {
+    if (setequal(names(mess), c("message", "call"))) {
       showAlert("Error", mess$message, "error", 5000)
       return()
     }
@@ -3178,25 +3419,37 @@ server <- function(input, output, session) {
       time_patterns <- trimws(time_patterns)  # Rimuove eventuali spazi inizio e fine
       
       if (Sample %in% colnames(pcrResult$Initdata)) {
-        pcrResult$Initdata[Time] <- NA  
-        pcrResult$Initdata[Sample_new] <- NA  
+        if(!Time %in% colnames(pcrResult$Initdata)) {
+          pcrResult$Initdata[Time] <- as.character(NA)
+        } else {
+          pcrResult$Initdata[Time] <- as.character(pcrResult$Initdata[[Time]])
+        }
+        if(!Sample_new %in% colnames(pcrResult$Initdata)) {
+          pcrResult$Initdata[Sample_new] <- pcrResult$Initdata[[Sample]]
+        }
         for (pattern in time_patterns) {
-          matched_rows <- grepl(pattern, pcrResult$Initdata[[Sample]], ignore.case = TRUE)
-          pcrResult$Initdata[Time][matched_rows,] <- pattern
-          pcrResult$Initdata[Sample_new] <- gsub(pattern, "", pcrResult$Initdata[[Sample]], ignore.case = TRUE)
+          matched_rows <- grepl(pattern, pcrResult$Initdata[[Sample_new]], ignore.case = TRUE)
+          if(any(matched_rows)) {
+            pcrResult$Initdata[Time][matched_rows,] <- pattern
+            pcrResult$Initdata[Sample_new] <- gsub(pattern, "", pcrResult$Initdata[[Sample_new]], ignore.case = TRUE)
+          }
         }
         
-        pcrResult$Initdata[Time] <- factor(x = pcrResult$Initdata[[Time]] , levels = time_patterns)
+        existing_patterns <- unique(pcrResult$Initdata[[Time]])
+        existing_patterns <- existing_patterns[!is.na(existing_patterns)]
+        all_patterns <- unique(c(existing_patterns, time_patterns))
+        pcrResult$Initdata[Time] <- factor(x = pcrResult$Initdata[[Time]] , levels = all_patterns)
         
         pcrResult$Initdata[Sample_new] <- trimws(pcrResult$Initdata[[Sample_new]])
+
         updateSelectInput(session, "PCR_time",
                           choices = c("", colnames(pcrResult$Initdata)),
                           selected = Time)
         updateSelectInput(session, "PCR_sample",
                           choices = c("", colnames(pcrResult$Initdata)),
                           selected = Sample_new)
-                          
-                          
+
+
         showAlert("Success", "Time patterns applied successfully!", "success", 2000)
       } else {
         showAlert("Error", "Sample column not found!", "error", 3000)
@@ -3228,7 +3481,7 @@ server <- function(input, output, session) {
         else
           NULL
       })
-   
+
       if(length(selectPCRcolumns)==3 ){
         tmp = PCR[,selectPCRcolumns]
         colnames(tmp) = c("Gene", "Sample", "Value")
@@ -3248,39 +3501,91 @@ server <- function(input, output, session) {
     }
     
   })
-  
+
+  selected_baselines <- reactiveValues()
+
+  observeEvent(FlagsPCR$restoredBaselines, {
+    restored <- FlagsPCR$restoredBaselines
+    for (name in names(reactiveValuesToList(selected_baselines))) selected_baselines[[name]] <- NULL
+    for (i in seq_len(nrow(restored))) selected_baselines[[restored$Sample[i]]] <- restored$Baseline[i]
+    FlagsPCR$restoredBaselines <- NULL
+  })
+
   observe({
-    if(!is.null(pcrResult$data)){
-      
-      PCR = pcrResult$data
-      
+    PCR <- req(pcrResult$data)
+    req(identical(input$CheckBaseline, FALSE))
+    samples <- unique(PCR$Sample)
+    values <- setNames(lapply(samples, function(sample) input[[paste0("select_base4", sample)]]), samples)
+    isolate({
+      for (sample in samples) {
+        if (!is.null(values[[sample]])) selected_baselines[[sample]] <- values[[sample]]
+      }
+    })
+  })
+
+  observe({
+      PCR = req(pcrResult$data)
+      input$CheckBaseline
       AllGenes = unique(PCR$Gene)
       Exp = unique(PCR$Sample)
       
-      updateSelectInput(session, "PCRbaseline",
-                        choices = Exp )
+        if(input$PCR_time != ""){
+          updateSelectInput(session, "PCRbaseline",
+                            choices = unique(PCR$Time) )
+        }else{
+          if(input$CheckBaseline)
+          {
+            updateSelectInput(session, "PCRbaseline",
+                              choices = Exp )
+          }else{
+            baselines = unlist(reactiveValuesToList(selected_baselines))
+            baselines = baselines[baselines != ""]
+            inputs_to_render <- setdiff(Exp, baselines)
+
+            Exp = Exp[!Exp %in% names(baselines)]
+
+            output$PCRbaseline_different <- renderUI({
+              # Crea una lista di selectizeInput dinamici
+              lapply(inputs_to_render, function(sample_name) {
+                selectizeInput(
+                  inputId = paste0("select_base4", sample_name),
+                  label = paste("Select baseline for", sample_name),
+                  choices = c("",Exp[Exp != sample_name]),
+                  selected = ifelse(!is.null(selected_baselines[[sample_name]]),selected_baselines[[sample_name]], "")
+                )
+              })
+            })
+          }
+        }
+
       updateSelectizeInput(session,"PCRnorm",
-                               choices = AllGenes )
-      
-    }else{
-      updateSelectInput(session, "PCRbaseline",
-                        choices = "" )
-      updateCheckboxGroupInput(session,"PCRnorm",
-                               choices = "" )
-    }
-  })
-  
-  observeEvent(input$PCRnorm,{
-    pcrResult$PCRnorm = input$PCRnorm
-    FlagsPCR$norm = T
-  })
-  observeEvent(input$PCRbaseline,{
-    pcrResult$BaselineExp = input$PCRbaseline
-    FlagsPCR$baseline = T
+                           choices = AllGenes )
+
   })
   
   observe({
-    if(FlagsPCR$baseline & FlagsPCR$norm & !is.null(pcrResult$data)){
+    req(pcrResult$data)
+    pcrResult$PCRnorm <- req(input$PCRnorm)
+    if(input$CheckBaseline){
+        BaselineExp = req(input$PCRbaseline)
+        samples = unique(pcrResult$data$Sample)
+        if (input$PCR_time == "") samples <- setdiff(samples, BaselineExp)
+        if(length(samples) < 1){
+          showAlert("Error", "Number of samples should be > 1", "error", 5000)
+          return()
+        }
+        pcrResult$BaselineExp = data.frame(Sample = samples,
+                                           Baseline = BaselineExp )
+      }else{
+        baselines = unlist(reactiveValuesToList(selected_baselines))
+        baselines = baselines[baselines != ""]
+        if(length(baselines)>0)
+          pcrResult$BaselineExp = data.frame(Sample = names(baselines), Baseline = baselines )
+        else{
+          return()
+        }
+      }
+
       
       pcrResult$BaselineExp -> BaselineExp
       pcrResult$PCRnorm -> PCRnorm
@@ -3307,28 +3612,44 @@ server <- function(input, output, session) {
         dplyr::mutate(dCt = Mean - HousekGeneMean)%>%
         ungroup()
       
-      BaselinePCR = PCRstep3 %>% 
-        dplyr::filter(Sample == BaselineExp) %>%
-        rename(BaselineMean=Mean, BaselineSd=Sd,BaselinedCt = dCt) %>%
-        dplyr::select(-Sample,  -HousekGeneMean, -HousekGeneSd)
-      
-      PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time","HousekGene") )
-      
-      PCRstep5 = PCRstep4 %>%
-        group_by(Sample,Gene,Time,HousekGene) %>%
-        dplyr::summarize(
-          ddCt = dCt - BaselinedCt,
-          Q = 2^{-ddCt},
-          Sd = Sd,
-          Mean = Mean)%>%
-        ungroup()
-      
-      AllGenes = unique(PCR$Gene)
+      if(input$PCR_time != ""){
+        # Da gestire con più baseline!! -> elimiare unique come sotto!
+        if(length(unique(BaselineExp$Baseline)) > 1 )
+           return()
+
+        BaselinePCR = PCRstep3 %>%
+          dplyr::filter(Time == unique(BaselineExp$Baseline)) %>%
+          rename(BaselineMean=Mean, BaselineSd=Sd, BaselinedCt = dCt, Baseline = Time) %>%
+          dplyr::select(-HousekGeneMean, -HousekGeneSd)
+
+        PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Sample","HousekGene") )
+
+      }else{
+
+        BaselinePCR = PCRstep3 %>%
+          dplyr::filter(Sample %in% BaselineExp$Baseline) %>%
+          rename(BaselineMean=Mean, BaselineSd=Sd,BaselinedCt = dCt, Baseline = Sample) %>%
+          dplyr::select(  -HousekGeneMean, -HousekGeneSd)
+        BaselinePCR = merge(BaselinePCR,BaselineExp)
+
+        for(b in unique(BaselinePCR$Baseline))
+          BaselinePCR = rbind(BaselinePCR, BaselinePCR %>% dplyr::filter(Baseline == b) %>%  mutate(Sample = b) )
+        BaselinePCR <- distinct(BaselinePCR)
+
+        PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time","HousekGene","Sample") )
+      }
+
+        PCRstep5 = PCRstep4 %>%
+          group_by(Sample,Gene,Time,HousekGene,Baseline) %>%
+          dplyr::summarize(
+            ddCt = dCt - BaselinedCt,
+            Q = 2^{-ddCt},
+            Sd = Sd,
+            Mean = Mean)%>%
+          ungroup()
+
       pcrResult$NewPCR = PCRstep5
       
-      PCRstep5 = PCRstep5 %>% dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
-      
-    }
   })
   # pcr plot
   
@@ -3337,12 +3658,14 @@ server <- function(input, output, session) {
     input$PCR_cut_type -> PCR_cut_type
     
     isolate({
-      NewPCRFiltered = NewPCR %>% dplyr::filter(!is.na(ddCt) | Sample == pcrResult$BaselineExp )
+      pcrResult$BaselineExp$Baseline -> baselines
+      NewPCRFiltered = NewPCR %>% dplyr::filter(!is.na(ddCt) | Sample %in% baselines )
       updateSelectizeInput(inputId = "HousKgene_plot", choices = c("",unique(NewPCR$HousekGene)),selected = "" )
+      updateSelectizeInput(inputId = "PCR_sample_plot", choices = c("All",unique(NewPCR$Sample)),selected = "All" )
+      updateSelectizeInput(inputId = "PCR_Baseline_plot", choices = c("All",unique(NewPCR$Baseline)),selected = "All" )
       updateSelectizeInput(inputId = "Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
-      updateSelectizeInput(inputId = "Select_Customize_Gene_plot",choices = c("",unique(NewPCR$Gene)),selected = "" )
-      updateSelectizeInput(inputId = "Select_Customize_HousKgene_plot",choices = c("",unique(NewPCR$HousekGene)),selected = "" )
-      
+
+      NewPCRFiltered$ddCt = NewPCRFiltered$ddCt + 0.01 # in this way the slider at the beginning does not touch any points
       if(PCR_cut_type == "Both"){
         updateSliderInput(session = session, inputId = "BothCutFoldChange_slider",
                           min = min(-NewPCRFiltered$ddCt,na.rm = T), max = max(-NewPCRFiltered$ddCt,na.rm = T), 
@@ -3360,58 +3683,86 @@ server <- function(input, output, session) {
     NewPCR = req(pcrResult$NewPCR)
     cut = req(input$CutFoldChange_slider)
     input$PCR_cut_type -> PCR_cut_type
+    pcrResult$BaselineExp$Baseline -> baselines
     
     if(PCR_cut_type == "Greater"){
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
-        dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
-        dplyr::mutate(Cut = if_else(-ddCt >= cut, "Greater", "Smaller"))
+        dplyr::filter(!is.na(ddCt), !Sample %in% baselines ) %>%
+        dplyr::mutate(Cut = if_else(-ddCt >= cut, 1, 0.5))
 
-      
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
-        dplyr::filter(-DDCT >= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
+        dplyr::filter(-DDCT >= cut,!is.na(DDCT), !Sample %in% baselines  )
     }else if(PCR_cut_type == "Smaller"){
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
-        dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
-        dplyr::mutate(Cut = if_else(-ddCt <= cut,  "Smaller", "Greater"))
+        dplyr::filter(!is.na(ddCt), !Sample %in% baselines  ) %>%
+        dplyr::mutate(Cut = if_else(-ddCt <= cut,  1, 0.5))
       
       table  =  PCRstep5 %>% dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
-        dplyr::filter(-DDCT <= cut,!is.na(DDCT), Sample != pcrResult$BaselineExp )
+        dplyr::filter(-DDCT <= cut,!is.na(DDCT), !Sample %in% baselines  )
       
     }else if(PCR_cut_type == "Both"){
       cut = req(input$BothCutFoldChange_slider)
       
       PCRstep5 = NewPCR %>%
         dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene) ) %>% 
-        dplyr::filter(!is.na(ddCt), Sample != pcrResult$BaselineExp ) %>% 
-        dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , "Outside interval", "Inside interval"))
+        dplyr::filter(!is.na(ddCt),! Sample %in% baselines ) %>%
+        dplyr::mutate(Cut = if_else(-ddCt >= max(cut) | -ddCt <= min(cut) , 0.5, 1))
 
       
       table  =  PCRstep5 %>% 
         dplyr::rename(DDCT = ddCt, `2^(-DDCT)` = Q) %>%
         dplyr::filter( -DDCT >= max(cut) | -DDCT <= min(cut),
-                       !is.na(DDCT), Sample != pcrResult$BaselineExp ) %>%
-        dplyr::select(-Cut)
+                       !is.na(DDCT), !Sample %in% baselines  )
     }
-    
-    pl = ggplot(PCRstep5,aes(x = paste(Time," ",Gene), y = -ddCt)) +
-      geom_jitter(aes(shape=Time, color = Sample,
-                      alpha = ifelse(Cut == "Greater", 1, 0.5),
-                      text = paste("Gene:", Gene, "<br>-DDCT:", -ddCt,
-                                   "<br>Housekeeping Gene: ", HousekGene,
-                                   "<br>Sample: ", Sample) ),
-                  height = 0, size = 3) +
-      facet_wrap(~HousekGene, ncol = 1)+
-      theme_bw()+
-      labs(x="",y= "-DDCT", title = "", col = "Sample")+
-      theme(axis.text.x=element_blank(), 
-            axis.ticks.x=element_blank(),
-            legend.position = "bottom")+
-      scale_color_brewer(palette = "Set1") +  
-      guides(alpha = "none") + 
-      scale_alpha_identity()+
-      geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")
+
+    if(input$PCR_time != ""){
+
+      pl = ggplot(PCRstep5 %>%
+                    mutate(
+                      TimeGene = factor(
+                        paste(Time, Gene),
+                        levels = unique(paste(Time, Gene))
+                      )
+                    ),aes(x = TimeGene, y = -ddCt)) +
+        geom_jitter(aes(shape=Time, color = Sample,
+                        alpha = Cut,
+                        text = paste("Gene:", Gene, "<br>-DDCT:", -ddCt,
+                                     "<br>Housekeeping Gene: ", HousekGene,
+                                     "<br>Sample: ", Sample,
+                                     "<br>Time: ",Time) ),
+                    height = 0, size = 3) +
+        facet_wrap(~HousekGene, ncol = 1)+
+        theme_bw()+
+        labs(x="",y= "-DDCT", title = "", col = "Sample")+
+        theme(axis.text.x=element_blank(),
+              axis.ticks.x=element_blank(),
+              legend.position = "bottom")+
+        scale_color_brewer(palette = "Set1") +
+        guides(alpha = "none") +
+        scale_alpha_identity()+
+        geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")
+    }else{
+      pl = ggplot(PCRstep5,aes(x = Gene , y = -ddCt)) +
+        geom_jitter(aes(color = Sample,
+                        alpha = Cut,
+                        text = paste("Gene:", Gene, "<br>-DDCT:", -ddCt,
+                                     "<br>Housekeeping Gene: ", HousekGene,
+                                     "<br>Sample: ", Sample) ),
+                    height = 0, size = 3) +
+        facet_wrap(~HousekGene, ncol = 1)+
+        theme_bw()+
+        labs(x="",y= "-DDCT", title = "", col = "Sample")+
+        theme(axis.text.x=element_blank(),
+              axis.ticks.x=element_blank(),
+              legend.position = "bottom")+
+        scale_color_brewer(palette = "Set1") +
+        guides(alpha = "none") +
+        scale_alpha_identity()+
+        geom_hline(yintercept = max(cut), color = "red", linetype = "dashed")
+    }
+
     
     if(PCR_cut_type == "Both"){
       pl = pl + geom_hline(yintercept = min(cut), color = "red", linetype = "dashed")
@@ -3422,8 +3773,10 @@ server <- function(input, output, session) {
     # Generate tables for each housekeeping gene
     housekeeping_genes <- unique(PCRstep5$HousekGene)
     tables <- lapply(housekeeping_genes, function(hg) {
-      table %>% 
-        dplyr::filter(HousekGene == hg)
+      tmp_table = table %>%
+        dplyr::filter(HousekGene == hg) %>% dplyr::select(-Cut)
+      if(input$PCR_time == ""){ tmp_table = tmp_table %>%  dplyr::select(-Time)}
+      tmp_table
     })
     names(tables) <- housekeeping_genes
     
@@ -3453,6 +3806,7 @@ server <- function(input, output, session) {
   })
   
   output$FoldchangeAllGenesPlot = plotly::renderPlotly({ 
+    req(pcrResult$AllGenesFoldChangePlot)
     plotly::ggplotly(pcrResult$AllGenesFoldChangePlot, tooltip = "text") 
     })
   
@@ -3460,6 +3814,8 @@ server <- function(input, output, session) {
     input$Gene_plot -> gene
     input$HousKgene_plot -> Hgene
     input$PCR_plot_y -> y_axis
+    req(input$PCR_sample_plot) -> sample
+    req(input$PCR_Baseline_plot) -> baseline
     plot_type <- req(input$PCR_plot_type)
     
     isolate({
@@ -3468,6 +3824,12 @@ server <- function(input, output, session) {
         PCRstep5 = pcrResult$NewPCR %>% 
           dplyr::filter(HousekGene == Hgene, Gene == gene) %>%
           dplyr::mutate(GeneH = paste(Gene, ", Housekeeping: ",HousekGene))
+        if( ! "All" %in% sample){
+          PCRstep5 = PCRstep5 %>% dplyr::filter(Sample %in% sample)
+        }
+        if( ! "All" %in% baseline){
+          PCRstep5 = PCRstep5 %>% dplyr::filter(Baseline %in% baseline)
+        }
         
         if(length(unique(PCRstep5$Time)) >1 ){
           plot1 = 
@@ -3477,50 +3839,62 @@ server <- function(input, output, session) {
             labs(x = "Time", y = "2^(-DDCT)")
         }else{
           plot1 = 
-            ggplot(data = PCRstep5, aes(x = Gene, y = ddCt))+
-            labs(x = "Gene", y = "DDCT")
-          plot2 = ggplot(data = PCRstep5, aes(x =Gene, y = Q ))+
-            labs(x = "Gene", y = "2^(-DDCT)")
+            ggplot(data = PCRstep5, aes(x = Sample, y = ddCt))+
+            labs(x = "Sample", y = "DDCT")
+          plot2 = ggplot(data = PCRstep5, aes(x =Sample, y = Q ))+
+            labs(x = "Sample", y = "2^(-DDCT)")
+        }
+
+
+        if( "bar"  %in% plot_type && "point" %in% plot_type) {
+          plot1 <- plot1 + geom_bar(aes(col = Sample,fill = Sample),alpha = 0.4, stat = "identity", position = "dodge")
+                                        #text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
+          plot2 <- plot2 + geom_bar(aes(col = Sample,fill = Sample),alpha = 0.4, stat = "identity", position = "dodge")
+                                        #text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
+        }else if( "bar"  %in% plot_type && !"point" %in% plot_type){
+          plot1 <- plot1 + geom_bar(aes(col = Sample,fill = Sample), stat = "identity", position = "dodge")
+                                        #text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
+          plot2 <- plot2 + geom_bar(aes(col = Sample,fill = Sample), stat = "identity", position = "dodge")
+                                        #text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
         }
         
         if ("point" %in% plot_type ) {
           if(length(unique(PCRstep5$Time)) >1){
             plot1 <- plot1 + geom_jitter(aes(shape=Time, color = Sample,
                                             text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0, size = 3)
+                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0,width = 0.1, size = 3)
             plot2 <- plot2 + geom_jitter(aes(shape=Time, color = Sample,
                                             text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0, size = 3)
+                                                         "<br>Sample: ", Sample,"<br>Time: ",Time)),height = 0,width = 0.1, size = 3)
           }
           else{
             plot1 <- plot1 + geom_jitter(aes(color = Sample,
                                             text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample)),size = 3)
+                                                         "<br>Sample: ", Sample)),height = 0,width = 0.1, size = 3)
             plot2 <- plot2 + geom_jitter(aes(color = Sample,
                                             text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,
-                                                         "<br>Sample: ", Sample)),size = 3)
+                                                         "<br>Sample: ", Sample)),height = 0,width = 0.1, size = 3)
           }
 
-        } else if( "bar"  %in% plot_type) {
-          plot1 <- plot1 + geom_bar(aes(col = Sample,fill = Sample,
-                                        text = paste("Gene:", gene, "<br>DDCT:", ddCt,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
-          plot2 <- plot2 + geom_bar(aes(col = Sample,fill = Sample,
-                                        text = paste("Gene:", gene, "<br>2^(-DDCT):", Q,"<br>Housekeeping Gene: ",Hgene,"<br>Sample: ", Sample)), stat = "identity", position = "dodge")
         }
         
         plot1 = plot1  + 
           facet_wrap(~GeneH, ncol = 1) +
           theme_bw()+
-          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))+
+          theme(legend.position = "none",
+                axis.text.x = element_text(angle = 45, hjust = 1,size=8))+
           scale_color_brewer(palette = "Set1") +
           scale_fill_brewer(palette = "Set1") 
         
         plot2 = plot2 + 
           facet_wrap(~GeneH, ncol = 1) +
           theme_bw()+
-          theme(axis.text.x = element_text(angle = 45, hjust = 1,size=8))+
+          theme(legend.position = "none",
+                axis.text.x = element_text(angle = 45, hjust = 1,size=8))+
           scale_color_brewer(palette = "Set1") +
           scale_fill_brewer(palette = "Set1") 
+
+        if(length(unique(PCRstep5$Time)) == 1 ){ PCRstep5 = PCRstep5 %>% dplyr::select(-Time) }
         
         FlagsPCR$singleGeneInfo = list(
           Plot= list(Plot1 = plot1,Plot2 = plot2),
@@ -3529,16 +3903,19 @@ server <- function(input, output, session) {
         
         # Render del plot con Plotly
         if(y_axis=="ddCt"){
-          output$SingleGenePlot = plotly::renderPlotly({
-            plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text")
-            #plotly::layout(showlegend = FALSE)
-          })
+          # output$SingleGenePlot = plotly::renderPlotly({
+          #   plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot1, tooltip = "text")
+          #   plotly::layout(showlegend = FALSE)
+          #  })
+          output$SingleGenePlot = renderPlot(FlagsPCR$singleGeneInfo$Plot$Plot1)
+
         }
         else{
-          output$SingleGenePlot = plotly::renderPlotly({
-          plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text") 
-          #plotly::layout(showlegend = FALSE)
-          })
+          # output$SingleGenePlot = plotly::renderPlotly({
+          # plotly::ggplotly(FlagsPCR$singleGeneInfo$Plot$Plot2, tooltip = "text")
+          # plotly::layout(showlegend = FALSE)
+          #  })
+          output$SingleGenePlot = renderPlot(FlagsPCR$singleGeneInfo$Plot$Plot2)
         }
         
         output$SingleGeneTable = renderTable({FlagsPCR$singleGeneInfo$Table })
@@ -3552,19 +3929,15 @@ server <- function(input, output, session) {
     isolate({
       if(Hgene != "" && gene != ""){
         
-        #plotList = pcrResult$plotPCR 
-        
-        #if(is.null(plotList)) plotList = list()
-        
-        plotList = list()
+        plotList = pcrResult$plotPCR
+        if(is.null(plotList)) plotList = list()
+
         plot = FlagsPCR$singleGeneInfo$Plot
         table = FlagsPCR$singleGeneInfo$Table
-        
-        #if(is.null(plotList[[paste0(gene,"_H",Hgene)]])){
-          plotList[[paste0(gene,"_H",Hgene)]] = list(plot = ggplot(),
-                                                     table = NULL)
+
+        plotList[[paste0(gene,"_H",Hgene)]] = list(plot = plot, table = table)
           
-          PCRplotUI =  renderUI({
+        PCRplotUI =  renderUI({
             plot_output_list <- lapply(names(plotList), function(i) {
               plotOutput(paste0("PCRplot_", i), width = "100%" )
             })
@@ -3579,36 +3952,48 @@ server <- function(input, output, session) {
           })
           # Dynamically generate plot output UI
           output$PCRplot <- renderUI({PCRplotUI})
-          
           output$PCRtables <- renderUI({PCRtableUI})
-        #}
-        
-        plotList[[paste0(gene,"_H",Hgene)]]$plot = plot
-        plotList[[paste0(gene,"_H",Hgene)]]$table = table
-        
         
         output[[paste0("PCRplot_", gene,"_H",Hgene)]] <- renderPlot({
-          plotList[[paste0(gene,"_H",Hgene)]]$plot
+          plots <- plotList[[paste0(gene,"_H",Hgene)]]$plot
+          plots$Plot1 + plots$Plot2
         })
         output[[paste0("PCRtable_", gene,"_H",Hgene)]] <- renderTable({ plotList[[paste0(gene,"_H",Hgene)]]$table})
         
         pcrResult$plotPCR <- plotList
         
-        df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(Sample != input$PCRbaseline)
-        
-        pcrResult$PointPlot <- ggplot(df) + 
-          geom_jitter(aes(x = Time, y = -DDCT, col = Sample,shape=Time),height = 0,  size = 3) +  
-          facet_wrap(~HousekGene, ncol = 1) +
-          theme_bw() +
-          labs(x = "", y = "-DDCT", title = "")+
-          scale_color_brewer(palette = "Set1") +
-          scale_fill_brewer(palette = "Set1") 
-          # theme(
-          #   axis.text.x = element_blank(), 
-          #   axis.ticks.x = element_blank()
-          # )
+        #### generate the point plot as the first one but with the filtered genes
+
+        df = bind_rows(lapply(plotList, `[[`, "table"))
+        if (input$PCR_time == "") {
+          df <- df %>% dplyr::filter(!Sample %in% pcrResult$BaselineExp$Baseline)
+        }
+
+        if(input$PCR_time != ""){
+          pl = ggplot(df,aes(x = paste(Time," ",Gene), y = -DDCT)) +
+            geom_jitter(aes(shape=Time, color = Sample ),
+                        height = 0, size = 3) +
+            facet_wrap(~HousekGene, ncol = 1)+
+            theme_bw()+
+            labs(x="",y= "-DDCT", title = "", col = "Sample")+
+            theme(legend.position = "bottom")+
+            scale_color_brewer(palette = "Set1")
+        }else{
+          pl = ggplot(df,aes(x = Gene , y = -DDCT)) +
+            geom_jitter(aes(color = Sample), height = 0, size = 3) +
+            facet_wrap(~HousekGene, ncol = 1)+
+            theme_bw()+
+            labs(x="",y= "-DDCT", title = "", col = "Sample")+
+            theme(legend.position = "bottom")+
+            scale_color_brewer(palette = "Set1")
+        }
+
+        pcrResult$PointPlot <- pl
         
         output$PointGenePlot <- renderPlot({pcrResult$PointPlot})
+
+        updateSelectizeInput(inputId = "Select_Customize_Gene_plot",choices = c("",unique(df$Gene)),selected = "" )
+        updateSelectizeInput(inputId = "Select_Customize_HousKgene_plot",choices = c("",unique(df$HousekGene)),selected = "" )
         
       }
     })
@@ -3631,8 +4016,12 @@ server <- function(input, output, session) {
           generatePlotParameters(pcrResult$PointPlot)
         ),
         tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(pcrResult$PointPlot)
+        ),
+        tabPanel(
           "Save Plot",
-          generateSavePlotTab()
+          generateSavePlotTab(formats = TRUE)
         )
       ),
       footer = tagList(
@@ -3648,14 +4037,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonPCR_1 <- downloadHandler(
     filename = function() {
-      paste0("plot_PCR_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_PCR_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(pcrResult$PointPlot, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(pcrResult$PointPlot, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -3695,8 +4086,12 @@ server <- function(input, output, session) {
             generatePlotParameters(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2)
           ),
           tabPanel(
+            "X-Axis Order",
+            generateXAxisOrderTab(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2)
+          ),
+          tabPanel(
             "Save Plot",
-            generateSavePlotTab()
+            generateSavePlotTab(formats = TRUE)
           )
         ),
         footer = tagList(
@@ -3711,14 +4106,16 @@ server <- function(input, output, session) {
   
   output$downloadPlotButtonPCR_2 <- downloadHandler(
     filename = function() {
-      paste0("plot_PCR_", Sys.Date(), ".png")
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_PCR_", Sys.Date(), ".", format)
     },
     content = function(file) {
       manageSpinner(TRUE)
       width <- input$plotWidth
       height <- input$plotHeight
       dpi <- input$plotResolution
-      savePlotAsPNG(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2, file, width, height, dpi)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(pcrResult$plotPCR[[paste0(pcrResult$CustomGene,"_H",pcrResult$CustomHgene)]]$plot$Plot2, file, width, height, dpi, format)
       manageSpinner(FALSE)
     }
   )
@@ -5966,619 +6363,6 @@ server <- function(input, output, session) {
     
   })
   
-  generateLayerParameters <- function(plot) {
-    # Build the plot to extract computed data and aesthetics
-    plot_build <- ggplot_build(plot)
-    
-    # Dynamically generate tabs for each layer
-    layer_tabs <- lapply(seq_along(plot$layers), function(i) {
-      layer <- plot$layers[[i]]
-      layer_type <- class(layer$geom)[1]
-      
-      aes_mapping <- layer$mapping
-      data <- plot_build$data[[i]]
-      default_params <- layer$aes_params
-      
-      if(!is.null(aes_mapping$colour)){
-        colour_mapping<-rlang::quo_name(aes_mapping$colour)
-        data<-data %>% dplyr::mutate(!!colour_mapping := plot_build$plot$data[[colour_mapping]])
-      }
-      if(!is.null(aes_mapping$shape)){
-        shape_mapping<-rlang::quo_name(aes_mapping$shape)
-        data<-data %>% dplyr::mutate(!!shape_mapping := plot_build$plot$data[[shape_mapping]])
-      }
-      
-      #Function to extract specific aesthetic values
-      extract_aes_value <- function(aesthetic, default,x_val) {
-        if (!is.null(aes_mapping[[aesthetic]])) {
-          if (aesthetic == "colour") {
-            filtered_data <- data[data[["colour"]] == x_val, ]
-            return(unique(filtered_data[[aesthetic]]))
-          }
-          else if (aesthetic == "shape") {
-            filtered_data <- data[data[["shape"]] == x_val, ]
-            return(unique(filtered_data[[aesthetic]]))
-          }
-          else{
-            filtered_data <- data[data[["group"]] == x_val, ]
-            return(unique(filtered_data[[aesthetic]]))
-          }
-        }
-        if (!is.null(default_params[[aesthetic]])) {
-          return(default_params[[aesthetic]])
-        }
-        return(default)
-      }
-      
-      # Generate inputs dynamically for layer-specific parameters
-      tabPanel(
-        paste("Layer", i, "(", layer_type, ")"),
-        wellPanel(
-          h4(paste("Customize Layer", i, "-", layer_type)),
-          
-          # Common controls for all layers
-          sliderInput(
-            paste0("layerSize_", i), "Layer Size", 
-            min = 0, max = max(5, extract_aes_value("size", 1, 1)),
-          step = 0.1, value = extract_aes_value("size", 1, 1)
-          ),
-          
-          # Layer-specific customization
-          if (layer_type == "GeomPoint") {
-            tagList(
-              if ("colour" %in% names(aes_mapping)) {
-                lapply(unique(data[["colour"]]), function(x_val) {
-                  colourpicker::colourInput(
-                    paste0("pointColor_", i, "_", gsub("#", "", x_val)),
-                    paste0("Point Color for ",colour_mapping," ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
-                    value = x_val
-                  )
-                })
-              } else {
-                colourpicker::colourInput(
-                  paste0("pointColor_", i),
-                  "Point Color",
-                  value = extract_aes_value("colour", "#000000",1)
-                )
-              },
-              
-              if ("shape" %in% names(aes_mapping)) {
-                lapply(unique(data[["shape"]]), function(x_val) {
-                  selectInput(
-                    paste0("pointShape_", i, "_", x_val),
-                    paste0("Point Shape for ",shape_mapping," ", unique(data[data[["shape"]] == x_val, ][[shape_mapping]])),
-                    choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
-                    selected = x_val
-                  )
-                })
-              } else {
-                selectInput(
-                  paste0("pointShape_", i),
-                  "Point Shape",
-                  choices = c("Circle" = 16, "Triangle" = 17, "Square" = 15, "Cross" = 4, "Plus" = 3),
-                  selected = extract_aes_value("shape", 16,1)
-                )
-              }
-            )
-          } else if (layer_type == "GeomLine") {
-            tagList(
-              # Line Type
-              if ("linetype" %in% names(aes_mapping)) {
-                lapply(unique(data[["group"]]), function(x_val) {
-                  selectInput(
-                    paste0("lineType_", i, "_", x_val),
-                    paste("Line Type for Group", x_val),
-                    choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
-                    selected = extract_aes_value("linetype", "solid",x_val)
-                  )
-                })
-              } else {
-                selectInput(
-                  paste0("lineType_", i),
-                  "Line Type",
-                  choices = c("Solid" = "solid", "Dashed" = "dashed", "Dotted" = "dotted", "Dotdash" = "dotdash"),
-                  selected = extract_aes_value("linetype", "solid",1)
-                )
-              },
-              
-              # Line Color
-              if ("colour" %in% names(aes_mapping)) {
-                lapply(unique(data[["colour"]]), function(x_val) {
-                  colourpicker::colourInput(
-                    paste0("lineColor_", i, "_",  gsub("#", "", x_val)),
-                    paste0("Line Color for ", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
-                    #value = extract_aes_value("colour", "#000000",x_val)
-                    value = x_val
-                  )
-                })
-              } else {
-                colourpicker::colourInput(
-                  paste0("lineColor_", i),
-                  "Line Color",
-                  value = extract_aes_value("colour", "#000000",1)
-                )
-              }
-            )
-          } else if (layer_type == "GeomBar") {
-            tagList(
-              # Bar Fill Color
-              if ("fill" %in% names(aes_mapping)) {
-                lapply(unique(data[["group"]]), function(x_val) {
-                  colourpicker::colourInput(
-                    paste0("barFillColor_", i, "_", x_val),
-                    paste("Bar Fill Color for Group", x_val),
-                    value = extract_aes_value("fill", "#FF9999",x_val)
-                  )
-                })
-              } else {
-                colourpicker::colourInput(
-                  paste0("barFillColor_", i),
-                  "Bar Fill Color",
-                  value = extract_aes_value("fill", "#FF9999",1)
-                )
-              },
-              sliderInput(
-                paste0("barWidth_", i),
-                "Bar Width",
-                min = 0.1, max = 1, value = extract_aes_value("width", 0.5)
-              ),
-              if("color" %in% names(aes_mapping)){
-                lapply(unique(data[["colour"]]), function(x_val) {
-                  colourpicker::colourInput(
-                    paste0("barColor_", i, "_",  gsub("#", "", x_val)),
-                    paste0("Bar Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
-                    #value = extract_aes_value("colour", "#000000",x_val)
-                    value = x_val
-                  )
-                })
-              } else {
-                colourpicker::colourInput(
-                  paste0("barColor_", i),
-                  "Bar Color",
-                  value = extract_aes_value("colour", "#000000",1)
-                )
-              }
-            )
-          } else if (layer_type == "GeomErrorbar") {
-            tagList(
-              sliderInput(
-                paste0("errorBarWidth_", i),
-                "Error Bar Width",
-                min = 0.1, max = 2, value = extract_aes_value("width", 0.5,1)
-              )
-              ,
-              if ("colour" %in% names(aes_mapping)) {
-                lapply(unique(data[["colour"]]), function(x_val) {
-                  colourpicker::colourInput(
-                    paste0("errorBarColor_", i, "_",  gsub("#", "", x_val)),
-                    paste("Error Bar Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
-                    #value = extract_aes_value("colour", "#000000",x_val)
-                    value = x_val
-                  )
-                })
-              } else {
-                colourpicker::colourInput(
-                  paste0("errorBarColor_", i),
-                  "Error Bar Color",
-                  value = extract_aes_value("colour", "#000000",1)
-                )
-              }
-            )
-          } else if (layer_type == "GeomBoxplot") {
-            tagList(
-              # Notch
-              checkboxInput(
-                paste0("notch_", i),
-                "Add Notch",
-                value = extract_aes_value("notch", FALSE,1)
-              ),
-              
-              if ("fill" %in% names(aes_mapping)) {
-                lapply(unique(data[["group"]]), function(x_val) {
-                  colourpicker::colourInput(
-                    paste0("boxFillColor_", i, "_", x_val),
-                    paste("Boxplot Fill Color for Group", x_val),
-                    value = extract_aes_value("fill", "#FF9999",x_val)
-                  )
-                })
-              } else {
-                colourpicker::colourInput(
-                  paste0("boxFillColor_", i),
-                  "Boxplot Fill Color",
-                  value = extract_aes_value("fill", "#FF9999",1)
-                )
-              },
-              
-              if("colour" %in% names(aes_mapping)){
-                lapply(unique(data[["colour"]]), function(x_val) {
-                  colourpicker::colourInput(
-                    paste0("boxOutlineColor_", i, "_",  gsub("#", "", x_val)),
-                    paste("Boxplot Outline Color for", colour_mapping, " ", unique(data[data[["colour"]] == x_val, ][[colour_mapping]])),
-                    #value = extract_aes_value("colour", "#000000",x_val)
-                    value = x_val
-                  )
-                })
-              } else {
-                colourpicker::colourInput(
-                  paste0("boxOutlineColor_", i),
-                  "Boxplot Outline Color",
-                  value = extract_aes_value("colour", "#000000",1)
-                )
-              },
-              colourpicker::colourInput(
-                paste0("outlierColor_", i),
-                "Outlier Color",
-                value = extract_aes_value("outlier.colour", "#FF0000",1)
-              ),
-              sliderInput(
-                paste0("outlierSize_", i),
-                "Outlier Size",
-                min = 1, max = 5, value = extract_aes_value("outlier.size", 2,1)
-              ),
-              sliderInput(
-                paste0("boxWidth_", i),
-                paste("Box Width"),
-                min = 0.1, max = 1, value = extract_aes_value("width", 0.5,1)
-              )
-            )
-          } else {
-            p("No specific customization available for this layer type.")
-          }
-        )
-      )
-    })
-    
-    return(layer_tabs)
-  }
-  
-  
-  
-  customizePlot <- function(plot, input) {
-    # General theme and title customization
-    backgroundColor <- input$backgroundColor
-    
-    updatedPlot <- plot +
-      ggtitle(input$plotTitle) +
-      labs(x = input$xAxisLabel, y = input$yAxisLabel) +
-      theme(
-        plot.title = element_text(size = input$plotTitleFontSize, color = input$plotTitleColor),
-        axis.text.x = element_text(size = input$xAxisFontSize),
-        axis.text.y = element_text(size = input$yAxisFontSize),
-        panel.background = element_rect(fill = backgroundColor, color = backgroundColor),
-        plot.background = element_rect(fill = backgroundColor, color = backgroundColor)
-      )
-    
-    updatedPlot$layers <- list()
-    plot_build=ggplot_build(plot)
-    
-    for (i in seq_along(plot$layers)) {
-      layer <- plot$layers[[i]]
-      layer_type <- class(layer$geom)[1]
-      current_mapping <- layer$mapping
-      
-      # Determine if properties are mapped
-      is_colour_mapped <- "colour" %in% names(current_mapping)
-      is_fill_mapped <- "fill" %in% names(current_mapping)
-      is_shape_mapped <- "shape" %in% names(current_mapping)
-      is_linetype_mapped <- "linetype" %in% names(current_mapping)
-      
-      
-      unique_x<-unique(plot_build$data[[i]][["group"]] )
-      unique_x_colour<-unique(plot_build$data[[i]][["colour"]] )
-      unique_x_shape<-unique(plot_build$data[[i]][["shape"]] )
-      # Customize each type of geom layer
-      if (layer_type == "GeomPoint") {
-        
-        colour_scale <- if (is_colour_mapped) {
-          scale_color_manual(
-            values = unlist(lapply(unique_x_colour, function(x_val) {
-              input[[paste0("pointColor_", i, "_",  gsub("#", "", x_val))]]
-            }))
-          )
-        } else NULL
-        
-        shape_scale <- if (is_shape_mapped) {
-          scale_shape_manual(
-            values = unlist(lapply(unique_x_shape, function(x_val) {
-              as.integer(input[[paste0("pointShape_", i, "_", x_val)]])
-            }))
-          )
-        } else NULL
-        
-        if(!is_shape_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_point(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              shape = as.integer(input[[paste0("pointShape_", i)]]),
-              colour= input[[paste0("pointColor_", i)]]
-            )+
-            colour_scale +
-            shape_scale
-        }
-        else if(is_shape_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_point(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              colour= input[[paste0("pointColor_", i)]]
-            )+
-            colour_scale +
-            shape_scale
-        }
-        else if(!is_shape_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_point(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              shape = as.integer(input[[paste0("pointShape_", i)]]),
-            )+
-            colour_scale +
-            shape_scale
-        }
-        else if(is_shape_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_point(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-            )+
-            colour_scale +
-            shape_scale
-        }
-        
-      } else if (layer_type == "GeomBar") {
-        
-        colour_scale <- if (is_colour_mapped) {
-          scale_color_manual(
-            values = unlist(lapply(unique_x_colour, function(x_val) {
-              input[[paste0("barColor_", i,"_", x_val)]]
-            }))
-          )
-        } else NULL
-        fill_scale <- if (is_fill_mapped) {
-          scale_fill_manual(
-            values = unlist(lapply(unique_x, function(x_val) {
-              input[[paste0("barFillColor_", i,"_", x_val)]]
-            }))
-          )
-        } else NULL
-        
-        if(!is_fill_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_bar(
-              mapping = layer$mapping,
-              position = layer$position,
-              stat = "identity",
-              size = input[[paste0("layerSize_", i)]],
-              width = input[[paste0("barWidth_", i)]],
-              fill= input[[paste0("barFillColor_", i)]],
-              color= input[[paste0("barColor_", i)]]
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        else if(is_fill_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_bar(
-              #data = layer$data,
-              mapping = layer$mapping,
-              position = layer$position,
-              stat = "identity",
-              size = input[[paste0("layerSize_", i)]],
-              width = input[[paste0("barWidth_", i)]],
-              color= input[[paste0("barColor_", i)]]
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        else if(!is_fill_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_bar(
-              mapping = layer$mapping,
-              position = layer$position,
-              stat = "identity",
-              size = input[[paste0("layerSize_", i)]],
-              width = input[[paste0("barWidth_", i)]],
-              fill= input[[paste0("barFillColor_", i)]]
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        else if(is_fill_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_bar(
-              mapping = layer$mapping,
-              position = layer$position,
-              stat = "identity",
-              size = input[[paste0("layerSize_", i)]],
-              width = input[[paste0("barWidth_", i)]],
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        
-      } else if (layer_type == "GeomLine") {
-        colour_scale <- if (is_colour_mapped) {
-          scale_color_manual(
-            values = unlist(lapply(unique_x_colour, function(x_val) {
-              input[[paste0("lineColor_", i,"_", x_val)]]
-            }))
-          )
-        } else NULL
-        linetype_scale <- if (is_linetype_mapped) {
-          scale_linetype_manual(
-            values = unlist(lapply(unique_x, function(x_val) {
-              input[[paste0("lineType_", i,"_", x_val)]]
-            }))
-          )
-        } else NULL
-        
-        if(!is_linetype_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_line(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              linetype= input[[paste0("lineType_", i)]],
-              color= input[[paste0("lineColor_", i)]]
-            ) +
-            colour_scale +
-            linetype_scale
-        }
-        else if(is_linetype_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_line(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              color= input[[paste0("lineColor_", i)]]
-            ) +
-            colour_scale +
-            linetype_scale
-        }
-        else if(!is_linetype_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_line(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              linetype= input[[paste0("lineType_", i)]]
-            ) +
-            colour_scale +
-            linetype_scale
-        }
-        else if(is_linetype_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_line(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]]
-            ) +
-            colour_scale +
-            linetype_scale
-        }
-        
-      } else if (layer_type == "GeomBoxplot") {
-        
-        colour_scale <- if (is_colour_mapped) {
-          scale_color_manual(
-            values = unlist(lapply(unique_x_colour, function(x_val) {
-              input[[paste0("boxOutlineColor_", i,"_", x_val)]]
-            }))
-          )
-        } else NULL
-        fill_scale <- if (is_fill_mapped) {
-          scale_fill_manual(
-            values = unlist(lapply(unique_x, function(x_val) {
-              input[[paste0("boxFillColor_", i,"_", x_val)]]
-            }))
-          )
-        } else NULL
-        
-        if(!is_fill_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_boxplot(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              notch = input[[paste0("notch_", i)]],
-              width = input[[paste0("boxWidth_", i)]],
-              outlier.size = input[[paste0("outlierSize_", i)]],
-              outlier.colour = input[[paste0("outlierColor_", i)]],
-              color= input[[paste0("boxOutlineColor_", i)]],
-              fill = input[[paste0("boxFillColor_", i)]]
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        else if(is_fill_mapped&&!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_boxplot(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              notch = input[[paste0("notch_", i)]],
-              width = input[[paste0("boxWidth_", i)]],
-              outlier.size = input[[paste0("outlierSize_", i)]],
-              outlier.colour = input[[paste0("outlierColor_", i)]],
-              color= input[[paste0("boxOutlineColor_", i)]]
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        else if(!is_fill_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_boxplot(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              notch = input[[paste0("notch_", i)]],
-              width = input[[paste0("boxWidth_", i)]],
-              outlier.size = input[[paste0("outlierSize_", i)]],
-              outlier.colour = input[[paste0("outlierColor_", i)]],
-              fill= input[[paste0("boxFillColor_", i)]]
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        else if(is_fill_mapped&&is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_boxplot(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              notch = input[[paste0("notch_", i)]],
-              width = input[[paste0("boxWidth_", i)]],
-              outlier.size = input[[paste0("outlierSize_", i)]],
-              outlier.colour = input[[paste0("outlierColor_", i)]]
-            ) +
-            colour_scale +
-            fill_scale
-        }
-        
-      } else if (layer_type == "GeomErrorbar") {
-        colour_scale <- if (is_colour_mapped) {
-          scale_color_manual(
-            values = unlist(lapply(unique_x_colour, function(x_val) {
-              input[[paste0("errorBarColor_", i,"_", x_val)]]
-            }))
-          )
-        } else NULL
-        
-        if(!is_colour_mapped){
-          updatedPlot <- updatedPlot +
-            geom_errorbar(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              width = input[[paste0("errorBarWidth_", i)]],
-              color= input[[paste0("errorBarColor_", i)]]
-            ) +
-            colour_scale
-        }
-        else{
-          updatedPlot <- updatedPlot +
-            geom_errorbar(
-              mapping = layer$mapping,
-              position = layer$position,
-              size = input[[paste0("layerSize_", i)]],
-              width = input[[paste0("errorBarWidth_", i)]]
-            ) +
-            colour_scale
-        }
-        
-      } else {
-        warning(paste("No specific customizations applied for layer type:", layer_type))
-      }
-    }
-    
-    return(updatedPlot)
-  }
-  
   #########################################
   
   output$downloadPlotButtonCYTOTOX_Plot1 <- downloadHandler(
@@ -8507,317 +8291,387 @@ server <- function(input, output, session) {
     for(dpath in 1:length(datapaths)){
       mess <- readRDS(datapaths[dpath])
       names(mess) -> namesRes
-      if("Flags"%in% namesRes) namesRes = namesRes[ namesRes != "Flags"]
-      
-      if(all(namesRes %in% names(wbquantResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensity %>% mutate(DataSet = dpath)
-      } else if(all(namesRes %in% names(pcrResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$PCR[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(endocResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$ENDOC[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(elisaResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$ELISA[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(cytotoxResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$CYTOTOX[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(ifResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$IF[[dpath]]  <- mess
-      } else if(all(namesRes %in% names(facsResult)) || all(namesRes %in% names(DataAnalysisModule))){
-        DataStatisticModule$FACS[[dpath]]  <- mess
-      }else{
-        showAlert("Error", paste(mess[["message"]],"\n The file must be RDs saved through the Data Analysis module."), "error", 5000)
-        manageSpinner(FALSE)
-        return()
+
+      if("Flags" %in% namesRes) namesRes = namesRes[namesRes != "Flags"]
+
+      # Define the mapping between DataAnalysisModule names and DataStatisticModule names
+      analysisTypeMap <- list(
+        wbquantResult = "WB",
+        pcrResult = "PCR",
+        endocResult = "ENDOC",
+        elisaResult = "ELISA",
+        cytotoxResult = "CYTOTOX",
+        ifResult = "IF",
+        facsResult = "FACS"
+      )
+
+      # Define expected names for each analysis type (for direct file matching)
+      expectedNames <- list(
+        WB = names(wbquantResult),
+        PCR = names(pcrResult),
+        ENDOC = names(endocResult),
+        ELISA = names(elisaResult),
+        CYTOTOX = names(cytotoxResult),
+        IF = names(ifResult),
+        FACS = names(facsResult)
+      )
+
+      # Check if this is a combined DataAnalysisModule file (contains multiple analysis results)
+      dataAnalysisNames <- names(DataAnalysisModule)
+      matchingAnalyses <- namesRes[namesRes %in% dataAnalysisNames]
+
+      if(length(matchingAnalyses) > 0) {
+        # This is a combined file - extract each matching analysis
+        for(analysisName in matchingAnalyses) {
+          if(analysisName %in% names(analysisTypeMap)) {
+            statModuleName <- analysisTypeMap[[analysisName]]
+            analysisData <- mess[[analysisName]]
+
+            if(!is.null(analysisData)) {
+              if(statModuleName == "WB" && !is.null(analysisData$AdjRelDensity)) {
+                DataStatisticModule$WB[[paste0(dpath, "_", analysisName)]] <-
+                  analysisData$AdjRelDensity %>% mutate(DataSet = dpath)
+              } else {
+                DataStatisticModule[[statModuleName]][[paste0(dpath, "_", analysisName)]] <- analysisData
+              }
+            }
+          }
+        }
+        DataStatisticModule$Flag <- TRUE
+      } else {
+        # This is a single analysis file - determine which type it is
+        analysisDetected <- FALSE
+
+        for(statName in names(expectedNames)) {
+          expectedCols <- expectedNames[[statName]]
+          if(any(namesRes %in% expectedCols)) {
+            if(statName == "WB" && !is.null(mess$AdjRelDensity)) {
+              DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensity %>% mutate(DataSet = dpath)
+              analysisDetected <- TRUE
+              break
+            } else if(all(expectedCols %in% namesRes)) {
+              DataStatisticModule[[statName]][[dpath]] <- mess
+              analysisDetected <- TRUE
+              break
+            }
+          }
+        }
+
+        if(!analysisDetected) {
+          showAlert("Error", "Unrecognized file format.\nThe file must be an RDs saved through the Data Analysis module.", "error", 5000)
+          manageSpinner(FALSE)
+          return()
+        }
+        DataStatisticModule$Flag <- TRUE
       }
-      DataStatisticModule$Flag <- TRUE
     }
     manageSpinner(FALSE)
     showAlert("Success", "The RDs files have been uploaded with success", "success", 2000)
     return(NULL)
   })
   
+  # Helper function to create the base statistical plot
+  createStatPlot <- function(stats, points, x_var, y_var, color_var, subtitle_txt, facet_var = NULL) {
+    p <- ggplot(stats, aes_string(x = x_var, y = "Mean")) +
+      geom_bar(stat = "identity", color = "black", fill = "#BAE1FF", position = position_dodge()) +
+      geom_errorbar(aes(ymin = Mean - sd, ymax = Mean + sd), width = .2, position = position_dodge(.9)) +
+      geom_point(data = points, aes_string(x = x_var, y = y_var, color = color_var),
+                 position = position_jitter(width = 0.2), size = 3) +
+      theme_bw() +
+      labs(title = "Results", subtitle = subtitle_txt, y = y_var, x = x_var, color = "Experiments") +
+      annotate("text", x = Inf, y = Inf,
+               label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n***: p <= 0.001",
+               hjust = 1.1, vjust = 1.5, size = 5, color = "black")
+
+    if (!is.null(facet_var)) {
+      p <- p + facet_wrap(as.formula(paste("~", facet_var)))
+    }
+    return(p)
+  }
+
+  # Helper function to format the main test text
+  formatMainTestText <- function(MulvTest, PairwiseTest, path = NULL) {
+    main_test_pvalue <- if (!is.null(MulvTest) && nrow(MulvTest)) MulvTest$pValue[1] else NA
+
+    if (!is.null(path)) {
+      return(paste0("Test used is: ", path[length(path)]))
+    }
+
+    if (is.null(PairwiseTest) && !is.na(main_test_pvalue)) {
+      return(paste0("P value from main test = ", signif(main_test_pvalue, digits = 3)))
+    }
+    return("")
+  }
+
   StatisticalAnalysisResults <- reactive({
-    if (!is.null(input$StatAnalysis) && input$StatAnalysis != "") {
-      results <- DataStatisticModule[[input$StatAnalysis]]
-      BivTest <- NULL
-      MulvTest <- NULL
-      PairwiseTest <- NULL
-      steps <- NULL
-      resplot <- NULL
-      stats <- NULL
-      path <- NULL
-      
-      switch(input$StatAnalysis, 
-             "WB" = {
-               do.call(rbind, results) -> results
-               points <- results %>%
-                 dplyr::select(DataSet, SampleName, AdjRelDensity) %>%
-                 dplyr::mutate(SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
-                               SampleName = trimws(SampleName),
-                               ColorSet = as.character(DataSet))
-               
-               stats <- points %>%
-                 group_by(SampleName) %>%
-                 dplyr::summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
-               
-               res <- testStat.function(points %>% select(SampleName, AdjRelDensity) %>% as_tibble())
-               BivTest <- res$BivTest
-               MulvTest <- res$MulvTest
-               PairwiseTest <- res$pairwise
-               steps <- res$steps
-               path <- res$path
-               
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               main_test_txt <- if (is.null(PairwiseTest)) {
-                 signif(main_test_pvalue, digits = 3) %>% paste0("P value from main test = ", .)
-               } else {
-                 ""
-               }
-               
-               resplot <- ggplot(stats, aes(x = SampleName, y = Mean)) + 
-                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = points, aes(x = SampleName, y = AdjRelDensity, color = ColorSet),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw() +
-                 labs(title = "Results", subtitle = main_test_txt, y = "AdjRelDensity", x = "SampleName", color = "Experiments") +
-                 annotate("text", x = Inf, y = Inf, label = "not showed: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-             },
-             "IF" = {
-               resultsNew <- do.call(rbind,
-                                     lapply(1:length(results),
-                                            function(l){
-                                              d = results[[l]]$SubStatData
-                                              d$File = l
-                                              d
-                                            } 
-                                     ) 
+    # Early return if no analysis selected
+    if (is.null(input$StatAnalysis) || input$StatAnalysis == "") {
+      return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL))
+    }
+
+    # Get results for selected analysis
+    results <- DataStatisticModule[[input$StatAnalysis]]
+
+    # Initialize result variables
+    testResults <- list(BivTest = NULL, MulvTest = NULL, PairwiseTest = NULL, steps = NULL, path = NULL)
+    stats <- NULL
+    resplot <- NULL
+    points <- NULL
+
+    # Process data based on analysis type
+    switch(input$StatAnalysis,
+
+           "WB" = {
+             # Combine and prepare data
+             results <- do.call(rbind, results)
+             points <- results %>%
+               dplyr::select(DataSet, SampleName, AdjRelDensity) %>%
+               dplyr::mutate(
+                 SampleName = gsub(pattern = "^[0-9]. ", x = SampleName, replacement = ""),
+                 SampleName = trimws(SampleName),
+                 ColorSet = as.character(DataSet)
                )
-               
-               stats <- resultsNew %>%
-                 group_by(ExpCond) %>% 
-                 summarise(Mean = mean(Values), sd = sd(Values))
-               
-               res <- testStat.function(resultsNew[,c("ExpCond", "Values")] %>% as_tibble() )
-               BivTest <- res$BivTest
-               MulvTest <- res$test
-               PairwiseTest <- res$pairwise
-               steps <- res$steps
-               path <- res$path
-               
-               main_test_txt <-  paste0("Test used is: ", path[length(path)])
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               
-               resplot <- ggplot(stats, aes(x = ExpCond, y = Mean)) + 
-                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = resultsNew, aes(x = ExpCond, y = Values, color = as.factor(File)),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw()+
-                 labs(title = "Results", subtitle = main_test_txt, color = "Experiments") +
-                 annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-               
-               stats <- stats %>% rename(SampleName = ExpCond)
-               
-             },
-             "PCR" = {
-               req(input$stat_genHpcr)
-               
-               resultsNew <- do.call(rbind,
-                                     lapply(1:length(results),
-                                            function(l){
-                                              d = results[[l]]$NewPCR
-                                              d$File = l
-                                              d
-                                            } 
-                                     ) 
+
+             # Calculate statistics
+             stats <- points %>%
+               group_by(SampleName) %>%
+               dplyr::summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
+
+             # Run statistical tests
+             res <- testStat.function(points %>% select(SampleName, AdjRelDensity) %>% as_tibble())
+             testResults <- list(
+               BivTest = res$BivTest, MulvTest = res$MulvTest,
+               PairwiseTest = res$pairwise, steps = res$steps, path = res$path
+             )
+
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest)
+             resplot <- createStatPlot(stats, points, "SampleName", "AdjRelDensity", "ColorSet", subtitle_txt)
+           },
+
+           "IF" = {
+             # Combine results from multiple files
+             resultsNew <- do.call(rbind, lapply(seq_along(results), function(l) {
+               d <- results[[l]]$SubStatData
+               d$File <- l
+               d
+             }))
+
+             # Calculate statistics
+             stats <- resultsNew %>%
+               group_by(ExpCond) %>%
+               summarise(Mean = mean(Values), sd = sd(Values), .groups = 'drop')
+
+             # Run statistical tests
+             res <- testStat.function(resultsNew[, c("ExpCond", "Values")] %>% as_tibble())
+             testResults <- list(
+               BivTest = res$BivTest, MulvTest = res$MulvTest,
+               PairwiseTest = res$pairwise, steps = res$steps, path = res$path
+             )
+
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest, testResults$path)
+             points <- resultsNew %>% mutate(ColorSet = as.factor(File))
+             resplot <- createStatPlot(stats, points, "ExpCond", "Values", "ColorSet", subtitle_txt)
+
+             # Rename for consistency
+             stats <- stats %>% rename(SampleName = ExpCond)
+           },
+
+           "PCR" = {
+             req(input$stat_genHpcr)
+
+             # Collect and flatten all tables from results
+             all_tables <- lapply(seq_along(results), function(res_idx) {
+               if (!is.null(results[[res_idx]]$plotPCR)) {
+                 lapply(results[[res_idx]]$plotPCR, function(x) {
+                   d <- x$table
+                   d$File <- res_idx
+                   d
+                 })
+               }
+             })
+             all_tables_flat <- unlist(all_tables, recursive = FALSE)
+             valid_tables <- Filter(function(tbl) !is.null(tbl) && nrow(tbl) > 0, all_tables_flat)
+
+             if (length(valid_tables) == 0) return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL))
+
+             combined_table <- bind_rows(valid_tables)
+
+             # Prepare data
+             resultsNew <- combined_table %>%
+               rename(Q = `2^(-DDCT)`) %>%
+               as.data.frame() %>%
+               mutate(
+                 Q = as.numeric(Q),
+                 GeneH = paste(Gene, ", Housekeeping: ", HousekGene)
+               ) %>%
+               dplyr::filter(GeneH == input$stat_genHpcr)
+
+             # Calculate statistics
+             stats <- resultsNew %>%
+               dplyr::group_by(Sample) %>%
+               dplyr::summarise(Mean = mean(Q), sd = sd(Q), .groups = 'drop')
+
+             # Run statistical tests
+             res <- testStat.function(resultsNew %>% dplyr::select(Sample, Q) %>% as_tibble())
+
+             if (is.null(res)) {
+               showAlert("Error", "The number of values per group has to be greater than 2.", "error", 5000)
+               testResults$steps <- "The number of values per group has to be greater than 2."
+             } else {
+               testResults <- list(
+                 BivTest = res$BivTest, MulvTest = res$MulvTest,
+                 PairwiseTest = res$pairwise, steps = res$steps, path = res$path
                )
-               
-               resultsNew <- as.data.frame(resultsNew) %>%
-                 mutate(Q = as.numeric(Q), GeneH = paste(Gene, ", Housekeeping: ", HousekGene))%>% 
-                 dplyr::filter(GeneH == input$stat_genHpcr )
-               
-               stats <- resultsNew %>%
-                 dplyr::group_by(Sample) %>% 
-                 dplyr::summarise(Mean = mean((Q)), sd = sd(Q))
-               
-               res <- testStat.function(resultsNew%>% dplyr::select(Sample, Q) %>% as_tibble()) 
-               
-               if(is.null(res)){ 
-                 showAlert("Error", "The number of values per group has to be greater than 2.", "error", 5000)
-                 steps = "The number of values per group has to be greater than 2."
-               }
-               
-               BivTest <- res$BivTest
-               MulvTest <- res$test
-               PairwiseTest <- res$pairwise
-               steps <- res$steps
-               path <- res$path
-               
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               main_test_txt <- if (is.null(PairwiseTest)) {
-                 signif(main_test_pvalue, digits = 3) %>% paste0("P value from main test = ", .)
-               } else {
-                 ""
-               }
-               
-               resplot <- ggplot(stats, aes(x = Sample, y = Mean)) + 
-                 geom_bar(stat="identity", color="black", fill = "#BAE1FF", position=position_dodge()) +
-                 geom_errorbar(aes(ymin=Mean-sd, ymax=Mean+sd), width=.2, position=position_dodge(.9)) +
-                 geom_point(data = resultsNew, aes(x = Sample, y = Q, color = as.factor(File)),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw() +
-                 facet_wrap(~GeneH)+
-                 labs(title = "Results", subtitle = main_test_txt, y = "Q", x = "Sample", color = "Experiments") +
-                 annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-               
-               stats <- stats %>% rename(SampleName = Sample)
-             },
-             "FACS" = {
-               resultsNew <- do.call(rbind,
-                                     lapply(1:length(results), function(l) {
-                                       d <- results[[l]]$dataFinal
-                                       d <- d %>%
-                                         tidyr::gather(-Name, key = "Gate", value = "Perc") %>%
-                                         mutate(Perc = as.numeric(gsub("%", "", Perc)))
-                                       d$File <- l
-                                       d <- merge(d, results[[l]]$ExpConditionDF)
-                                       d
-                                     })
-               )
-               
-               stats <- resultsNew %>%
-                 group_by(ExpCondition, Gate) %>%
-                 summarise(Mean = mean(Perc), sd = sd(Perc), .groups = 'drop')
-               
-               resList <- lapply(unique(resultsNew$Gate), function(g) {
-                 gate_results <- resultsNew %>% dplyr::filter(Gate == g)
-                 testStat.function(gate_results[, c("ExpCondition", "Perc")]  %>% as_tibble() )
-               })
-               
-               BivTest <- do.call(rbind, lapply(resList, function(res) res$BivTest))
-               MulvTest <- do.call(rbind, lapply(resList, function(res) res$test))
-               PairwiseTest <- do.call(rbind, lapply(resList, function(res) res$pairwise))
-               steps <- unlist(lapply(resList, function(res) res$steps))
-               paths <- lapply(resList, function(res) res$path)
-               
-               main_test_pvalue <- if (!is.null(MulvTest)) MulvTest$pValue else NA
-               main_test_txt <- if (is.null(PairwiseTest)) {
-                 signif(main_test_pvalue, digits = 3) %>% paste0("P value from main test = ", .)
-               } else {
-                 ""
-               }
-               
-               resplot <- ggplot(stats, aes(x = ExpCondition, y = Mean)) + 
-                 geom_bar(stat = "identity", color = "black", fill = "#BAE1FF", position = position_dodge()) +
-                 geom_errorbar(aes(ymin = Mean - sd, ymax = Mean + sd), width = .2, position = position_dodge(.9)) +
-                 geom_point(data = resultsNew, aes(x = ExpCondition, y = Perc, color = as.factor(File)),
-                            position = position_jitter(width = 0.2), size = 3) +
-                 theme_bw() +
-                 labs(title = "Results", subtitle = main_test_txt, color = "File") +
-                 facet_wrap(~ Gate) +
-                 annotate("text", x = Inf, y = Inf, label = "ns: p > 0.05\n*: p <= 0.05\n**: p <= 0.01\n ***: p <= 0.001", 
-                          hjust = 1.1, vjust = 1.5, size = 5, color = "black")
-               
-               stats <- stats %>% rename(SampleName = ExpCondition)
-               
              }
-      )
-      
-      post_hoc_pairs = c()
-      annotations = c()
-      
-      if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && main_test_pvalue < 0.05) {
-        PairwiseTest <- PairwiseTest %>%
-          separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
-          mutate(group1 = trimws(group1), 
-                 group2 = trimws(group2),
-                 stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
-        
-        all_combinations <- combn(unique(stats$SampleName), 2, simplify = FALSE)
+
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest)
+             points <- resultsNew %>% mutate(ColorSet = as.factor(File))
+             resplot <- createStatPlot(stats, points, "Sample", "Q", "ColorSet", subtitle_txt, facet_var = "GeneH")
+
+             # Rename for consistency
+             stats <- stats %>% rename(SampleName = Sample)
+           },
+
+           "FACS" = {
+             # Combine results from multiple files
+             resultsNew <- do.call(rbind, lapply(seq_along(results), function(l) {
+               d <- results[[l]]$dataFinal %>%
+                 tidyr::gather(-Name, key = "Gate", value = "Perc") %>%
+                 mutate(Perc = as.numeric(gsub("%", "", Perc)))
+               d$File <- l
+               merge(d, results[[l]]$ExpConditionDF)
+             }))
+
+             # Calculate statistics
+             stats <- resultsNew %>%
+               group_by(ExpCondition, Gate) %>%
+               summarise(Mean = mean(Perc), sd = sd(Perc), .groups = 'drop')
+
+             # Run statistical tests for each gate
+             resList <- lapply(unique(resultsNew$Gate), function(g) {
+               gate_results <- resultsNew %>% dplyr::filter(Gate == g)
+               testStat.function(gate_results[, c("ExpCondition", "Perc")] %>% as_tibble())
+             })
+
+             # Combine test results
+             testResults <- list(
+               BivTest = do.call(rbind, lapply(resList, function(res) res$BivTest)),
+               MulvTest = do.call(rbind, lapply(resList, function(res) res$MulvTest)),
+               PairwiseTest = do.call(rbind, lapply(resList, function(res) res$pairwise)),
+               steps = unlist(lapply(resList, function(res) res$steps)),
+               path = lapply(resList, function(res) res$path)
+             )
+
+             # Create plot
+             subtitle_txt <- formatMainTestText(testResults$MulvTest, testResults$PairwiseTest)
+             points <- resultsNew %>% mutate(ColorSet = as.factor(File))
+             resplot <- createStatPlot(stats, points, "ExpCondition", "Perc", "ColorSet", subtitle_txt, facet_var = "Gate")
+
+             # Rename for consistency
+             stats <- stats %>% rename(SampleName = ExpCondition)
+           }
+    )
+
+    # Add significance annotations to plot
+    resplot <- addSignificanceAnnotations(
+      resplot, stats, testResults$PairwiseTest, testResults$BivTest, testResults$MulvTest
+    )
+
+    # Create decision tree
+    path <- if (is.list(testResults$path) && length(testResults$path)) testResults$path[[1]] else testResults$path
+    decision_tree <- if (length(path)) create_decision_tree(path) else NULL
+
+    # Render outputs
+    output$decision_tree_plot <- renderPlot({ decision_tree })
+    output$analysis_output <- renderUI({
+      steps_formatted <- gsub("Step", "<br><br>Step", testResults$steps)
+      steps_formatted <- gsub("Group", "<br>&nbsp;&nbsp;&nbsp;&nbsp;Group", steps_formatted)
+      HTML(steps_formatted)
+    })
+
+    return(list(
+      Table = stats,
+      TableTests = list(
+        PairwiseTest = testResults$PairwiseTest,
+        BivTest = testResults$BivTest,
+        MulvTest = testResults$MulvTest
+      ),
+      Plot = resplot,
+      DecisionTree = decision_tree
+    ))
+  })
+
+  # Helper function to add significance annotations to plot
+  addSignificanceAnnotations <- function(resplot, stats, PairwiseTest, BivTest, MulvTest) {
+    if (is.null(resplot) || is.null(stats)) return(resplot)
+
+    main_test_pvalue <- if (!is.null(MulvTest)) {
+      if (is.data.frame(MulvTest)) MulvTest$pValue[1] else MulvTest$pValue
+    } else NA
+
+    post_hoc_pairs <- list()
+    annotations <- c()
+
+    # Determine which test results to use for annotations
+    test_data <- NULL
+    if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && !is.na(main_test_pvalue) && main_test_pvalue < 0.05) {
+      test_data <- PairwiseTest
+    } else if (!is.null(BivTest)) {
+      test_data <- BivTest
+    }
+
+    if (!is.null(test_data) && nrow(test_data) > 0) {
+      test_data <- test_data %>%
+        separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
+        mutate(
+          group1 = trimws(group1),
+          group2 = trimws(group2),
+          stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns"))
+        )
+
+      # Generate all pairwise combinations
+      sample_names <- unique(stats$SampleName)
+      if (length(sample_names) >= 2) {
+        all_combinations <- combn(sample_names, 2, simplify = FALSE)
         
         post_hoc_pairs <- lapply(all_combinations, function(pair) {
-          pair <- unlist(pair)
           c(trimws(pair[1]), trimws(pair[2]))
         })
         
         annotations <- sapply(post_hoc_pairs, function(pair) {
-          idx <- which((PairwiseTest$group1 == pair[1] & PairwiseTest$group2 == pair[2]) |
-                         (PairwiseTest$group1 == pair[2] & PairwiseTest$group2 == pair[1]))
-          if (length(idx) > 0) {
-            as.character(PairwiseTest$stars[idx])
-          } else {
-            "ns"
-          }
+          idx <- which(
+            (test_data$group1 == pair[1] & test_data$group2 == pair[2]) |
+            (test_data$group1 == pair[2] & test_data$group2 == pair[1])
+          )
+          if (length(idx) > 0) as.character(test_data$stars[idx[1]]) else "ns"
         })
-        
-      } 
-      else if(!is.null(BivTest)){
-        BivTest <- BivTest %>%
-          separate(Condition, into = c("group1", "group2"), sep = " vs ") %>%
-          mutate(group1 = trimws(group1), 
-                 group2 = trimws(group2),
-                 stars = cut(pValue, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", "ns")))
-        
-        all_combinations <- combn(unique(stats$SampleName), 2, simplify = FALSE)
-        
-        post_hoc_pairs <- lapply(all_combinations, function(pair) {
-          pair <- unlist(pair)
-          c(trimws(pair[1]), trimws(pair[2]))
-        })
-        annotations <- sapply(post_hoc_pairs, function(pair) {
-          idx <- which((BivTest$group1 == pair[1] & BivTest$group2 == pair[2]) |
-                         (BivTest$group1 == pair[2] & BivTest$group2 == pair[1]))
-          if (length(idx) > 0) {
-            as.character(BivTest$stars[idx])
-          } else {
-            "ns"
-          }
-        })
-        
       }
-      else {
-        print("No pairwise comparisons to plot.")
-      }
-      
-      
-      
-      if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
-        y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
-        y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
-        
-        nspos = which(annotations != "ns")
-        if(length(nspos)>0)
-          resplot <- resplot + 
+    }
+
+    # Add significance bars to plot
+    if (length(post_hoc_pairs) > 0 && length(annotations) > 0) {
+      y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
+      y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
+
+      sig_positions <- which(annotations != "ns")
+      if (length(sig_positions) > 0) {
+        resplot <- resplot +
           ggsignif::geom_signif(
-            comparisons = post_hoc_pairs[nspos],
-            y_position = y_pos[nspos],
-            annotations = annotations[nspos],
+            comparisons = post_hoc_pairs[sig_positions],
+            y_position = y_pos[sig_positions],
+            annotations = annotations[sig_positions],
             tip_length = 0.01,
             textsize = 8 / 1.5,
             vjust = 0.8
           )
-      } else {
-        print("No valid post-hoc comparisons or annotations to plot.")
       }
-      
-      decision_tree = create_decision_tree(path)
-      
-      output$decision_tree_plot <- renderPlot({ decision_tree })
-      
-      output$analysis_output <- renderUI({
-        steps_formatted <- gsub("Step", "<br><br>Step", steps)
-        steps_formatted <- gsub("Group", "<br>&nbsp;&nbsp;&nbsp;&nbsp;Group", steps_formatted)
-        HTML(steps_formatted)
-      })
-      
-      return(list(Table = stats, TableTests = list(PairwiseTest = PairwiseTest, BivTest = BivTest, MulvTest = MulvTest), Plot = resplot, DecisionTree = decision_tree ))
-    } else {
-      return(list(Table = NULL, TableTest = NULL, Plot = NULL, DecisionTree = NULL))
     }
-  })
+
+    return(resplot)
+  }
   
   
   output$TabStat <- renderDT({
@@ -8829,8 +8683,65 @@ server <- function(input, output, session) {
   )
   )
   
-  output$PlotStat <- renderPlot({
-    StatisticalAnalysisResults()$Plot
+  observeEvent(StatisticalAnalysisResults(), {
+    statPlotResult$resplot <- StatisticalAnalysisResults()$Plot
+  }, ignoreNULL = FALSE)
+  output$PlotStat <- renderPlot({ statPlotResult$resplot })
+
+  # Customize button for statistical plot
+  observeEvent(input$Customize_StatPlotButton, {
+    req(statPlotResult$resplot)
+    layer_tabs <- generateLayerParameters(statPlotResult$resplot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel(
+          "Layer Customization",
+          do.call(tagList, layer_tabs)
+        ),
+        tabPanel(
+          "Common Parameters",
+          generatePlotParameters(statPlotResult$resplot)
+        ),
+        tabPanel(
+          "X-Axis Order",
+          generateXAxisOrderTab(statPlotResult$resplot)
+        ),
+        tabPanel(
+          "Save Plot",
+          generateSavePlotTab(formats = TRUE)
+        )
+      ),
+      footer = tagList(
+        actionButton("applyChangesStat", "Apply Changes"),
+        downloadButton("downloadPlotButtonStat", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+
+  output$downloadPlotButtonStat <- downloadHandler(
+    filename = function() {
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_Statistical_", Sys.Date(), ".", format)
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      width <- input$plotWidth
+      height <- input$plotHeight
+      dpi <- input$plotResolution
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(statPlotResult$resplot, file, width, height, dpi, format)
+      manageSpinner(FALSE)
+    }
+  )
+
+  observeEvent(input$applyChangesStat, {
+    updatedPlot <- customizePlot(statPlotResult$resplot, input)
+    statPlotResult$resplot <- updatedPlot
+    output$PlotStat <- renderPlot({ updatedPlot })
+    removeModal()
   })
   
   output$TabMulvTest <- renderDT({
