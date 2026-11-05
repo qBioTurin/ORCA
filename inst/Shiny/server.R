@@ -1425,31 +1425,37 @@ server <- function(input, output, session) {
   #   FlagsBCA$EXPselected = FlagsBCA$AllExp[! FlagsBCA$AllExp %in% c(FlagsBCA$STDCselected,FlagsBCA$BASEselected,FlagsBCA$BLANCHEselected)]
   # },ignoreNULL = F)
   
-  observe({
-    BCA_blanks = input$BCA_blanks
-    standcurve = bcaResult$Tablestandcurve
+  observeEvent(list(bcaResult$data, input$BCA_standcurve, input$BCA_blanks), {
+    bcaTot <- bcaResult$data
+    standcurve <- NULL
+    BlankV <- 0
     
-    isolate({
-      if( !is.null(BCA_blanks) && !is.null(standcurve) && BCA_blanks == "yes" ){
+    if (!is.null(bcaTot) && length(input$BCA_standcurve) > 0 && input$BCA_standcurve != "") {
+      standcurve <- bcaTot %>%
+        dplyr::filter(exp %in% input$BCA_standcurve) %>%
+        dplyr::select(exp, time, values) %>%
+        dplyr::rename(Measures = values, Concentrations = time) %>%
+        dplyr::filter(Concentrations != "")
+      
+      standcurve$Concentrations <- as.numeric(standcurve$Concentrations)
+      standcurve$BlankValues <- NA_real_
+      standcurve$MeasuresWithoutBlank <- NA_real_
+      
+      if (identical(input$BCA_blanks, "yes") && nrow(standcurve) > 0) {
+        minConcentration <- min(standcurve$Concentrations, na.rm = TRUE)
+        BlankV <- standcurve %>%
+          dplyr::filter(Concentrations == minConcentration) %>%
+          dplyr::summarize(M = mean(Measures, na.rm = TRUE)) %>%
+          dplyr::pull(M)
         
-        exp = FlagsBCA$EXPselected
-        stcd = FlagsBCA$STDCselected
-        exp = exp[exp != ""]
-        expNotBlank = unique(c(stcd,exp))
-        
-        BlankV = standcurve %>% dplyr::filter(Concentrations == min(Concentrations)) %>% dplyr::summarize(M = mean(Measures)) %>% pull(M)
-        
-        standcurve$BlankValues = BlankV
-        standcurve$MeasuresWithoutBlank =  standcurve$Measures - BlankV
-        
-        bcaResult$MapBlank = BlankV
-        bcaResult$Tablestandcurve = standcurve
-        
-      }else{
-        bcaResult$MapBlank = 0
+        standcurve$BlankValues <- BlankV
+        standcurve$MeasuresWithoutBlank <- standcurve$Measures - BlankV
       }
-    })
-  })
+    }
+    
+    bcaResult$MapBlank <- BlankV
+    bcaResult$Tablestandcurve <- standcurve
+  }, ignoreInit = FALSE)
   
   ## update the data with the blank and baseline
   observe({
@@ -1461,26 +1467,23 @@ server <- function(input, output, session) {
       isolate({
         if(!is.null(MapBlank) && !is.null(bcaTot)){
           
-          bcaTotAverage = bcaTot %>%
+          bcaQuant = bcaTot %>%
             dplyr::filter(exp != stcd) %>%
-            #mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
-            group_by(time, exp) %>%
-            dplyr::summarize(AverageValues = mean(values), 
-                             BlankValues = MapBlank,
-                             AverageValuesWithoutBlank = AverageValues - BlankValues) %>%
-            ungroup()
+            dplyr::mutate(BlankValues = MapBlank,
+                          ValuesWithoutBlank = values - BlankValues)
           
           if( !is.null(Regression) ){  
-            bcamean = bcaTotAverage %>%
-              dplyr::mutate(Quantification =  Regression$fun(AverageValuesWithoutBlank) ) %>%
-              rename(SampleName = exp,ExpCondition = time) 
+            bcaQuant = bcaQuant %>%
+              dplyr::mutate(Quantification = Regression$fun(ValuesWithoutBlank)) %>%
+              dplyr::rename(SampleName = exp, ExpCondition = time,
+                            PlateRow = Var1, PlateColumn = Var2)
             
-            output$BCAtables = renderDT(bcamean)
+            output$BCAtables = renderDT(bcaQuant)
             
-            bcaResult$dataQuant = bcamean
+            bcaResult$dataQuant = bcaQuant
             
-            bcameanNew = bcamean %>%
-              select(SampleName,ExpCondition,Quantification) %>%
+            bcameanNew = bcaQuant %>%
+              select(PlateRow, PlateColumn, SampleName, ExpCondition, Quantification) %>%
               rename(Ug = Quantification)
             bcaResult$dataFinal = bcameanNew
             output$BCAtablesUG = renderDT(bcameanNew)
@@ -1491,32 +1494,6 @@ server <- function(input, output, session) {
         }
       })
     }
-  })
-  
-  observe({
-    input$BCA_standcurve -> BCA_standcurve
-    bcaResult$data -> data
-    
-    isolate({
-      if(BCA_standcurve != ""){
-        
-        standcurve = data %>%
-          dplyr::filter(exp %in% BCA_standcurve) %>%
-          # group_by(exp,time) %>%
-          # summarise(AverageMeasures = mean(values)) %>%
-          # ungroup() %>%
-          dplyr::select(exp,time,values) %>%
-          rename(Measures = values, Concentrations = time) %>%
-          dplyr::filter(Concentrations != "")
-        
-        # If nothing changes w..r.t. the already saved table then I keep the old one!
-        if(is.null(bcaResult$Tablestandcurve) || 
-           !identical(bcaResult$Tablestandcurve,standcurve) )
-        {
-          bcaResult$Tablestandcurve = standcurve
-        }
-      } 
-    })
   })
   
   ## update table standCurve
@@ -1587,48 +1564,73 @@ server <- function(input, output, session) {
     removeModal()
   })
   
+  fitBCARegression <- function(standcurve) {
+    if (is.null(standcurve) || nrow(standcurve) == 0) return(NULL)
+    
+    standcurve$Concentrations <- as.numeric(standcurve$Concentrations)
+    if ("MeasuresWithoutBlank" %in% names(standcurve) && any(!is.na(standcurve$MeasuresWithoutBlank))) {
+      standcurve <- standcurve %>%
+        dplyr::select(Concentrations, MeasuresWithoutBlank) %>%
+        dplyr::rename(Measures = MeasuresWithoutBlank)
+      y <- "Measures Without Blank"
+    } else {
+      standcurve <- standcurve %>% dplyr::select(Concentrations, Measures)
+      y <- "Measures"
+    }
+    
+    standcurve <- standcurve %>%
+      dplyr::filter(is.finite(Concentrations), is.finite(Measures)) %>%
+      stats::na.omit()
+    if (nrow(standcurve) < 2 || dplyr::n_distinct(standcurve$Concentrations) < 2) return(NULL)
+    
+    modelStancurve <- stats::lm(Measures ~ Concentrations, data = standcurve)
+    intercept <- unname(stats::coef(modelStancurve)[[1]])
+    slope <- unname(stats::coef(modelStancurve)[[2]])
+    if (!is.finite(slope) || slope == 0) return(NULL)
+    
+    infoLM <- data.frame(
+      x = min(standcurve$Concentrations) + c(1, 1),
+      y = max(standcurve$Measures) + c( sd(standcurve$Measures)*3/4 , sd(standcurve$Measures)*2/4 ),
+      text = c(
+        paste0("y = ", signif(slope, 5), "x + ", signif(intercept, 5)),
+        paste0("Adj R2 = ", signif(summary(modelStancurve)$adj.r.squared, 5))
+      )
+    )
+    
+    regressionPlot <- ggplot(standcurve, aes(Concentrations, Measures)) +
+      geom_point() +
+      theme_bw() +
+      geom_smooth(method = "lm", col = "red") +
+      geom_text(data = infoLM, aes(x = x, y = y, label = text),
+                vjust = "inward", hjust = "inward") +
+      labs(x = "Concentrations", y = y)
+    
+    list(
+      data = modelStancurve,
+      plot = regressionPlot,
+      fun = function(x) (x - intercept) / slope
+    )
+  }
+  
+  observeEvent(bcaResult$Tablestandcurve, {
+    if (!is.null(bcaResult$Regression)) {
+      regression <- fitBCARegression(bcaResult$Tablestandcurve)
+      if (!is.null(regression)) {
+        bcaResult$Regression <- regression
+        output$BCAregression <- renderPlot(regression$plot)
+      }
+    }
+  }, ignoreInit = TRUE)
+  
   
   observeEvent(input$BCA_buttonRegression,{
-    standcurve = bcaResult$Tablestandcurve
-    
-    if(!is.null(standcurve)){
-      standcurve$Concentrations = as.numeric(standcurve$Concentrations)
-      if(!all(is.na(standcurve$BlankValues)) ){
-        standcurve = standcurve %>%
-          select(Concentrations, MeasuresWithoutBlank) %>%
-          rename( Measures = MeasuresWithoutBlank ) %>% na.omit()
-        y="Measures Without Blank"
-      }else{
-        y="Measures"
-        standcurve = standcurve %>% 
-          select(Concentrations, Measures) %>% na.omit()
-      }
-      
-      regressionPlot = ggplot(standcurve,aes(Concentrations, Measures)) +
-        geom_point() +
-        theme_bw()
-      
-      #if(input$regressionType == "Linear"){
-      modelStancurve = lm(Measures~Concentrations, data = standcurve)
-      
-      infoLM = data.frame(x = min(standcurve$Concentrations) + c(1,1),
-                          y = max(standcurve$Measures) + c(2,1.75),
-                          text = c( paste0("y = ", signif(modelStancurve$coef[[2]], 5), "x + ",signif(modelStancurve$coef[[1]],5 )),
-                                    paste0("Adj R2 = ",signif(summary(modelStancurve)$adj.r.squared, 5))) )
-      
-      fun = paste0("(x - ",modelStancurve$coef[[1]],")/", modelStancurve$coef[[2]])
-      
-      regressionPlot =  regressionPlot +
-        geom_smooth(method='lm', col = "red") +
-        geom_text(data= infoLM,
-                  aes(x = x, y = y, label =text ),
-                  vjust = "inward", hjust = "inward" )+
-        labs(x = "Concentrations", y = y) 
-      
-      bcaResult$Regression = list(data = modelStancurve, plot = regressionPlot, fun = function(x){ eval( parse(text = fun ) ) } )
-      
-    }else{
-      regressionPlot = ggplot()
+    regression <- fitBCARegression(bcaResult$Tablestandcurve)
+    if (!is.null(regression)) {
+      bcaResult$Regression <- regression
+      regressionPlot <- regression$plot
+    } else {
+      regressionPlot <- ggplot()
+      showAlert("Error", "At least two distinct standard concentrations with valid measurements are required.", "error", 5000)
     }
     output$BCAregression <- renderPlot(regressionPlot)
     output$customize_regression_button <- renderUI({
@@ -8245,10 +8247,11 @@ server <- function(input, output, session) {
         Analysis[j] = all(sapply(DataStatisticModule[[j]], is.null))
       
       AnalysisNames = AnalysisNames[!Analysis]
+      currentAnalysis <- input$StatAnalysis
       
       updateSelectizeInput(inputId = "StatAnalysis",
                            choices = c("",AnalysisNames),
-                           selected = "")
+               selected = if (!is.null(currentAnalysis) && currentAnalysis %in% AnalysisNames) currentAnalysis else "")
       
       if("PCR" %in% AnalysisNames ){
         results <- DataStatisticModule[["PCR"]]
@@ -8330,11 +8333,13 @@ server <- function(input, output, session) {
             analysisData <- mess[[analysisName]]
 
             if(!is.null(analysisData)) {
+              entryIndex <- length(DataStatisticModule[[statModuleName]]) + 1L
+              entryName <- as.character(entryIndex)
               if(statModuleName == "WB" && !is.null(analysisData$AdjRelDensity)) {
-                DataStatisticModule$WB[[paste0(dpath, "_", analysisName)]] <-
-                  analysisData$AdjRelDensity %>% mutate(DataSet = dpath)
+                DataStatisticModule$WB[[entryName]] <-
+                  analysisData$AdjRelDensity %>% mutate(DataSet = entryIndex)
               } else {
-                DataStatisticModule[[statModuleName]][[paste0(dpath, "_", analysisName)]] <- analysisData
+                DataStatisticModule[[statModuleName]][[entryName]] <- analysisData
               }
             }
           }
@@ -8348,11 +8353,13 @@ server <- function(input, output, session) {
           expectedCols <- expectedNames[[statName]]
           if(any(namesRes %in% expectedCols)) {
             if(statName == "WB" && !is.null(mess$AdjRelDensity)) {
-              DataStatisticModule$WB[[dpath]] <- mess$AdjRelDensity %>% mutate(DataSet = dpath)
+              entryIndex <- length(DataStatisticModule$WB) + 1L
+              DataStatisticModule$WB[[as.character(entryIndex)]] <- mess$AdjRelDensity %>% mutate(DataSet = entryIndex)
               analysisDetected <- TRUE
               break
             } else if(all(expectedCols %in% namesRes)) {
-              DataStatisticModule[[statName]][[dpath]] <- mess
+              entryIndex <- length(DataStatisticModule[[statName]]) + 1L
+              DataStatisticModule[[statName]][[as.character(entryIndex)]] <- mess
               analysisDetected <- TRUE
               break
             }
@@ -8408,7 +8415,7 @@ server <- function(input, output, session) {
   StatisticalAnalysisResults <- reactive({
     # Early return if no analysis selected
     if (is.null(input$StatAnalysis) || input$StatAnalysis == "") {
-      return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL))
+      return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL, Steps = NULL))
     }
 
     # Get results for selected analysis
@@ -8496,7 +8503,7 @@ server <- function(input, output, session) {
              all_tables_flat <- unlist(all_tables, recursive = FALSE)
              valid_tables <- Filter(function(tbl) !is.null(tbl) && nrow(tbl) > 0, all_tables_flat)
 
-             if (length(valid_tables) == 0) return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL))
+             if (length(valid_tables) == 0) return(list(Table = NULL, TableTests = NULL, Plot = NULL, DecisionTree = NULL, Steps = NULL))
 
              combined_table <- bind_rows(valid_tables)
 
@@ -8586,14 +8593,6 @@ server <- function(input, output, session) {
     path <- if (is.list(testResults$path) && length(testResults$path)) testResults$path[[1]] else testResults$path
     decision_tree <- if (length(path)) create_decision_tree(path) else NULL
 
-    # Render outputs
-    output$decision_tree_plot <- renderPlot({ decision_tree })
-    output$analysis_output <- renderUI({
-      steps_formatted <- gsub("Step", "<br><br>Step", testResults$steps)
-      steps_formatted <- gsub("Group", "<br>&nbsp;&nbsp;&nbsp;&nbsp;Group", steps_formatted)
-      HTML(steps_formatted)
-    })
-
     return(list(
       Table = stats,
       TableTests = list(
@@ -8602,24 +8601,34 @@ server <- function(input, output, session) {
         MulvTest = testResults$MulvTest
       ),
       Plot = resplot,
-      DecisionTree = decision_tree
+      DecisionTree = decision_tree,
+      Steps = testResults$steps
     ))
+  })
+
+  output$decision_tree_plot <- renderPlot({
+    StatisticalAnalysisResults()$DecisionTree
+  })
+  output$analysis_output <- renderUI({
+    steps <- StatisticalAnalysisResults()$Steps
+    if (is.null(steps) || !length(steps)) return(NULL)
+    steps_formatted <- gsub("Step", "<br><br>Step", steps)
+    steps_formatted <- gsub("Group", "<br>&nbsp;&nbsp;&nbsp;&nbsp;Group", steps_formatted)
+    HTML(steps_formatted)
   })
 
   # Helper function to add significance annotations to plot
   addSignificanceAnnotations <- function(resplot, stats, PairwiseTest, BivTest, MulvTest) {
     if (is.null(resplot) || is.null(stats)) return(resplot)
 
-    main_test_pvalue <- if (!is.null(MulvTest)) {
-      if (is.data.frame(MulvTest)) MulvTest$pValue[1] else MulvTest$pValue
-    } else NA
+    main_test_pvalue <- if (!is.null(MulvTest) && nrow(MulvTest) > 0) MulvTest$pValue[1] else NA_real_
 
     post_hoc_pairs <- list()
     annotations <- c()
 
     # Determine which test results to use for annotations
     test_data <- NULL
-    if (!is.null(PairwiseTest) && !is.null(main_test_pvalue) && !is.na(main_test_pvalue) && main_test_pvalue < 0.05) {
+    if (!is.null(PairwiseTest) && nrow(PairwiseTest) > 0) {
       test_data <- PairwiseTest
     } else if (!is.null(BivTest)) {
       test_data <- BivTest
@@ -8658,18 +8667,20 @@ server <- function(input, output, session) {
       y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
       y_pos <- seq(y_max + 0.1, y_max + 0.1 + 0.1 * length(post_hoc_pairs), length.out = length(post_hoc_pairs))
 
-      sig_positions <- which(annotations != "ns")
-      if (length(sig_positions) > 0) {
-        resplot <- resplot +
-          ggsignif::geom_signif(
-            comparisons = post_hoc_pairs[sig_positions],
-            y_position = y_pos[sig_positions],
-            annotations = annotations[sig_positions],
-            tip_length = 0.01,
-            textsize = 8 / 1.5,
-            vjust = 0.8
-          )
-      }
+      resplot <- resplot +
+        ggsignif::geom_signif(
+          comparisons = post_hoc_pairs,
+          y_position = y_pos,
+          annotations = annotations,
+          tip_length = 0.01,
+          textsize = 8 / 1.5,
+          vjust = 0.8
+        )
+    } else if (length(unique(stats$SampleName)) > 2 && length(main_test_pvalue) == 1 &&
+               is.finite(main_test_pvalue) && main_test_pvalue >= 0.05) {
+      y_max <- max(stats$Mean + stats$sd, na.rm = TRUE)
+      resplot <- resplot +
+        annotate("text", x = Inf, y = y_max + 0.1, label = "ns", hjust = 1.1, vjust = 0)
     }
 
     return(resplot)
