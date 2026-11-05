@@ -2939,6 +2939,7 @@ server <- function(input, output, session) {
   )
   
   loadWBanalysi4Quant = function(datapath,wbResult){
+    alert$alertContext <- ""
     manageSpinner(TRUE)
     names(wbResult) -> namesAll
     
@@ -2949,8 +2950,9 @@ server <- function(input, output, session) {
     )
     
     if( setequal(names(mess),c("message","call")) ) {
+      manageSpinner(FALSE)
       showAlert("Error", mess[["message"]], "error", 5000)
-      return(mess[["message"]]) 
+      return(NULL)
     }
     
     #wbquantResult$NormWBanalysis = mess

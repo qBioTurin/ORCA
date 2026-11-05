@@ -223,6 +223,44 @@ ui <- dashboardPage(
       .info-box-icon {
         background: linear-gradient(135deg, #0066cc 0%, #004d99 100%) !important;
       }
+
+      .wb-quantification,
+      .wb-quantification .row,
+      .wb-quantification .box {
+        box-sizing: border-box;
+        max-width: 100%;
+        min-width: 0;
+      }
+      .wb-quantification .dataTables_wrapper {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      .wb-quant-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        width: 100%;
+        padding: 0 15px 10px;
+        box-sizing: border-box;
+      }
+      .wb-quant-actions .btn {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        text-align: center;
+      }
+      @media (max-width: 767px) {
+        .wb-quantification .box {
+          width: 100% !important;
+        }
+        .wb-quant-actions {
+          justify-content: stretch;
+        }
+        .wb-quant-actions .btn {
+          flex: 1 1 100%;
+        }
+      }
     ")
                   ),
                   tags$li(a(onclick = "window.open('https://github.com/qBioTurin/ORCA')",
@@ -274,8 +312,8 @@ ui <- dashboardPage(
                                   menuSubItem("Quantification", tabName = "tablesIF")),
                          menuItem('Flow Cytometry analysis', tabName = 'facs',
                                   menuItem("Raw data", tabName = "RawFACS",
-                                            menuSubItem("Upload raw data", tabName = "uploadRawFACS"),
-                                            menuSubItem("Raw data", tabName = "plotRawFACS")),
+                                           menuSubItem("Upload raw data", tabName = "uploadRawFACS"),
+                                           menuSubItem("Raw data", tabName = "plotRawFACS")),
                                   menuSubItem("Upload data", tabName = "uploadFACS"),
                                   menuSubItem("Hierarchical gating", tabName = "tablesFACS"),
                                   menuSubItem("Statistics", tabName = "statFACS")) 
@@ -437,15 +475,15 @@ ui <- dashboardPage(
                   margin: 0 auto;
                 }
               ")),
-
+              
               # ===== Analysis Features Summary Guide =====
               div(class = "analysis-guide-header",
                   h2(icon("chart-line"), " Analysis Features Summary Guide"),
                   p("Explore the comprehensive analysis capabilities of ORCA. Click on any analysis section in the sidebar to get started.")
               ),
-
+              
               div(class = "analysis-cards-container",
-
+                  
                   # ===== RT-qPCR Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
@@ -457,15 +495,15 @@ ui <- dashboardPage(
                             "Reverse Transcription quantitative PCR analysis for gene expression quantification with ΔΔCt calculations and fold-change analysis."
                           ),
                           tags$ul(class = "analysis-card-features",
-                              tags$li(icon("calculator"), "ΔΔCt Method for relative expression"),
-                              tags$li(icon("balance-scale"), "Housekeeping gene normalization"),
-                              tags$li(icon("chart-line"), "Time course expression tracking"),
-                              tags$li(icon("chart-bar"), "Fold change visualization"),
-                              tags$li(icon("download"), "Export data & publication plots")
+                                  tags$li(icon("calculator"), "ΔΔCt Method for relative expression"),
+                                  tags$li(icon("balance-scale"), "Housekeeping gene normalization"),
+                                  tags$li(icon("chart-line"), "Time course expression tracking"),
+                                  tags$li(icon("chart-bar"), "Fold change visualization"),
+                                  tags$li(icon("download"), "Export data & publication plots")
                           )
                       )
                   ),
-
+                  
                   # ===== BCA Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
@@ -477,15 +515,15 @@ ui <- dashboardPage(
                             "Bicinchoninic Acid assay for protein quantification with automatic calibration curve fitting and concentration calculations."
                           ),
                           tags$ul(class = "analysis-card-features",
-                              tags$li(icon("chart-area"), "Linear regression calibration"),
-                              tags$li(icon("calculator"), "Concentration from absorbance"),
-                              tags$li(icon("chart-bar"), "Statistical analysis & CV"),
-                              tags$li(icon("palette"), "Interactive scatter plots"),
-                              tags$li(icon("download"), "Excel reports & high-res plots")
+                                  tags$li(icon("chart-area"), "Linear regression calibration"),
+                                  tags$li(icon("calculator"), "Concentration from absorbance"),
+                                  tags$li(icon("chart-bar"), "Statistical analysis & CV"),
+                                  tags$li(icon("palette"), "Interactive scatter plots"),
+                                  tags$li(icon("download"), "Excel reports & high-res plots")
                           )
                       )
                   ),
-
+                  
                   # ===== ELISA Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
@@ -497,15 +535,15 @@ ui <- dashboardPage(
                             "Enzyme-Linked ImmunoSorbent Assay analysis with standard curve fitting and concentration calculations."
                           ),
                           tags$ul(class = "analysis-card-features",
-                              tags$li(icon("chart-area"), "Linear, quadratic or hyperbolic fitting"),
-                              tags$li(icon("calculator"), "OD to concentration interpolation"),
-                              tags$li(icon("chart-bar"), "t-tests and ANOVA comparisons"),
-                              tags$li(icon("palette"), "Bar plots with error bars"),
-                              tags$li(icon("download"), "High resolution exports")
+                                  tags$li(icon("chart-area"), "Linear, quadratic or hyperbolic fitting"),
+                                  tags$li(icon("calculator"), "OD to concentration interpolation"),
+                                  tags$li(icon("chart-bar"), "t-tests and ANOVA comparisons"),
+                                  tags$li(icon("palette"), "Bar plots with error bars"),
+                                  tags$li(icon("download"), "High resolution exports")
                           )
                       )
                   ),
-
+                  
                   # ===== Endocytosis Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
@@ -517,15 +555,15 @@ ui <- dashboardPage(
                             "Endocytosis analysis for tracking cellular internalization dynamics with time-course measurements and normalization."
                           ),
                           tags$ul(class = "analysis-card-features",
-                              tags$li(icon("calculator"), "Internalization rate calculations"),
-                              tags$li(icon("balance-scale"), "Baseline normalization"),
-                              tags$li(icon("chart-bar"), "Statistical testing & ANOVA"),
-                              tags$li(icon("clock"), "Time-series dynamics plots"),
-                              tags$li(icon("download"), "Publication-ready figures")
+                                  tags$li(icon("calculator"), "Internalization rate calculations"),
+                                  tags$li(icon("balance-scale"), "Baseline normalization"),
+                                  tags$li(icon("chart-bar"), "Statistical testing & ANOVA"),
+                                  tags$li(icon("clock"), "Time-series dynamics plots"),
+                                  tags$li(icon("download"), "Publication-ready figures")
                           )
                       )
                   ),
-
+                  
                   # ===== Cytotoxicity Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
@@ -537,15 +575,15 @@ ui <- dashboardPage(
                             "Cytotoxicity analysis with baseline normalization and comparisons across experimental conditions."
                           ),
                           tags$ul(class = "analysis-card-features",
-                              tags$li(icon("percentage"), "Cell viability percentages"),
-                              tags$li(icon("chart-line"), "Baseline normalization"),
-                              tags$li(icon("chart-bar"), "Multiple comparison corrections"),
-                              tags$li(icon("palette"), "Customizable comparison plots"),
-                              tags$li(icon("download"), "Quantification data & plot export")
+                                  tags$li(icon("percentage"), "Cell viability percentages"),
+                                  tags$li(icon("chart-line"), "Baseline normalization"),
+                                  tags$li(icon("chart-bar"), "Multiple comparison corrections"),
+                                  tags$li(icon("palette"), "Customizable comparison plots"),
+                                  tags$li(icon("download"), "Quantification data & plot export")
                           )
                       )
                   ),
-
+                  
                   # ===== Immunofluorescence Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
@@ -557,15 +595,15 @@ ui <- dashboardPage(
                             "Quantitative analysis of Fluorescence Microscopy data with compartment distributions and statistical testing."
                           ),
                           tags$ul(class = "analysis-card-features",
-                              tags$li(icon("calculator"), "Automatic mean & SD calculations"),
-                              tags$li(icon("chart-bar"), "t-tests, ANOVA & post-hoc"),
-                              tags$li(icon("palette"), "Customizable bar plots"),
-                              tags$li(icon("filter"), "Significance level filtering"),
-                              tags$li(icon("download"), "Excel reports with statistics")
+                                  tags$li(icon("calculator"), "Automatic mean & SD calculations"),
+                                  tags$li(icon("chart-bar"), "t-tests, ANOVA & post-hoc"),
+                                  tags$li(icon("palette"), "Customizable bar plots"),
+                                  tags$li(icon("filter"), "Significance level filtering"),
+                                  tags$li(icon("download"), "Excel reports with statistics")
                           )
                       )
                   ),
-
+                  
                   # ===== Flow Cytometry Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",
@@ -577,11 +615,11 @@ ui <- dashboardPage(
                             "Flow cytometry analysis with hierarchical gating strategies and population frequency calculations."
                           ),
                           tags$ul(class = "analysis-card-features",
-                              tags$li(icon("project-diagram"), "Hierarchical gating strategy"),
-                              tags$li(icon("calculator"), "Population frequencies & counts"),
-                              tags$li(icon("chart-bar"), "Cross-group statistical tests"),
-                              tags$li(icon("palette"), "Gate previews & sample overview plots"),
-                              tags$li(icon("download"), "Gating results & figures")
+                                  tags$li(icon("project-diagram"), "Hierarchical gating strategy"),
+                                  tags$li(icon("calculator"), "Population frequencies & counts"),
+                                  tags$li(icon("chart-bar"), "Cross-group statistical tests"),
+                                  tags$li(icon("palette"), "Gate previews & sample overview plots"),
+                                  tags$li(icon("download"), "Gating results & figures")
                           )
                       )
                   )
@@ -884,11 +922,11 @@ ui <- dashboardPage(
                     # Inputs for model generation function
                     fluidRow(
                       column(4,
-                           fileInput("transFileInput", "Upload Transitions File (.cpp)", accept = ".cpp")
-                    ),
-                    column(2,offset = 6,
-                           actionButton("generateModel", "Generate the model")
-                    )
+                             fileInput("transFileInput", "Upload Transitions File (.cpp)", accept = ".cpp")
+                      ),
+                      column(2,offset = 6,
+                             actionButton("generateModel", "Generate the model")
+                      )
                     ),
                     fluidRow(
                       column(10,offset = 1,verbatimTextOutput("EPIMODgenerationOutput"))
@@ -939,16 +977,16 @@ ui <- dashboardPage(
                     )
                 )
               ),
-      fluidRow(
-        box(width = 12, title = "Visualisations", collapsible = T,
-            fluidRow(
-              column(10,offset = 1,selectInput("epimod_placesPlot","Places dynamics to show:", choices = "" , multiple = TRUE))
-            ),
-            fluidRow(
-              plotOutput("epimod_tracePlot")
-            )
-        )
-      )
+              fluidRow(
+                box(width = 12, title = "Visualisations", collapsible = T,
+                    fluidRow(
+                      column(10,offset = 1,selectInput("epimod_placesPlot","Places dynamics to show:", choices = "" , multiple = TRUE))
+                    ),
+                    fluidRow(
+                      plotOutput("epimod_tracePlot")
+                    )
+                )
+              )
       ),
       ## END epimod ####
       ## END model integration: GreatMOD ####
@@ -1125,104 +1163,101 @@ ui <- dashboardPage(
                     the normalizer, enabling lane-specific normalization."
                   )
               ),
-              fluidRow(
-                box( width = 6,
-                     title = tagList(shiny::icon("gear", verify_fa = FALSE), "Set the WB analysis as normalizer"),
-                     h5("To keep the necessary samples (rows) just clicking on it."),
-                     column(9,
-                            fileInput(
-                              inputId = "NormWBImport",
-                              label = "",
-                              placeholder = "Select an WB RDs file generated through the Profile Plots step",
-                              width = "90%"
-                            )
-                     ),
-                     column(3,
-                            actionButton(
-                              label = "Load",
-                              icon = shiny::icon("upload"),
-                              width = "100%",
-                              inputId = "actionB_loadingNormWB"
-                            )
-                     ),
-                     fluidRow(
-                       column(
-                         width = 10,
-                         offset = 1,
-                         DTOutput('AUC_WBnorm')
-                       )
-                     )
-                ),
-                box( width = 6,
-                     title = tagList(shiny::icon("gear", verify_fa = FALSE),
-                                     "Set the WB analysis to normalize"),
-                     h5("To keep the necessary samples (rows) just clicking on it."),
-                     column(9,
-                            fileInput(inputId = "WBImport",
-                                      label = "",
-                                      placeholder = "Select an WB RDs file generated through the Profile Plots step",
-                                      width = "90%"
-                            )
-                     ),
-                     column(3,
-                            actionButton( label = "Load",
-                                          icon = shiny::icon("upload"),
-                                          width = "100%",
-                                          inputId = "actionB_loadingWB"
-                            )
-                     ),
-                     fluidRow(
-                       column(
-                         width = 10,
-                         offset = 1,
-                         DTOutput('AUC_WB')
-                       )
-                     )
-                )
-              ),
-              box( width = 12,
-                   title = tagList(shiny::icon("gear", verify_fa = FALSE), "WB quantification"),
-                   h3("Relative Density"),
-                   fluidRow(
-                     column(
-                       width = 8,
-                       selectInput("IdLaneNorm_RelDens",
-                                   label = "Select the Lane to use for the relative normalization",
-                                   choices = "Nothing selected",selected = "Nothing selected")
-                     ),
-                     column(
-                       width = 12,
-                       DTOutput('AUC_RelDens')
-                     )
-                   ),
-                   h3("Adjusted Relative Density"),
-                   fluidRow(
-                     column(
-                       width = 12,
-                       DTOutput('AUC_AdjRelDens')
-                     )
-                   ),
-                   plotOutput("plot_AdjRelDens"),
-                   fluidRow(
-                     column(
-                       width = 2, offset = 7,  # Adjusting offset to align properly
-                       actionButton(
-                         inputId = "CustomizePlotWBQuantification", 
-                         label = "Customize or Download Plot", 
-                         icon = icon("paint-brush")
-                       )
-                     ),
-                     column(
-                       width = 2, 
-                       downloadButton(
-                         label = "Download Analysis & Excel", 
-                         outputId = "downloadWBquantAnalysis",
-                         #href = "Results.RData",
-                         #download = "Results.RData",
-                         icon = icon("download")
-                       )
-                     )
-                   )
+              div(class = "wb-quantification",
+                  fluidRow(
+                    box( width = 6,
+                         title = tagList(shiny::icon("gear", verify_fa = FALSE), "Set the WB analysis as normalizer"),
+                         h5("To keep the necessary samples (rows) just clicking on it."),
+                         column(9,
+                                fileInput(
+                                  inputId = "NormWBImport",
+                                  label = "",
+                                  placeholder = "Select an WB RDs file generated through the Profile Plots step",
+                                  width = "90%"
+                                )
+                         ),
+                         column(3,
+                                actionButton(
+                                  label = "Load",
+                                  icon = shiny::icon("upload"),
+                                  width = "100%",
+                                  inputId = "actionB_loadingNormWB"
+                                )
+                         ),
+                         fluidRow(
+                           column(
+                             width = 10,
+                             offset = 1,
+                             DTOutput('AUC_WBnorm')
+                           )
+                         )
+                    ),
+                    box( width = 6,
+                         title = tagList(shiny::icon("gear", verify_fa = FALSE),
+                                         "Set the WB analysis to normalize"),
+                         h5("To keep the necessary samples (rows) just clicking on it."),
+                         column(9,
+                                fileInput(inputId = "WBImport",
+                                          label = "",
+                                          placeholder = "Select an WB RDs file generated through the Profile Plots step",
+                                          width = "90%"
+                                )
+                         ),
+                         column(3,
+                                actionButton( label = "Load",
+                                              icon = shiny::icon("upload"),
+                                              width = "100%",
+                                              inputId = "actionB_loadingWB"
+                                )
+                         ),
+                         fluidRow(
+                           column(
+                             width = 10,
+                             offset = 1,
+                             DTOutput('AUC_WB')
+                           )
+                         )
+                    ),
+                    box( width = 12,
+                         title = tagList(shiny::icon("gear", verify_fa = FALSE), "WB quantification"),
+                         h3("Relative Density"),
+                         fluidRow(
+                           column(
+                             width = 8,
+                             selectInput("IdLaneNorm_RelDens",
+                                         label = "Select the Lane to use for the relative normalization",
+                                         choices = "Nothing selected",selected = "Nothing selected")
+                           ),
+                           column(
+                             width = 12,
+                             DTOutput('AUC_RelDens')
+                           )
+                         ),
+                         h3("Adjusted Relative Density"),
+                         fluidRow(
+                           column(
+                             width = 12,
+                             DTOutput('AUC_AdjRelDens')
+                           )
+                         ),
+                         plotOutput("plot_AdjRelDens"),
+                         div(class = "wb-quant-actions",
+                             actionButton(
+                               inputId = "CustomizePlotWBQuantification", 
+                               label = "Customize or Download Plot", 
+                               icon = icon("paint-brush")
+                             ),
+                             downloadButton(
+                               label = "Download Analysis & Excel", 
+                               outputId = "downloadWBquantAnalysis",
+                               #href = "Results.RData",
+                               #download = "Results.RData",
+                               icon = icon("download")
+                             )
+                         )
+                    )
+                    
+                  )
               )
       ),
       ## END data analysis: WB  #######
@@ -1271,7 +1306,7 @@ ui <- dashboardPage(
                        )
                 )
               ),
-
+              
               fluidRow(
                 box(
                   width = 12,
@@ -1675,7 +1710,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-
+        
         fluidRow(
           box(width = 12,
               title = "Assign experimental information to values:",
@@ -1875,7 +1910,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-
+        
         fluidRow(
           box(width = 12,
               title = "Assign experimental information to values:",
@@ -2041,7 +2076,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-
+        
         fluidRow(
           column(
             width = 10,offset = 1,
@@ -2186,7 +2221,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-
+        
         fluidRow(
           column(
             width = 10,offset = 1,
@@ -2318,31 +2353,31 @@ ui <- dashboardPage(
               #   )
               # ),
               fluidRow(
-              box(width = 12,collapsible = T,
-                  title = "Whole overview", status = "primary", solidHeader = TRUE,
-                  fluidRow(
-                    column(
-                      4,
-                      selectInput("facs_xChannel", "X-axis Channel", choices = NULL)
+                box(width = 12,collapsible = T,
+                    title = "Whole overview", status = "primary", solidHeader = TRUE,
+                    fluidRow(
+                      column(
+                        4,
+                        selectInput("facs_xChannel", "X-axis Channel", choices = NULL)
+                      ),
+                      column(
+                        4,
+                        selectInput("facs_yChannel", "Y-axis Channel", choices = NULL)
+                      )
                     ),
-                    column(
-                      4,
-                      selectInput("facs_yChannel", "Y-axis Channel", choices = NULL)
-                    )
-                  ),
-                  fluidRow(
-                    column(6, selectInput("facs_overviewGate", "Overview population / gate",
-                                          choices = c("All cells" = ""))),
-                    column(3, checkboxInput("facs_overviewShowGates", "Show gate outlines", TRUE)),
-                    column(3, actionButton("facs_plotChannelButton", "Plot") )
-                  ),
-                  helpText("All samples keep their position. Samples without the selected gate have an empty panel. Outlines are shown only for gates defined on the selected channels."),
-                  fluidRow(
-                    column(12, uiOutput("facs_overviewPlotUI", width = "100%"))
-                  ),
-                  actionButton("CustomizeOverviewFACS", "Customize or Download Overview",
-                               icon = icon("paint-brush"))
-              )),
+                    fluidRow(
+                      column(6, selectInput("facs_overviewGate", "Overview population / gate",
+                                            choices = c("All cells" = ""))),
+                      column(3, checkboxInput("facs_overviewShowGates", "Show gate outlines", TRUE)),
+                      column(3, actionButton("facs_plotChannelButton", "Plot") )
+                    ),
+                    helpText("All samples keep their position. Samples without the selected gate have an empty panel. Outlines are shown only for gates defined on the selected channels."),
+                    fluidRow(
+                      column(12, uiOutput("facs_overviewPlotUI", width = "100%"))
+                    ),
+                    actionButton("CustomizeOverviewFACS", "Customize or Download Overview",
+                                 icon = icon("paint-brush"))
+                )),
               fluidRow(
                 # Nuova sezione per la selezione gerarchica
                 box(width = 12, title = "Interactive Hierarchical Selection", status = "primary", solidHeader = TRUE,
@@ -2489,7 +2524,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-
+        
       ),
       tabItem(tabName = "tablesFACS",
               h2("Hierarchical gating"),
@@ -2686,7 +2721,7 @@ ui <- dashboardPage(
                  )
           )
         ),
-
+        
         tags$style(type='text/css', "#loadAnalysis_Button { width:100%; margin-top: 20px;}")
       ),
       tabItem(tabName = "tablesIF",
@@ -2794,9 +2829,9 @@ ui <- dashboardPage(
                     ),
                     fluidRow(
                       column(3,offset = 1,
-                        selectizeInput("StatAnalysis",
-                                     label = "Select the analysis:",
-                                     choices = "")
+                             selectizeInput("StatAnalysis",
+                                            label = "Select the analysis:",
+                                            choices = "")
                       ),
                       column(3,
                              conditionalPanel(condition = "input.StatAnalysis == 'PCR'",
