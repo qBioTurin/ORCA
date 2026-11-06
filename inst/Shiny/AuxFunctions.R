@@ -521,43 +521,73 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            ListIm <- ResultList[["Im"]] 
            im <- ListIm$RGB
            
-           plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
-           rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
-           insertPlot(wb = wb, sheet="WBimage")
+           # Save plot to temporary file to ensure Docker compatibility
+           tmpPlotFile <- tempfile(fileext = ".png")
+           tryCatch({
+             png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+             plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
+             rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
+             dev.off()
+             insertImage(wb = wb, sheet = "WBimage", file = tmpPlotFile)
+           }, error = function(e) {
+             print(paste("Errore nel salvare WBimage:", conditionMessage(e)))
+           }, finally = {
+             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+           })
            
            if(!is.null(PanelStructures$data)){
              
            addWorksheet(wb, "WBimage and protein bands")
-           plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
-           rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
-           for (i in seq_len(nrow(PanelStructures$data))) {
-               with(PanelStructures$data, {
-                 rect(xmin[i], ymin[i], xmax[i], ymax[i], border = "red")
-               })
-           }
-           
-           insertPlot(wb = wb, sheet = "WBimage and protein bands",
-                      fileType = "png",
-                      units = "in",
-                      dpi = 600)
+           # Save plot to temporary file to ensure Docker compatibility
+           tmpPlotFile <- tempfile(fileext = ".png")
+           tryCatch({
+             png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+             plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
+             rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
+             for (i in seq_len(nrow(PanelStructures$data))) {
+                 with(PanelStructures$data, {
+                   rect(xmin[i], ymin[i], xmax[i], ymax[i], border = "red")
+                 })
+             }
+             dev.off()
+             insertImage(wb = wb, sheet = "WBimage and protein bands", file = tmpPlotFile)
+           }, error = function(e) {
+             print(paste("Errore nel salvare WBimage and protein bands:", conditionMessage(e)))
+           }, finally = {
+             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+           })
            
            startRow <- 22
            writeDataTable(wb, PanelStructures$data, sheet = "WBimage and protein bands", startRow = startRow, startCol = 1)
           }
            
            addWorksheet(wb, "Plot")
-           print(ResultList[["Plots"]])
-           insertPlot(wb = wb, sheet="Plot",
-                      fileType = "png",
-                      units = "in",
-                      dpi = 600, width = 10,height = 8)
+           # Save plot to temporary file to ensure Docker compatibility
+           tmpPlotFile <- tempfile(fileext = ".png")
+           tryCatch({
+             png(tmpPlotFile, width = 10, height = 8, units = "in", res = 600)
+             print(ResultList[["Plots"]])
+             dev.off()
+             insertImage(wb = wb, sheet = "Plot", file = tmpPlotFile)
+           }, error = function(e) {
+             print(paste("Errore nel salvare Plots:", conditionMessage(e)))
+           }, finally = {
+             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+           })
            
            addWorksheet(wb, "Truncated Plot")
-           print(ResultList[["TruncatedPlots"]])
-           insertPlot(wb = wb, sheet="Truncated Plot",
-                      fileType = "png",
-                      units = "in",
-                      dpi = 600, width = 10,height = 8)
+           # Save plot to temporary file to ensure Docker compatibility
+           tmpPlotFile <- tempfile(fileext = ".png")
+           tryCatch({
+             png(tmpPlotFile, width = 10, height = 8, units = "in", res = 600)
+             print(ResultList[["TruncatedPlots"]])
+             dev.off()
+             insertImage(wb = wb, sheet = "Truncated Plot", file = tmpPlotFile)
+           }, error = function(e) {
+             print(paste("Errore nel salvare TruncatedPlots:", conditionMessage(e)))
+           }, finally = {
+             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+           })
            
            addWorksheet(wb, "AUC")
            finaldata = ResultList[["AUCdf"]]
@@ -587,21 +617,18 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            if(!is.null( ResultList[["AdjRelDensityPlot"]])){
              addWorksheet(wb,"Barplot AdjRelDensity")
-             print(
-               ResultList[["AdjRelDensityPlot"]]
-             )
-               # ResultList[["AdjRelDensity"]]   %>%
-               #   ggplot() +
-               #   geom_bar(aes(x = SampleName,
-               #                y = AdjRelDensity,
-               #                fill = SampleName ),
-               #            stat = "identity" ) +
-               #   theme_bw()
-               # 
-             insertPlot(wb, sheet = "Barplot AdjRelDensity",
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600, width = 10,height = 8)
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 10, height = 8, units = "in", res = 600)
+               print(ResultList[["AdjRelDensityPlot"]])
+               dev.off()
+               insertImage(wb = wb, sheet = "Barplot AdjRelDensity", file = tmpPlotFile)
+             }, error = function(e) {
+               print(paste("Errore nel salvare AdjRelDensityPlot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
              
            }
          }, 
@@ -623,12 +650,18 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                               ResultList[["AllGenesFoldChangeTable"]][[Hk]], sheet="Result All Genes")
              }
              
-             print(ResultList[["AllGenesFoldChangePlot"]])
-             insertPlot(wb = wb,  sheet="Result All Genes",
-                        startCol=dim(ResultList[["AllGenesFoldChangeTable"]][[1]])[2]+ 4,
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600,width = 14,height = 6)
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 14, height = 6, units = "in", res = 600)
+               print(ResultList[["AllGenesFoldChangePlot"]])
+               dev.off()
+               insertImage(wb = wb, sheet = "Result All Genes", file = tmpPlotFile)
+             }, error = function(e) {
+               print(paste("Errore nel salvare AllGenesFoldChangePlot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
              
            }
            
@@ -638,40 +671,51 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              addWorksheet(wb,paste0("Gene ", j) )
              writeDataTable(wb,ResultList[["plotPCR"]][[i]]$table, sheet=paste0("Gene ", j))
              
-             #print(ResultList[["plotPCR"]][[i]]$plot + labs(title = i))
-             
              plot_list <- ResultList[["plotPCR"]][[i]]$plot
              k=0
              for (plot_name in names(plot_list)) {
-               print(plot_list[[plot_name]] + labs(title = paste(i, "-", plot_name)))
-               insertPlot(wb = wb,  sheet=paste0("Gene ", j),
-                          startCol=dim(ResultList[["plotPCR"]][[i]]$table)[2]+ 2+ k,
-                          fileType = "png",
-                          units = "in",
-                          dpi = 600,width = 20, height = 6)
+               # Save plot to temporary file to ensure Docker compatibility
+               tmpPlotFile <- tempfile(fileext = ".png")
+               tryCatch({
+                 png(tmpPlotFile, width = 20, height = 6, units = "in", res = 600)
+                 print(plot_list[[plot_name]] + labs(title = paste(i, "-", plot_name)))
+                 dev.off()
+                 insertImage(wb = wb, sheet = paste0("Gene ", j), file = tmpPlotFile)
+               }, error = function(e) {
+                 print(paste("Errore nel salvare gene plot per", i, "-", plot_name, ":", conditionMessage(e)))
+               }, finally = {
+                 if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+               })
                k=k+5
              }
              
-             
            }
+           
            
            addWorksheet(wb,"Points Plot")
            plotList = ResultList[["plotPCR"]]
            df = do.call(rbind, lapply(plotList, `[[`, 2)) %>% dplyr::filter(DDCT == 0)
            
-           print(
-             ggplot(df,aes(x = Gene, y = -DDCT)) +
-               geom_point() +
-               facet_wrap(~HousekGene, ncol = 1)+
-               theme_bw()+
-               labs(x="",y= "Log2(Q)", title = "")+
-               theme(axis.text.x=element_blank(), 
-                     axis.ticks.x=element_blank())
-           )
-           insertPlot(wb = wb,  sheet="Points Plot",
-                      fileType = "png",
-                      units = "in",
-                      dpi = 600)
+           # Save plot to temporary file to ensure Docker compatibility
+           tmpPlotFile <- tempfile(fileext = ".png")
+           tryCatch({
+             png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+             print(
+               ggplot(df,aes(x = Gene, y = -DDCT)) +
+                 geom_point() +
+                 facet_wrap(~HousekGene, ncol = 1)+
+                 theme_bw()+
+                 labs(x="",y= "Log2(Q)", title = "")+
+                 theme(axis.text.x=element_blank(), 
+                       axis.ticks.x=element_blank())
+             )
+             dev.off()
+             insertImage(wb = wb, sheet = "Points Plot", file = tmpPlotFile)
+           }, error = function(e) {
+             print(paste("Errore nel salvare Points Plot:", conditionMessage(e)))
+           }, finally = {
+             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+           })
            
          },
          "ENDOC" = {
@@ -696,11 +740,18 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            if(!is.null(ResultList$resPlot) ) {
              addWorksheet(wb, "PointPlot")
-             print(ResultList$resPlot)
-             insertPlot(wb = wb,  sheet="PointPlot",
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600,width = 8,height = 6)
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               print(ResultList$resPlot)
+               dev.off()
+               insertImage(wb = wb, sheet = "PointPlot", file = tmpPlotFile)
+             }, error = function(e) {
+               print(paste("Errore nel salvare ENDOC resPlot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
              print("PointPlot scritto nel foglio Excel")
            } else {
              print("PointPlot non disponibile o non è un data.frame")
@@ -718,25 +769,36 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            addWorksheet(wb,"standard curve")
            standcurve = ResultList[["Tablestandcurve"]]
            lmStancurve = ResultList[["Regression"]]$data
-           print(ResultList[["Regression"]]$plot)
-           
            writeDataTable(wb,standcurve, sheet="standard curve")
-           insertPlot(wb = wb,  sheet="standard curve",
-                      startCol=dim(standcurve)[2]+ 2,
-                      fileType = "png",
-                      units = "in",
-                      dpi = 600)
+           # Save plot to temporary file to ensure Docker compatibility
+           tmpPlotFile <- tempfile(fileext = ".png")
+           tryCatch({
+             png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+             print(ResultList[["Regression"]]$plot)
+             dev.off()
+             insertImage(wb = wb, sheet = "standard curve", file = tmpPlotFile)
+           }, error = function(e) {
+             print(paste("Errore nel salvare Regression plot:", conditionMessage(e)))
+           }, finally = {
+             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+           })
            
            ## Analysis
            addWorksheet(wb,"Analysis")
            writeDataTable(wb,ResultList[["dataFinal"]], sheet="Analysis")
            if(!is.null(ResultList$resPlot)){
-             print(ResultList$resPlot)
-             insertPlot(wb = wb,  sheet="Analysis",
-                        startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600)
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               print(ResultList$resPlot)
+               dev.off()
+               insertImage(wb = wb, sheet = "Analysis", file = tmpPlotFile)
+             }, error = function(e) {
+               print(paste("Errore nel salvare ELISA resPlot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
            }
          },
          "RAWFACS" = {
@@ -766,13 +828,18 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              writeDataTable(wb, ResultList$dataFinal, sheet = "Final data")  
            }
            if (!is.null(ResultList$Barplot) ) {
-             
-             print(ResultList$Barplot)
-             insertPlot(wb,  sheet = "Final data",
-                        startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600,width = 8,height = 6)  
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               print(ResultList$Barplot)
+               dev.off()
+               insertImage(wb = wb, sheet = "Final data", file = tmpPlotFile)
+             }, error = function(e) {
+               print(paste("Errore nel salvare FACS Barplot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
            }
            
          },
@@ -792,14 +859,19 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              addWorksheet(wb,"standard curve")
              standcurve = ResultList[["Tablestandcurve"]]
              lmStancurve = ResultList[["Regression"]]$data
-             print(ResultList[["Regression"]]$plot)
-             
              writeDataTable(wb,standcurve, sheet="standard curve")
-             insertPlot(wb = wb,  sheet="standard curve",
-                        startCol=dim(standcurve)[2]+ 2,
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600)
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               print(ResultList[["Regression"]]$plot)
+               dev.off()
+               insertImage(wb = wb, sheet = "standard curve", file = tmpPlotFile)
+             }, error = function(e) {
+               print(paste("Errore nel salvare BCA Regression plot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
            }
            # Se esiste anche dataQuant e vuoi scriverlo su un altro foglio
            if (!is.null(ResultList$dataQuant) && is.data.frame(ResultList$dataQuant)) {
@@ -828,13 +900,13 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            } else {
              print("Errore: Initdata non disponibile o non è un data.frame")
            }
-           # Se esiste anche dataFinal e vuoi scriverlo su un altro foglio
-           if (!is.null(ResultList$dataFinal) && is.data.frame(ResultList$dataFinal)) {
+           # Se esiste anche FinalData e vuoi scriverlo su un altro foglio
+           if (!is.null(ResultList$FinalData) && is.data.frame(ResultList$FinalData)) {
              addWorksheet(wb, "Results Analysis")  # Aggiunge un foglio per l'analisi finale
-             writeDataTable(wb, ResultList$dataFinal, sheet = "Results Analysis")  # Scrive i dati di analisi finale
-             print("dataFinal scritto nel foglio Excel")
+             writeDataTable(wb, ResultList$FinalData, sheet = "Results Analysis")  # Scrive i dati di analisi finale
+             print("FinalData scritto nel foglio Excel")
            } else {
-             print("dataFinal non disponibile o non è un data.frame")
+             print("FinalData non disponibile o non è un data.frame")
            }
            
            # Se esiste anche SubStatData e vuoi scriverlo su un altro foglio
@@ -857,13 +929,20 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            # Se esiste anche resplot e vuoi scriverlo su un altro foglio
            if (!is.null(ResultList$resplot)) {
-             addWorksheet(wb, "Bar plot") 
-             print(ResultList$resplot)
-             insertPlot(wb = wb,  sheet="Bar plot",
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600,width = 8,height = 6)
-             print("resplot scritto nel foglio Excel")
+             addWorksheet(wb, "Bar plot")
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               print(ResultList$resplot)
+               dev.off()
+               insertImage(wb = wb, sheet = "Bar plot", file = tmpPlotFile)
+               print("resplot scritto nel foglio Excel")
+             }, error = function(e) {
+               print(paste("Errore nel salvare resplot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
            } else {
              print("resplot non disponibile o non è un data.frame")
            }
@@ -888,11 +967,18 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            }
            if(!is.null(ResultList$resPlot) ) {
              addWorksheet(wb, "Barplot")
-             print(ResultList$Barplot)
-             insertPlot(wb = wb,  sheet="Barplot",
-                        fileType = "png",
-                        units = "in",
-                        dpi = 600,width = 8,height = 6)
+             # Save plot to temporary file to ensure Docker compatibility
+             tmpPlotFile <- tempfile(fileext = ".png")
+             tryCatch({
+               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               print(ResultList$Barplot)
+               dev.off()
+               insertImage(wb = wb, sheet = "Barplot", file = tmpPlotFile)
+             }, error = function(e) {
+               print(paste("Errore nel salvare CYTOTOX Barplot:", conditionMessage(e)))
+             }, finally = {
+               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
+             })
              print("Barplot scritto nel foglio Excel")
            } else {
              print("Barplot non disponibile o non è un data.frame")

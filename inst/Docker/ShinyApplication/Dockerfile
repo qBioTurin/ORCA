@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM rocker/r-ver:4.2.1
+FROM rocker/r-ver:4.5.2
 
 ENV S6_VERSION=v2.1.0.2
 ENV RSTUDIO_VERSION=daily
@@ -21,9 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libfontconfig1-dev \
   cmake \
   pkg-config \
+  libglpk-dev \
+  libglpk40 \
   && rm -rf /var/lib/apt/lists/*
 
-# install R packages required 
+
+# install R packages required - using latest CRAN mirror
 RUN R -e 'install.packages(c(\
               "rjson", \ 
               "openxlsx", \
@@ -44,7 +47,7 @@ RUN R -e 'install.packages(c(\
               "randomcoloR",\
               "plotly"\
             ), \
-            repos="https://packagemanager.rstudio.com/cran/__linux__/focal/2022-08-01"\
+            repos="https://cloud.r-project.org"\
           )'
 
 RUN R -e 'install.packages(c("ggraph", "tidyverse", "xml2", "visNetwork", "shinyFiles"))'
@@ -56,15 +59,17 @@ RUN R -e 'install.packages("ggpubr")'
 RUN R -e 'install.packages(c("patchwork","BiocManager"))'
 RUN R -e 'install.packages("remotes")'
 
-RUN R -e 'install.packages("BH", repos = "https://p3m.dev/cran/2023-03-01")'
+RUN R -e 'install.packages("BH")'
 RUN R -e 'BiocManager::install(c("ggcyto", "flowCore" ))'
 
 # Create data directory
 RUN mkdir ./home/data; chmod 777 ./home/data
 #COPY ./Data/ ./home/data/Examples/
 
-RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="v3.0-(on-going)")'
+
 RUN R -e 'install.packages("shinyAce")'
+
+RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="v3.0-(on-going)");'
 
 # expose port
 EXPOSE 3838
