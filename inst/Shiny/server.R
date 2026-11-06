@@ -331,7 +331,7 @@ server <- function(input, output, session) {
                finalTable = results %>% mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
                  MeanScaled = OmicsValue*Mean/100 # I have to divide 100 because Mean is in %
-               )%>% select(-sd) 
+               )%>% dplyr::select(-sd) 
                
                list(Table = finalTable)
              },
@@ -507,12 +507,12 @@ server <- function(input, output, session) {
   # Output tables for places and transitions
   output$placesTable <- renderDT({
     req(GreatModResult$initPN)
-    datatable(GreatModResult$initPN$places %>% select(id,marking), selection = "single", editable = TRUE)
+    datatable(GreatModResult$initPN$places %>% dplyr::select(id,marking), selection = "single", editable = TRUE)
   })
   
   output$transitionsTable <- renderDT({
     req(GreatModResult$initPN)
-    datatable(GreatModResult$initPN$transitions %>% select(id,rate), selection = "single", editable = TRUE)
+    datatable(GreatModResult$initPN$transitions %>% dplyr::select(id,rate), selection = "single", editable = TRUE)
   })
   
   # Render the Petri net network
@@ -520,7 +520,7 @@ server <- function(input, output, session) {
     petri_net <- req(GreatModResult$initPN)
     
     # Combine places and transitions into one node data frame
-    nodes <- rbind(petri_net$places %>% select(-marking), petri_net$transitions %>% select(-rate) )
+    nodes <- rbind(petri_net$places %>% dplyr::select(-marking), petri_net$transitions %>% dplyr::select(-rate) )
     
     visNetwork(nodes, petri_net$edges) %>%
       visNodes(borderWidth = 2, size = 20) %>%  # Set border width for all nodes
@@ -883,7 +883,7 @@ server <- function(input, output, session) {
                 trace
               })
       )->trace
-      updateSelectInput("epimod_placesPlot",session = session,choices = trace %>% select(-ID,-Time) %>% colnames() )
+      updateSelectInput("epimod_placesPlot",session = session,choices = trace %>% dplyr::select(-ID,-Time) %>% colnames() )
       GreatModResult$modelanalysisParms$trace = trace
     }
     
@@ -916,7 +916,7 @@ server <- function(input, output, session) {
     }else{ # stocastico
       
       meanTrace <- traces %>% group_by(Time,Place) %>%
-        summarise(Vmean=mean(Marking)) %>%
+        dplyr::summarise(Vmean=mean(Marking)) %>%
         ungroup()
       
       pl<-ggplot( )+
@@ -1483,7 +1483,7 @@ server <- function(input, output, session) {
             bcaResult$dataQuant = bcaQuant
             
             bcameanNew = bcaQuant %>%
-              select(PlateRow, PlateColumn, SampleName, ExpCondition, Quantification) %>%
+              dplyr::select(PlateRow, PlateColumn, SampleName, ExpCondition, Quantification) %>%
               rename(Ug = Quantification)
             bcaResult$dataFinal = bcameanNew
             output$BCAtablesUG = renderDT(bcameanNew)
@@ -1500,7 +1500,7 @@ server <- function(input, output, session) {
   observeEvent(bcaResult$Tablestandcurve,{
     output$BCA_Table_stdcurve <- DT::renderDataTable({
       DT::datatable( bcaResult$Tablestandcurve %>% 
-                       select(exp, Concentrations,  Measures,  BlankValues, MeasuresWithoutBlank) %>%
+                       dplyr::select(exp, Concentrations,  Measures,  BlankValues, MeasuresWithoutBlank) %>%
                        rename(SampleName = exp),
                      selection = 'none',
                      # editable = list(target = "cell",
@@ -1854,11 +1854,11 @@ server <- function(input, output, session) {
 
           IFinalData = IFdataCalc  %>%
             tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}",
-                                values_from = c(Values, Perc)) %>% ungroup() %>% select(-nRow)
+                                values_from = c(Values, Perc)) %>% ungroup() %>% dplyr::select(-nRow)
 
           statisticData = IFdataCalc %>%
             group_by(ExpCond,Vars) %>%
-            summarise(MeanValues = mean(Values),
+            dplyr::summarise(MeanValues = mean(Values),
                       sdValues = sd(Values),
                       MeanPerc = mean(Perc),
                       sdPerc = sd(Perc),
@@ -1880,11 +1880,11 @@ server <- function(input, output, session) {
 
           IFinalData = IFdataCalc  %>%
             tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}",
-                                values_from = c(Values)) %>% ungroup() %>% select(-nRow)
+                                values_from = c(Values)) %>% ungroup() %>% dplyr::select(-nRow)
 
           statisticData = IFdataCalc %>%
             group_by(ExpCond,Vars) %>%
-            summarise(MeanValues = mean(Values),
+            dplyr::summarise(MeanValues = mean(Values),
                       sdValues = sd(Values)) %>%
             tidyr::pivot_wider( names_from = Vars, names_glue = "{Vars}_{.value}",
                                 values_from = c(MeanValues, sdValues)) %>% ungroup()
@@ -2035,7 +2035,7 @@ server <- function(input, output, session) {
         IFinalData[,c("ExpCond", plot_col_name)] -> SubData
         colnames(SubData) = c("ExpCond", "Values")
 
-        SubDataStat = SubData %>% group_by(ExpCond) %>% summarise(Mean = mean(Values), sd = sd(Values),Values = Values)
+        SubDataStat = SubData %>% group_by(ExpCond) %>% dplyr::reframe(Mean = mean(Values), sd = sd(Values),Values = Values)
 
         # Get color mapping for current conditions
         current_conditions <- unique(SubDataStat$ExpCond)
@@ -2205,7 +2205,7 @@ server <- function(input, output, session) {
       } else {
         test_to_show[selected_rows, , drop = FALSE] -> selected_tests
         # Filter based on selected rows
-        selected_tests %>% select(group1,group2) -> selected_conditions
+        selected_tests %>% dplyr::select(group1,group2) -> selected_conditions
         lapply(seq_len(nrow(selected_conditions)), function(i) {
           c(selected_conditions$group1[i], selected_conditions$group2[i])
         }) -> filtered_pairs
@@ -3597,14 +3597,14 @@ server <- function(input, output, session) {
       
       NewPCR = PCR  %>% mutate(Value = as.numeric(Value)) %>% 
         na.omit() %>%
-        group_by(Sample,Gene,Time) %>%
+        dplyr::group_by(Sample,Gene,Time) %>%
         dplyr::summarise(Mean = mean(Value),
                          Sd = sd(Value)) %>%
-        ungroup()
+        dplyr::ungroup()
       
       HousekGenePCR = NewPCR %>%
         dplyr::filter(Gene %in% PCRnorm)%>%
-        rename(HousekGene = Gene,HousekGeneMean=Mean, HousekGeneSd=Sd) 
+        dplyr::rename(HousekGene = Gene,HousekGeneMean=Mean, HousekGeneSd=Sd) 
       
       PCRstep2 = merge(HousekGenePCR,NewPCR %>% dplyr::filter(!Gene %in% PCRnorm), all.y = T,by=c("Sample","Time") )
       
@@ -3623,7 +3623,7 @@ server <- function(input, output, session) {
 
         BaselinePCR = PCRstep3 %>%
           dplyr::filter(Time == unique(BaselineExp$Baseline)) %>%
-          rename(BaselineMean=Mean, BaselineSd=Sd, BaselinedCt = dCt, Baseline = Time) %>%
+          dplyr::rename(BaselineMean=Mean, BaselineSd=Sd, BaselinedCt = dCt, Baseline = Time) %>%
           dplyr::select(-HousekGeneMean, -HousekGeneSd)
 
         PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Sample","HousekGene") )
@@ -3637,7 +3637,7 @@ server <- function(input, output, session) {
         BaselinePCR = merge(BaselinePCR,BaselineExp)
 
         for(b in unique(BaselinePCR$Baseline))
-          BaselinePCR = rbind(BaselinePCR, BaselinePCR %>% dplyr::filter(Baseline == b) %>%  mutate(Sample = b) )
+          BaselinePCR = rbind(BaselinePCR, BaselinePCR %>% dplyr::filter(Baseline == b) %>%  dplyr::mutate(Sample = b) )
         BaselinePCR <- distinct(BaselinePCR)
 
         PCRstep4 = merge(BaselinePCR,PCRstep3,all.y = T,by=c("Gene","Time","HousekGene","Sample") )
@@ -4685,7 +4685,7 @@ server <- function(input, output, session) {
             dplyr::filter(exp != stcd) %>%
             dplyr::filter(exp != "") %>%
             #mutate(time = ifelse(exp %in% MapBlank$Blank, 0, time)) %>%
-            group_by(time, exp) %>%
+            dplyr::group_by(time, exp) %>%
             dplyr::summarize(AverageValues = mean(values), 
                              BlankValues = MapBlank,
                              AverageValuesWithoutBlank = AverageValues - BlankValues) %>%
@@ -4824,7 +4824,7 @@ server <- function(input, output, session) {
       cols_to_select <- c(base_cols, existing_optional_cols)
       
       DT::datatable( elisaResult$Tablestandcurve %>% 
-                       select(all_of(cols_to_select)) %>%
+                       dplyr::select(all_of(cols_to_select)) %>%
                        rename(SampleName = exp),
                      selection = 'none',
                      # editable = list(target = "cell",
@@ -4845,13 +4845,13 @@ server <- function(input, output, session) {
       standcurve$Concentrations = as.numeric(standcurve$Concentrations)
       if(!all(is.na(standcurve$BlankValues)) ){
         standcurve = standcurve %>%
-          select(Concentrations, MeasuresWithoutBlank) %>%
+          dplyr::select(Concentrations, MeasuresWithoutBlank) %>%
           rename( Measures = MeasuresWithoutBlank ) %>% na.omit()
         y="Measures Without Blank"
       }else{
         y="Measures"
         standcurve = standcurve %>% 
-          select(Concentrations, Measures) %>% na.omit()
+          dplyr::select(Concentrations, Measures) %>% na.omit()
       }
       
       regressionPlot = ggplot(standcurve,aes(Concentrations, Measures)) +
@@ -5556,7 +5556,7 @@ server <- function(input, output, session) {
         
         if(length(unique(endocTot_base$time)) == 1){ 
           # if there is only one point then the baseline is used to normalize every times
-          endocTot_base = endocTot_base %>% select(-time)
+          endocTot_base = endocTot_base %>% dplyr::select(-time)
         }
         endocTot_base = merge(endocTotAverage,
                               endocTot_base )
@@ -6236,7 +6236,7 @@ server <- function(input, output, session) {
       
       CYTOTOXcell = merge(merge(merge(CYTOTOXcell_REP,CYTOTOXcell_EXP) , CYTOTOXcell_SN), CYTOTOXcell_value) %>%
         group_by(SN,EXP,REP) %>%
-        summarise(MeanV = mean(Val,na.rm = T)) %>%
+        dplyr::summarise(MeanV = mean(Val,na.rm = T)) %>%
         ungroup()
       
       CYTOTOXcell_base = CYTOTOXcell %>%
@@ -8447,7 +8447,7 @@ server <- function(input, output, session) {
                dplyr::summarise(Mean = mean(AdjRelDensity), sd = sd(AdjRelDensity), .groups = 'drop')
 
              # Run statistical tests
-             res <- testStat.function(points %>% select(SampleName, AdjRelDensity) %>% as_tibble())
+             res <- testStat.function(points %>% dplyr::select(SampleName, AdjRelDensity) %>% as_tibble())
              testResults <- list(
                BivTest = res$BivTest, MulvTest = res$MulvTest,
                PairwiseTest = res$pairwise, steps = res$steps, path = res$path
@@ -8469,7 +8469,7 @@ server <- function(input, output, session) {
              # Calculate statistics
              stats <- resultsNew %>%
                group_by(ExpCond) %>%
-               summarise(Mean = mean(Values), sd = sd(Values), .groups = 'drop')
+               dplyr::summarise(Mean = mean(Values), sd = sd(Values), .groups = 'drop')
 
              # Run statistical tests
              res <- testStat.function(resultsNew[, c("ExpCond", "Values")] %>% as_tibble())
@@ -8509,9 +8509,9 @@ server <- function(input, output, session) {
 
              # Prepare data
              resultsNew <- combined_table %>%
-               rename(Q = `2^(-DDCT)`) %>%
+               dplyr::rename(Q = `2^(-DDCT)`) %>%
                as.data.frame() %>%
-               mutate(
+               dplyr::mutate(
                  Q = as.numeric(Q),
                  GeneH = paste(Gene, ", Housekeeping: ", HousekGene)
                ) %>%
@@ -8557,7 +8557,7 @@ server <- function(input, output, session) {
              # Calculate statistics
              stats <- resultsNew %>%
                group_by(ExpCondition, Gate) %>%
-               summarise(Mean = mean(Perc), sd = sd(Perc), .groups = 'drop')
+               dplyr::summarise(Mean = mean(Perc), sd = sd(Perc), .groups = 'drop')
 
              # Run statistical tests for each gate
              resList <- lapply(unique(resultsNew$Gate), function(g) {

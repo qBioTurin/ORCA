@@ -2017,7 +2017,7 @@ testStat.function <- function(data) {
   shapiro_results <- data %>%
     group_by(data[[1]]) %>%
     dplyr::filter(n() >= 3) %>%
-    summarize(
+    dplyr::summarize(
       p.value = ifelse(
         length(unique(Value)) > 1, 
         shapiro.test(Value)$p.value, 
@@ -2041,8 +2041,8 @@ testStat.function <- function(data) {
   }
   
   group_counts <- data %>%
-    group_by(data[[1]]) %>%
-    summarize(count = n())
+    dplyr::group_by(data[[1]]) %>%
+    dplyr::summarize(count = n())
   
   vars <- unique(data[,1])
 
