@@ -7682,22 +7682,54 @@ server <- function(input, output, session) {
         facsResult$cells <- vector("list", nrow(data))
         facsResult$originalName <- vector("list", nrow(data))
         
+        # Keep track of hierarchical paths for each tube/generation
+        hierarchical_paths <- list()
+        
         for (i in 1:nrow(data)) {
           x <- data[i, 1]
+          tube_name <- as.character(data[i, 2])
           
           if (is.na(x)) {
             facsResult$depth[i] <- NA
             facsResult$depthCount[i] <- 0
-            facsResult$name[i] <- data[i, 2]
+            facsResult$name[i] <- tube_name
             facsResult$statistics[i] <- data[i, 3]
             facsResult$cells[i] <- data[i, 4]
+            # Initialize hierarchical path for this tube
+            hierarchical_paths[[tube_name]] <- character(0)
           } else {
             x_cleaned <- gsub(" ", "", x)  
+            depth_count <- str_count(x_cleaned, fixed(">"))
             facsResult$depth[i] <- x 
-            facsResult$depthCount[i] <- str_count(x_cleaned, fixed(">"))
-            facsResult$name[i] <- data[i, 2]
+            facsResult$depthCount[i] <- depth_count
             facsResult$statistics[i] <- data[i, 3]
             facsResult$cells[i] <- data[i, 4]
+            
+            # Build hierarchical path using gate names from column 4
+            gate_name <- as.character(data[i, 4])
+            if (!is.na(gate_name) && gate_name != "" && gate_name != "NA") {
+              # Ensure hierarchical_paths has entry for this tube
+              if (!tube_name %in% names(hierarchical_paths)) {
+                hierarchical_paths[[tube_name]] <- character(0)
+              }
+              
+              # Adjust path to match the current depth
+              current_path <- hierarchical_paths[[tube_name]]
+              if (length(current_path) >= depth_count) {
+                # Truncate path to current depth - 1
+                hierarchical_paths[[tube_name]] <- current_path[1:(depth_count - 1)]
+              }
+              
+              # Add current gate to path
+              hierarchical_paths[[tube_name]] <- c(hierarchical_paths[[tube_name]], gate_name)
+              
+              # Set name as the hierarchical path joined by /
+              full_path <- paste(c(tube_name, hierarchical_paths[[tube_name]]), collapse = "/")
+              facsResult$name[i] <- full_path
+            } else {
+              # If no gate name available, use the depth string
+              facsResult$name[i] <- paste(c(tube_name, x), collapse = "/")
+            }
           }
         }
         
@@ -8048,6 +8080,8 @@ server <- function(input, output, session) {
   observeEvent(input$FACSstatButton, {
     facsResult$ExpConditionDF -> ExpConditionDF
     facsResult$dataFinal -> dataFinal
+    StatDF = NULL
+    
     isolate({
       if(!is.null(dataFinal) && !is.null(ExpConditionDF)  ){
         dataFinalExpCond = merge(dataFinal,ExpConditionDF) %>%
@@ -8061,22 +8095,28 @@ server <- function(input, output, session) {
                               subdata = dataFinalExpCond %>% dplyr::filter(Gate == gate) %>% dplyr::select(ExpCondition,Percetages)
                               testStat.function(tibble(subdata), var = gate)
                             }) )
+        } else {
+          showAlert("Info", "Not enough experimental conditions for statistical analysis. Please ensure you have assigned at least 2 different experimental conditions.", "info", 5000)
         }
+      } else {
+        showAlert("Error", "Please ensure both data and experimental conditions are loaded before calculating statistics.", "error", 5000)
       }
       
     })
     
-    facsResult$StatDF = StatDF
-    output$FACSstat_tab = renderDT({
-      DT::datatable( StatDF,
-                     selection = 'none',
-                     rownames= FALSE,
-                     options = list(scrollX = TRUE,
-                                    searching = FALSE,
-                                    dom = 't' # Only display the table
-                     )
-      )
-    })
+    if(!is.null(StatDF)){
+      facsResult$StatDF = StatDF
+      output$FACSstat_tab = renderDT({
+        DT::datatable( StatDF,
+                       selection = 'none',
+                       rownames= FALSE,
+                       options = list(scrollX = TRUE,
+                                      searching = FALSE,
+                                      dom = 't' # Only display the table
+                       )
+        )
+      })
+    }
     
   })
   

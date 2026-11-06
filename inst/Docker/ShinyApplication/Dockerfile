@@ -59,16 +59,12 @@ RUN R -e 'install.packages("remotes")'
 RUN R -e 'install.packages("BH", repos = "https://p3m.dev/cran/2023-03-01")'
 RUN R -e 'BiocManager::install(c("ggcyto", "flowCore" ))'
 
+# Create data directory
+RUN mkdir ./home/data; chmod 777 ./home/data
+#COPY ./Data/ ./home/data/Examples/
+
 RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="v3.0-(on-going)")'
-
-# Create data directory
-RUN mkdir ./home/data; chmod 777 ./home/data
-#COPY ./Data/ ./home/data/Examples/
-
-COPY ./inst/Shiny/* ./app/
-# Create data directory
-RUN mkdir ./home/data; chmod 777 ./home/data
-#COPY ./Data/ ./home/data/Examples/
+RUN R -e 'install.packages("shinyAce")'
 
 # expose port
 EXPOSE 3838

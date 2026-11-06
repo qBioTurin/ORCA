@@ -485,6 +485,46 @@ ui <- dashboardPage(
               
               div(class = "analysis-cards-container",
                   
+                  # ===== Western Blot Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("microscope"),
+                          h4("Western Blot Analysis")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Quantitative analysis of Western Blot images with automatic band detection, densitometry calculations, and relative density normalization."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                                  tags$li(icon("image"), "TIFF image import & visualization"),
+                                  tags$li(icon("crop"), "Protein band manual selection"),
+                                  tags$li(icon("calculator"), "Densitometry & area under curve"),
+                                  tags$li(icon("chart-line"), "Truncation analysis for background"),
+                                  tags$li(icon("download"), "Excel reports & high-res plots")
+                          )
+                      )
+                  ),
+                  
+                  # ===== WB Quantification Card =====
+                  div(class = "analysis-card",
+                      div(class = "analysis-card-header",
+                          icon("balance-scale"),
+                          h4("WB Quantification")
+                      ),
+                      div(class = "analysis-card-body",
+                          p(class = "analysis-card-description",
+                            "Western Blot quantification with normalization against reference proteins and comparative analysis across samples."
+                          ),
+                          tags$ul(class = "analysis-card-features",
+                                  tags$li(icon("chart-line"), "Relative density calculations"),
+                                  tags$li(icon("chart-area"), "Adjusted relative density"),
+                                  tags$li(icon("chart-bar"), "Normalizer WB integration"),
+                                  tags$li(icon("palette"), "Bar plot visualization"),
+                                  tags$li(icon("download"), "Quantification data & plot export")
+                          )
+                      )
+                  ),
+                  
                   # ===== RT-qPCR Card =====
                   div(class = "analysis-card",
                       div(class = "analysis-card-header",

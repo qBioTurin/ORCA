@@ -537,7 +537,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            }
            
            insertPlot(wb = wb, sheet = "WBimage and protein bands",
-                      fileType = "tiff",
+                      fileType = "png",
                       units = "in",
                       dpi = 600)
            
@@ -548,14 +548,14 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            addWorksheet(wb, "Plot")
            print(ResultList[["Plots"]])
            insertPlot(wb = wb, sheet="Plot",
-                      fileType = "tiff",
+                      fileType = "png",
                       units = "in",
                       dpi = 600, width = 10,height = 8)
            
            addWorksheet(wb, "Truncated Plot")
            print(ResultList[["TruncatedPlots"]])
            insertPlot(wb = wb, sheet="Truncated Plot",
-                      fileType = "tiff",
+                      fileType = "png",
                       units = "in",
                       dpi = 600, width = 10,height = 8)
            
@@ -599,7 +599,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                #   theme_bw()
                # 
              insertPlot(wb, sheet = "Barplot AdjRelDensity",
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600, width = 10,height = 8)
              
@@ -626,7 +626,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              print(ResultList[["AllGenesFoldChangePlot"]])
              insertPlot(wb = wb,  sheet="Result All Genes",
                         startCol=dim(ResultList[["AllGenesFoldChangeTable"]][[1]])[2]+ 4,
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600,width = 14,height = 6)
              
@@ -646,7 +646,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                print(plot_list[[plot_name]] + labs(title = paste(i, "-", plot_name)))
                insertPlot(wb = wb,  sheet=paste0("Gene ", j),
                           startCol=dim(ResultList[["plotPCR"]][[i]]$table)[2]+ 2+ k,
-                          fileType = "tiff",
+                          fileType = "png",
                           units = "in",
                           dpi = 600,width = 20, height = 6)
                k=k+5
@@ -669,7 +669,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                      axis.ticks.x=element_blank())
            )
            insertPlot(wb = wb,  sheet="Points Plot",
-                      fileType = "tiff",
+                      fileType = "png",
                       units = "in",
                       dpi = 600)
            
@@ -698,7 +698,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              addWorksheet(wb, "PointPlot")
              print(ResultList$resPlot)
              insertPlot(wb = wb,  sheet="PointPlot",
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600,width = 8,height = 6)
              print("PointPlot scritto nel foglio Excel")
@@ -723,7 +723,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            writeDataTable(wb,standcurve, sheet="standard curve")
            insertPlot(wb = wb,  sheet="standard curve",
                       startCol=dim(standcurve)[2]+ 2,
-                      fileType = "tiff",
+                      fileType = "png",
                       units = "in",
                       dpi = 600)
            
@@ -734,7 +734,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              print(ResultList$resPlot)
              insertPlot(wb = wb,  sheet="Analysis",
                         startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600)
            }
@@ -770,7 +770,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              print(ResultList$Barplot)
              insertPlot(wb,  sheet = "Final data",
                         startCol=dim(ResultList[["dataFinal"]] )[2]+ 2,
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600,width = 8,height = 6)  
            }
@@ -797,7 +797,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              writeDataTable(wb,standcurve, sheet="standard curve")
              insertPlot(wb = wb,  sheet="standard curve",
                         startCol=dim(standcurve)[2]+ 2,
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600)
            }
@@ -860,7 +860,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              addWorksheet(wb, "Bar plot") 
              print(ResultList$resplot)
              insertPlot(wb = wb,  sheet="Bar plot",
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600,width = 8,height = 6)
              print("resplot scritto nel foglio Excel")
@@ -890,7 +890,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              addWorksheet(wb, "Barplot")
              print(ResultList$Barplot)
              insertPlot(wb = wb,  sheet="Barplot",
-                        fileType = "tiff",
+                        fileType = "png",
                         units = "in",
                         dpi = 600,width = 8,height = 6)
              print("Barplot scritto nel foglio Excel")
