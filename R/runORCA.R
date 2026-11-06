@@ -1,7 +1,8 @@
 #' @title Run ORCA
 #' @description function to lunch the ORCA shiny application.
 #'
-#' @param 
+#' @param inDocker If it runs in docker
+#' @param port Port to use
 #'
 #' @author Beccuti Marco, Pernice Simone, Tortarolo Dora
 #' @import shinydashboard shinyjs jsonlite shinyalert shinybusy zoo knitr ggplot2 shinythemes OpenImageR dplyr openxlsx patchwork stringr randomcoloR plotly flowCore xml2 visNetwork shinyFiles
@@ -15,7 +16,7 @@
 #' }
 #' @export
 
-ORCA.run <-function()
+ORCA.run <-function(port = 3838, inDocker = FALSE)
 {
   x = T
   
@@ -25,16 +26,19 @@ ORCA.run <-function()
   source(Appui)
   source(Appserver)
   
-  app <-shinyApp(ui, server,
-             options =  options(shiny.maxRequestSize=1000*1024^2,
-                                shiny.launch.browser = .rs.invokeShinyWindowExternal)
-    )
+  options(shiny.maxRequestSize = 1000*1024^2)
+  app <- shinyApp(ui, server)
+  if(inDocker){
+    host = '0.0.0.0'
+  }else{
+    host = getOption("shiny.host", "127.0.0.1")
+  }
   
   app$staticPaths <- list(
-      `/` = httpuv::staticPath(system.file("Shiny","www", package = "ORCA"), indexhtml = FALSE, fallthrough = TRUE)
-    )
+    `/` = httpuv::staticPath(system.file("Shiny","www", package = "ORCA"), indexhtml = FALSE, fallthrough = TRUE)
+  )
   
-  runApp(app)
+  runApp(app, host = host, port = port)
   # runApp(
   #   appDir = system.file("Shiny", package = "ORCA"),
   #   launch.browser = T

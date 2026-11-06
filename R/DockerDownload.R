@@ -26,14 +26,14 @@ downloadContainers <- function(containers.file=NULL, tag = "latest"){
                              row.names = 1)
   }
   
-
-    # curr.tag <- gsub(pattern = "([[:alpha:]]+){1}(/ORCA){1}(-[[:alpha:]]+:){1}",
-    #                  replacement = "",
-    #                  x = containers$names)
-    # curr.tag <- unique(curr.tag)
-    # containers$names <- gsub(pattern = curr.tag,
-    #                          replacement = tag,
-    #                          x = containers$names)
+  
+  # curr.tag <- gsub(pattern = "([[:alpha:]]+){1}(/ORCA){1}(-[[:alpha:]]+:){1}",
+  #                  replacement = "",
+  #                  x = containers$names)
+  # curr.tag <- unique(curr.tag)
+  # containers$names <- gsub(pattern = curr.tag,
+  #                          replacement = tag,
+  #                          x = containers$names)
   
   userid=system("id -u", intern = TRUE)
   username=system("id -un", intern = TRUE)
@@ -48,12 +48,12 @@ downloadContainers <- function(containers.file=NULL, tag = "latest"){
     }
     else
     {
-        return(status)
+      return(status)
     }
   }
   
   write.table(containers,
               paste(path.package(package = "ORCA"),"Containers/containersNames.txt",
                     sep = "/"))
-
-  }
+  
+}

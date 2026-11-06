@@ -1,65 +1,100 @@
-#'
 #' @title Run docker container
 #'
-#' @description This is the function to run the application through its docker image
+#' @description This function runs the Shiny app using its Docker image. It pulls the image if not available,
+#' opens the browser, and monitors for errors.
 #' @author Pernice Simone
 #'
 #' @examples
-#'\dontrun{
-##'     #running runDocker
-#'      docker.run(params=NULL, changeUID=TRUE, debug=FALSE)
-#'
+#' \dontrun{
+#'   docker.application.run()
 #' }
-
-docker.application.run <- function(){
-
-
-  # to check the Docker ID by file
-  if (file.exists("dockerID")){
-    cat("\n\nDocker does not start, there is already a docker container running che dockerID file!!!\n\n")
-    system("echo 2 > ExitStatusFile 2>&1")
-    return(2)
+#' @export
+docker.application.run <- function(port = 3838, image = "qbioturin/orca-application:latest", debug = FALSE) {
+  
+  # Check if Docker is installed
+  if (system("docker --version", ignore.stdout = TRUE, ignore.stderr = TRUE) != 0) {
+    cat("Docker is not installed or not available in PATH.\n")
+    system("echo 1 > ExitStatusFile 2>&1")
+    return(1)
   }
   
-  ## to execute docker
-  cat(paste("docker run -it --rm -p 3838:3838 qbioturin/ORCA-application"))
-  system(paste("docker run -it --rm -p 3838:3838 qbioturin/ORCA-application") )
-
-  ## Get the Docker ID from file
-  dockerid=readLines("dockerID", warn = FALSE)
-  cat("\nDocker ID is:\n",substr(dockerid,1, 12),"\n")
+  # Check if Docker image exists locally
+  image_check_cmd <- paste("docker images -q", image)
+  image_id <- system(image_check_cmd, intern = TRUE)
   
-  ## Check the Docker container status
-  dockerStatus=system(paste("docker inspect -f {{.State.Running}}",dockerid),intern= T)
-  while(dockerStatus=="true"){
-    Sys.sleep(10);
-    dockerStatus=system(paste("docker inspect -f {{.State.Running}}",dockerid),intern= T)
-    cat(".")
+  if (length(image_id) == 0 || image_id == "") {
+    cat("\nDocker image not found locally. Pulling from DockerHub...\n")
+    pull_status <- system(paste("docker pull", image))
+    if (pull_status != 0) {
+      cat("\nFailed to pull the image from DockerHub.\n")
+      system("echo 2 > ExitStatusFile 2>&1")
+      return(2)
+    }
+  } else {
+    cat("\nDocker image found locally.\n")
   }
-  cat(".\n\n")
-  ## Check the Docker container exit status
-  dockerExit <- system(paste("docker inspect -f {{.State.ExitCode}}",dockerid),intern= T)
   
-  if(as.numeric(dockerExit)!=0){
-    cat("\nExecution is interrupted\n")
-    cat(paste("\nDocker container ", substr(dockerid,1,12), " had exit different from 0\n", sep=""))
-    system(paste("docker logs ", substr(dockerid,1,12), " &> ", substr(dockerid,1,12),"_error.log", sep=""))
-    # cat("The container's log is saved at: ")
-    # system(paste0("docker inspect --format=","'{{.LogPath}}' ",dockerid))
-    cat(paste("Please send to simone.pernice@unito.it this error: Docker failed exit 0,\n the description of the function you were using and the following error log file,\n which is saved in your working folder:\n", substr(dockerid,1,12),"_error.log\n", sep=""))
+  # Run Docker container in detached mode
+  run_cmd <- paste("docker run -d -p", paste0(port, ":3838"), image)
+  container_id <- system(run_cmd, intern = TRUE)
+  
+  if (length(container_id) == 0 || container_id == "") {
+    cat("\nFailed to start Docker container.\n")
     system("echo 3 > ExitStatusFile 2>&1")
     return(3)
-  }else{
-    cat("\nDocker exit status:",dockerExit,"\n\n")
-    file.remove("dockerID")
-    if(debug==TRUE){
-      system(paste("docker logs ", substr(dockerid,1,12), " &> ", substr(dockerid,1,12),".log", sep=""))
-      cat("The container's log is saved at: ")
-      system(paste0("docker inspect --format=","'{{.LogPath}}' ",dockerid))
-    }
-    system(paste("docker rm -f ",dockerid),intern= T)
-    #Normal Docker execution
-    system("echo 0 > ExitStatusFile 2>&1")
-    return(0)
   }
+  
+  # Open app in browser
+  browse_url <- paste0("http://0.0.0.0:", port)
+  cat("\nOpening Shiny app in your browser: ", browse_url, "\n")
+  utils::browseURL(browse_url)
+  
+  # Monitor container
+  cat("Waiting for container to finish...\n")
+  cat("\nType 's' and press ENTER to stop the container...\n")
+  repeat {
+    input <- tryCatch(readLines(n = 1, warn = FALSE), error = function(e) "")
+    if (tolower(input) == "s") {
+      cat("\n Stopping container...\n")
+      system(paste("docker stop", container_id))
+      break
+    }
+    
+    # Check if container is still running
+    status <- system(paste("docker inspect -f {{.State.Running}}", container_id), intern = TRUE)
+    if (status != "true") {
+      cat("\n️  Container has stopped.\n")
+      break
+    }
+    
+    Sys.sleep(5)
+  }
+  
+  # Get exit code
+  exit_code <- system(paste("docker inspect -f '{{.State.ExitCode}}'", container_id), intern = TRUE)
+  
+  if (as.numeric(exit_code) != 0) {
+    cat("\nDocker container exited with error. Exit code:", exit_code, "\n")
+    log_file <- paste0(substr(container_id, 1, 12), "_error.log")
+    system(paste("docker logs", container_id, ">", log_file))
+    cat("Log saved to:", log_file, "\n")
+    cat("Please send the log to simone.pernice@unito.it with a description of the error.\n")
+    system("echo 4 > ExitStatusFile 2>&1")
+    return(4)
+  }
+  
+  if (debug) {
+    log_file <- paste0(substr(container_id, 1, 12), ".log")
+    system(paste("docker logs", container_id, ">", log_file))
+    cat("\nDebug log saved to:", log_file, "\n")
+  }
+  
+  # Clean up (optional since container is started with `-d`, not `--rm`)
+  system(paste("docker rm", container_id), ignore.stdout = TRUE, ignore.stderr = TRUE)
+  
+  system("echo 0 > ExitStatusFile 2>&1")
+  cat("\nShiny app ran successfully.\n")
+  
+  
+  return(0)
 }
