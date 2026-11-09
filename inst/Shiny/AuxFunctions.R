@@ -226,6 +226,24 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
 
 
 # function called when you need to read a file
+# Quantification consumes AUC tables, not source images or intensity-profile plots.
+wbQuantificationInput <- function(analysis) {
+  if (is.null(analysis)) return(NULL)
+  list(AUCdf = analysis$AUCdf)
+}
+
+wbQuantificationExport <- function(results) {
+  results$WBanalysis <- wbQuantificationInput(results$WBanalysis)
+  results$NormWBanalysis <- wbQuantificationInput(results$NormWBanalysis)
+  results
+}
+
+# Keep plot mappings out of the Shiny observer environment when saving RDS files.
+wbQuantificationPlot <- function(data) {
+  ggplot2::ggplot(data, ggplot2::aes(x = SampleName, y = AdjRelDensity, fill = SampleName)) +
+    ggplot2::geom_bar(stat = "identity") + ggplot2::theme_bw()
+}
+
 readfile <- function(filename, type, isFileUploaded, colname = TRUE, namesAll = namesAll, allDouble = FALSE, colors = FALSE) {
   out <- tryCatch({
     switch(type, "tif" = {
@@ -513,6 +531,10 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
     file.remove(filename)
   }
   
+  # Create a temporary directory for plot files that persists until workbook is saved
+  tmpPlotDir <- tempdir()
+  tmpPlotFiles <- character(0)  # Track files to cleanup later
+  
   switch(analysis, 
          "WB" = {
            wb <- createWorkbook("WB")
@@ -522,26 +544,25 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            im <- ListIm$RGB
            
            # Save plot to temporary file to ensure Docker compatibility
-           tmpPlotFile <- tempfile(fileext = ".png")
+           wbPlotFile1 <- file.path(tmpPlotDir, paste0("WBimage_", Sys.time() %>% as.numeric(), ".png"))
            tryCatch({
-             png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+             png(wbPlotFile1, width = 8, height = 6, units = "in", res = 600)
              plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
              rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
              dev.off()
-             insertImage(wb = wb, sheet = "WBimage", file = tmpPlotFile)
+             insertImage(wb = wb, sheet = "WBimage", file = wbPlotFile1)
+             tmpPlotFiles <- c(tmpPlotFiles, wbPlotFile1)
            }, error = function(e) {
              print(paste("Errore nel salvare WBimage:", conditionMessage(e)))
-           }, finally = {
-             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
            })
            
            if(!is.null(PanelStructures$data)){
              
            addWorksheet(wb, "WBimage and protein bands")
            # Save plot to temporary file to ensure Docker compatibility
-           tmpPlotFile <- tempfile(fileext = ".png")
+           wbPlotFile2 <- file.path(tmpPlotDir, paste0("WBimage_bands_", Sys.time() %>% as.numeric(), ".png"))
            tryCatch({
-             png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+             png(wbPlotFile2, width = 8, height = 6, units = "in", res = 600)
              plot(c(1, dim(im)[2]), c(1, dim(im)[1]), type='n', ann=FALSE)
              rasterImage(im, 1, 1, dim(im)[2], dim(im)[1])
              for (i in seq_len(nrow(PanelStructures$data))) {
@@ -550,11 +571,10 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                  })
              }
              dev.off()
-             insertImage(wb = wb, sheet = "WBimage and protein bands", file = tmpPlotFile)
+             insertImage(wb = wb, sheet = "WBimage and protein bands", file = wbPlotFile2)
+             tmpPlotFiles <- c(tmpPlotFiles, wbPlotFile2)
            }, error = function(e) {
              print(paste("Errore nel salvare WBimage and protein bands:", conditionMessage(e)))
-           }, finally = {
-             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
            })
            
            startRow <- 22
@@ -563,30 +583,28 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            
            addWorksheet(wb, "Plot")
            # Save plot to temporary file to ensure Docker compatibility
-           tmpPlotFile <- tempfile(fileext = ".png")
+           wbPlotFile3 <- file.path(tmpPlotDir, paste0("WBplot_", Sys.time() %>% as.numeric(), ".png"))
            tryCatch({
-             png(tmpPlotFile, width = 10, height = 8, units = "in", res = 600)
+             png(wbPlotFile3, width = 10, height = 8, units = "in", res = 600)
              print(ResultList[["Plots"]])
              dev.off()
-             insertImage(wb = wb, sheet = "Plot", file = tmpPlotFile)
+             insertImage(wb = wb, sheet = "Plot", file = wbPlotFile3)
+             tmpPlotFiles <- c(tmpPlotFiles, wbPlotFile3)
            }, error = function(e) {
              print(paste("Errore nel salvare Plots:", conditionMessage(e)))
-           }, finally = {
-             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
            })
            
            addWorksheet(wb, "Truncated Plot")
            # Save plot to temporary file to ensure Docker compatibility
-           tmpPlotFile <- tempfile(fileext = ".png")
+           wbPlotFile4 <- file.path(tmpPlotDir, paste0("WBtruncated_", Sys.time() %>% as.numeric(), ".png"))
            tryCatch({
-             png(tmpPlotFile, width = 10, height = 8, units = "in", res = 600)
+             png(wbPlotFile4, width = 10, height = 8, units = "in", res = 600)
              print(ResultList[["TruncatedPlots"]])
              dev.off()
-             insertImage(wb = wb, sheet = "Truncated Plot", file = tmpPlotFile)
+             insertImage(wb = wb, sheet = "Truncated Plot", file = wbPlotFile4)
+             tmpPlotFiles <- c(tmpPlotFiles, wbPlotFile4)
            }, error = function(e) {
              print(paste("Errore nel salvare TruncatedPlots:", conditionMessage(e)))
-           }, finally = {
-             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
            })
            
            addWorksheet(wb, "AUC")
@@ -594,6 +612,8 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            writeDataTable(wb, finaldata, sheet="AUC")
            
            saveWorkbook(wb, filename)
+           # Clean up temporary plot files after workbook is saved
+           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
            return(1)
          },
          "WB comparison" = {
@@ -618,19 +638,23 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            if(!is.null( ResultList[["AdjRelDensityPlot"]])){
              addWorksheet(wb,"Barplot AdjRelDensity")
              # Save plot to temporary file to ensure Docker compatibility
-             tmpPlotFile <- tempfile(fileext = ".png")
+             wbcompPlotFile <- file.path(tmpPlotDir, paste0("WBcomp_adjreldensity_", Sys.time() %>% as.numeric(), ".png"))
              tryCatch({
-               png(tmpPlotFile, width = 10, height = 8, units = "in", res = 600)
+               png(wbcompPlotFile, width = 10, height = 8, units = "in", res = 300)
                print(ResultList[["AdjRelDensityPlot"]])
                dev.off()
-               insertImage(wb = wb, sheet = "Barplot AdjRelDensity", file = tmpPlotFile)
+               insertImage(wb = wb, sheet = "Barplot AdjRelDensity", file = wbcompPlotFile)
+               tmpPlotFiles <- c(tmpPlotFiles, wbcompPlotFile)
              }, error = function(e) {
                print(paste("Errore nel salvare AdjRelDensityPlot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
              
            }
+           
+           saveWorkbook(wb, filename)
+           # Clean up temporary plot files after workbook is saved
+           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
+           return(1)
          }, 
          "RT-qPCR" = {
            wb <- createWorkbook("RTqPCR")
@@ -659,8 +683,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                insertImage(wb = wb, sheet = "Result All Genes", file = tmpPlotFile)
              }, error = function(e) {
                print(paste("Errore nel salvare AllGenesFoldChangePlot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
              
            }
@@ -683,8 +705,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                  insertImage(wb = wb, sheet = paste0("Gene ", j), file = tmpPlotFile)
                }, error = function(e) {
                  print(paste("Errore nel salvare gene plot per", i, "-", plot_name, ":", conditionMessage(e)))
-               }, finally = {
-                 if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
                })
                k=k+5
              }
@@ -713,8 +733,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              insertImage(wb = wb, sheet = "Points Plot", file = tmpPlotFile)
            }, error = function(e) {
              print(paste("Errore nel salvare Points Plot:", conditionMessage(e)))
-           }, finally = {
-             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
            })
            
          },
@@ -749,8 +767,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                insertImage(wb = wb, sheet = "PointPlot", file = tmpPlotFile)
              }, error = function(e) {
                print(paste("Errore nel salvare ENDOC resPlot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
              print("PointPlot scritto nel foglio Excel")
            } else {
@@ -779,8 +795,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              insertImage(wb = wb, sheet = "standard curve", file = tmpPlotFile)
            }, error = function(e) {
              print(paste("Errore nel salvare Regression plot:", conditionMessage(e)))
-           }, finally = {
-             if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
            })
            
            ## Analysis
@@ -796,8 +810,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                insertImage(wb = wb, sheet = "Analysis", file = tmpPlotFile)
              }, error = function(e) {
                print(paste("Errore nel salvare ELISA resPlot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
            }
          },
@@ -837,8 +849,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                insertImage(wb = wb, sheet = "Final data", file = tmpPlotFile)
              }, error = function(e) {
                print(paste("Errore nel salvare FACS Barplot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
            }
            
@@ -869,8 +879,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
                insertImage(wb = wb, sheet = "standard curve", file = tmpPlotFile)
              }, error = function(e) {
                print(paste("Errore nel salvare BCA Regression plot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
            }
            # Se esiste anche dataQuant e vuoi scriverlo su un altro foglio
@@ -931,21 +939,24 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            if (!is.null(ResultList$resplot)) {
              addWorksheet(wb, "Bar plot")
              # Save plot to temporary file to ensure Docker compatibility
-             tmpPlotFile <- tempfile(fileext = ".png")
+             ifPlotFile <- file.path(tmpPlotDir, paste0("IF_resplot_", Sys.time() %>% as.numeric(), ".png"))
              tryCatch({
-               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               png(ifPlotFile, width = 8, height = 6, units = "in", res = 600)
                print(ResultList$resplot)
                dev.off()
-               insertImage(wb = wb, sheet = "Bar plot", file = tmpPlotFile)
+               insertImage(wb = wb, sheet = "Bar plot", file = ifPlotFile)
+               tmpPlotFiles <- c(tmpPlotFiles, ifPlotFile)
                print("resplot scritto nel foglio Excel")
              }, error = function(e) {
                print(paste("Errore nel salvare resplot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
            } else {
              print("resplot non disponibile o non è un data.frame")
            }
+           
+           saveWorkbook(wb, filename)
+           # Clean up temporary plot files after workbook is saved
+           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
          },
          "CYTOTOX" = {
            wb <- createWorkbook("CYTOTOX")  
@@ -968,26 +979,31 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            if(!is.null(ResultList$resPlot) ) {
              addWorksheet(wb, "Barplot")
              # Save plot to temporary file to ensure Docker compatibility
-             tmpPlotFile <- tempfile(fileext = ".png")
+             cytotoxPlotFile <- file.path(tmpPlotDir, paste0("CYTOTOX_barplot_", Sys.time() %>% as.numeric(), ".png"))
              tryCatch({
-               png(tmpPlotFile, width = 8, height = 6, units = "in", res = 600)
+               png(cytotoxPlotFile, width = 8, height = 6, units = "in", res = 600)
                print(ResultList$Barplot)
                dev.off()
-               insertImage(wb = wb, sheet = "Barplot", file = tmpPlotFile)
+               insertImage(wb = wb, sheet = "Barplot", file = cytotoxPlotFile)
+               tmpPlotFiles <- c(tmpPlotFiles, cytotoxPlotFile)
              }, error = function(e) {
                print(paste("Errore nel salvare CYTOTOX Barplot:", conditionMessage(e)))
-             }, finally = {
-               if (file.exists(tmpPlotFile)) unlink(tmpPlotFile)
              })
              print("Barplot scritto nel foglio Excel")
            } else {
              print("Barplot non disponibile o non è un data.frame")
            }
+           
+           saveWorkbook(wb, filename)
+           # Clean up temporary plot files after workbook is saved
+           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
          }
          
   )
   
   saveWorkbook(wb, filename)  # Salva il workbook
+  # Note: Temporary PNG files will be cleaned up automatically by R's tempdir cleanup
+  # We keep them persistent until workbook is fully saved to ensure openxlsx can access them
   return(1)  # Restituisce 1 per indicare il successo
 }
 
@@ -2270,6 +2286,14 @@ testStat.function <- function(data) {
 }
 
 
+# Resolve inherited aesthetics while respecting fixed layer parameters.
+plotLayerMapping <- function(plot, layer) {
+  mapping <- if (isTRUE(layer$inherit.aes)) plot$mapping else ggplot2::aes()
+  for (name in names(layer$mapping)) mapping[[name]] <- layer$mapping[[name]]
+  for (name in names(layer$aes_params)) mapping[[name]] <- NULL
+  mapping
+}
+
 generateLayerParameters <- function(plot) {
   # Build the plot to extract computed data and aesthetics
   plot_build <- ggplot_build(plot)
@@ -2279,7 +2303,14 @@ generateLayerParameters <- function(plot) {
     layer <- plot$layers[[i]]
     layer_type <- class(layer$geom)[1]
     
-    aes_mapping <- layer$mapping
+    if (isFacsDensityLayer(layer)) {
+      return(tabPanel(
+        paste("Layer", i, "(Density points)"),
+        wellPanel(helpText("Points are coloured by local density (green = few, red = many). Switch off the density flag to choose a fixed colour."))
+      ))
+    }
+    
+    aes_mapping <- plotLayerMapping(plot, layer)
     data <- plot_build$data[[i]]
     default_params <- layer$aes_params
     
@@ -2591,6 +2622,14 @@ customizePlot <- function(plot, input) {
       plot.background = element_rect(fill = backgroundColor, color = backgroundColor)
     )
   
+  if (!is.null(input$facetTitleFontSize)) {
+    updatedPlot <- updatedPlot + theme(
+      strip.text = element_text(size = input$facetTitleFontSize),
+      strip.text.x = element_text(size = input$facetTitleFontSize),
+      strip.text.y = element_text(size = input$facetTitleFontSize)
+    )
+  }
+
   # Apply x-axis reordering if provided
   if (!is.null(input$sortable_x_axis) && length(input$sortable_x_axis) > 0) {
     # Get the new order from the input
@@ -2607,7 +2646,12 @@ customizePlot <- function(plot, input) {
   for (i in seq_along(plot$layers)) {
     layer <- plot$layers[[i]]
     layer_type <- class(layer$geom)[1]
-    current_mapping <- layer$mapping
+    current_mapping <- plotLayerMapping(plot, layer)
+    
+    if (isFacsDensityLayer(layer)) {
+      updatedPlot <- updatedPlot + layer
+      next
+    }
 
     # Check if the layer has its own dataset
     layer_data <- if (!is.null(layer$data) && !inherits(layer$data, "waiver")) {
@@ -2624,9 +2668,17 @@ customizePlot <- function(plot, input) {
     
     
     unique_x<-unique(plot_build$data[[i]][["group"]] )
-    unique_x_colour<-unique(plot_build$data[[i]][["colour"]] )
-    unique_x_shape<-unique(plot_build$data[[i]][["shape"]] )
-    unique_x_fill<-unique(plot_build$data[[i]][["fill"]] )
+    mapped_values <- function(aesthetic) {
+      sc <- plot_build$plot$scales$get_scales(aesthetic)
+      if (!is.null(sc) && sc$is_discrete()) {
+        limits <- sc$get_limits()
+        return(setNames(sc$map(limits), limits))
+      }
+      unique(plot_build$data[[i]][[aesthetic]])
+    }
+    unique_x_colour <- mapped_values("colour")
+    unique_x_shape <- mapped_values("shape")
+    unique_x_fill <- mapped_values("fill")
 
     # Customize each type of geom layer
     if (layer_type == "GeomPoint") {
@@ -2635,7 +2687,7 @@ customizePlot <- function(plot, input) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
             input_val <- input[[paste0("pointColor_", i, "_",  gsub("#", "", x_val))]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2705,7 +2757,7 @@ customizePlot <- function(plot, input) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
             input_val <- input[[paste0("barColor_", i,"_", gsub("#", "", x_val))]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2713,7 +2765,7 @@ customizePlot <- function(plot, input) {
         scale_fill_manual(
           values = unlist(lapply(unique_x_fill, function(x_val) {
             input_val <- input[[paste0("barFillColor_", i,"_", gsub("#", "", x_val))]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2781,7 +2833,7 @@ customizePlot <- function(plot, input) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
             input_val <- input[[paste0("lineColor_", i,"_", gsub("#", "", x_val))]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2789,7 +2841,7 @@ customizePlot <- function(plot, input) {
         scale_linetype_manual(
           values = unlist(lapply(unique_x, function(x_val) {
             input_val <- input[[paste0("lineType_", i,"_", x_val)]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2850,7 +2902,7 @@ customizePlot <- function(plot, input) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
             input_val <- input[[paste0("boxOutlineColor_", i,"_", gsub("#", "", x_val))]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2858,7 +2910,7 @@ customizePlot <- function(plot, input) {
         scale_fill_manual(
           values = unlist(lapply(unique_x_fill, function(x_val) {
             input_val <- input[[paste0("boxFillColor_", i,"_", gsub("#", "", x_val))]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2934,7 +2986,7 @@ customizePlot <- function(plot, input) {
         scale_color_manual(
           values = unlist(lapply(unique_x_colour, function(x_val) {
             input_val <- input[[paste0("errorBarColor_", i,"_", gsub("#", "", x_val))]]
-            if (is.null(input_val)) x_val else input_val
+            if (is.null(input_val)) unname(x_val) else unname(input_val)
           }))
         )
       } else NULL
@@ -2977,6 +3029,22 @@ customizePlot <- function(plot, input) {
       annotations <- layer_params$annotations
       y_position <- layer_params$y_position
 
+      if (isTRUE(layer_params$manual)) {
+        # Manual layers carry their comparisons in the layer data (one row per bar).
+        updatedPlot <- updatedPlot + suppressWarnings(
+          ggsignif::geom_signif(
+            data = layer$data,
+            mapping = layer$mapping,
+            manual = TRUE,
+            inherit.aes = FALSE,
+            size = line_size,
+            textsize = textsize,
+            color = color,
+            tip_length = tip_length,
+            vjust = 0.2
+          )
+        )
+      } else {
       updatedPlot <- updatedPlot +
         ggsignif::geom_signif(
           comparisons = comparisons,
@@ -2988,6 +3056,7 @@ customizePlot <- function(plot, input) {
           tip_length = tip_length,
           vjust = 0.8
         )
+      }
     }
     else {
       updatedPlot <- updatedPlot + layer
@@ -3009,6 +3078,7 @@ generatePlotParameters <- function(plot) {
   theme_elements <- utils::modifyList(global_theme, plot_theme)
   
   title_size <- ggplot2::calc_element("plot.title", global_theme + plot$theme)$size %||% 14
+  facet_title_size <- ggplot2::calc_element("strip.text.x", global_theme + plot$theme)$size %||% 12
   title_color <- theme_elements$plot.title$colour %||% "#000000"
   x_axis_size <- theme_elements$axis.text.x$size %||% 12
   y_axis_size <- theme_elements$axis.text.y$size %||% 12
@@ -3026,6 +3096,10 @@ generatePlotParameters <- function(plot) {
       min = 8, 
       max = 30, 
       value = title_size
+    ),
+    if (!inherits(plot$facet, "FacetNull")) sliderInput(
+      "facetTitleFontSize", "Facet Title Font Size",
+      min = 6, max = 40, value = facet_title_size
     ),
     colourpicker::colourInput(
       "plotTitleColor", 
@@ -3163,6 +3237,135 @@ savePlotAsPNG <- function(plot, filePath, width, height, dpi) {
 
 
 
+# One row per test and gate; group1/group2 identify the compared conditions (group2 is NA for the main test).
+facsGateTests <- function(points) {
+  rows <- lapply(unique(points$Gate), function(gate) {
+    subdata <- points[points$Gate == gate, c("ExpCondition", "Percetages")]
+    res <- testStat.function(tibble::as_tibble(subdata))
+    if (is.null(res)) return(NULL)
+    tests <- do.call(rbind, list(res$BivTest, res$MulvTest, res$pairwise))
+    if (is.null(tests) || !nrow(tests)) return(NULL)
+    groups <- strsplit(trimws(as.character(tests$Condition)), "\\s+vs\\s+")
+    isPair <- lengths(groups) == 2L & !tests$Test %in% c("Anova", "Kruskal-Wallis")
+    group1 <- ifelse(isPair, vapply(groups, function(g) g[1], character(1)), "All groups")
+    group2 <- ifelse(isPair, vapply(groups, function(g) g[length(g)], character(1)), NA_character_)
+    data.frame(Gate = gate, Test = tests$Test, group1 = group1, group2 = group2,
+               pValue = tests$pValue,
+               stars = as.character(cut(tests$pValue, c(-Inf, 0.001, 0.01, 0.05, Inf),
+                                        labels = c("***", "**", "*", "ns"))),
+               conf.int = tests$conf.int, stringsAsFactors = FALSE)
+  })
+  rows <- Filter(Negate(is.null), rows)
+  if (!length(rows)) return(NULL)
+  do.call(rbind, rows)
+}
+
+# Bar plot per gate with significance bars; selectedRows picks which rows of tests to draw (none = all).
+facsStatPlot <- function(points, tests = NULL, selectedRows = NULL) {
+  conditions <- unique(as.character(points$ExpCondition))
+  points$ExpCondition <- factor(points$ExpCondition, levels = conditions)
+  points$Gate <- factor(points$Gate, levels = unique(points$Gate))
+  stats <- points %>%
+    dplyr::group_by(Gate, ExpCondition) %>%
+    dplyr::summarise(Mean = mean(Percetages), sd = sd(Percetages), .groups = "drop")
+  stats$sd[is.na(stats$sd)] <- 0
+  n <- length(conditions)
+  colors <- if (n <= 8) RColorBrewer::brewer.pal(max(3, n), "Set2")[seq_len(n)] else randomcoloR::distinctColorPalette(n)
+  names(colors) <- conditions
+
+  p <- ggplot2::ggplot(stats, ggplot2::aes(x = ExpCondition, y = Mean, fill = ExpCondition)) +
+    ggplot2::geom_bar(stat = "identity", color = "black", position = ggplot2::position_dodge()) +
+    ggplot2::geom_errorbar(ggplot2::aes(ymin = Mean - sd, ymax = Mean + sd), width = .2,
+                           position = ggplot2::position_dodge(.9)) +
+    ggplot2::geom_point(data = points, ggplot2::aes(x = ExpCondition, y = Percetages, color = ExpCondition),
+                        position = ggplot2::position_jitter(width = 0.2), size = 3) +
+    ggplot2::scale_fill_manual(values = colors) +
+    ggplot2::scale_color_manual(values = colors) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.15))) +
+    ggplot2::facet_wrap(~Gate, scales = "free_y", ncol = min(3L, nlevels(points$Gate))) +
+    ggplot2::theme_bw() +
+    ggplot2::labs(color = "Experimental Condition", fill = "Experimental Condition",
+                  y = "Percentages (%)", x = "")
+  if (is.null(tests) || !nrow(tests)) return(p)
+
+  chosen <- if (length(selectedRows)) tests[selectedRows, , drop = FALSE] else tests
+  pairs <- chosen[!is.na(chosen$group2) & chosen$group1 %in% conditions & chosen$group2 %in% conditions, , drop = FALSE]
+  if (nrow(pairs)) {
+    top <- tapply(c(stats$Mean + stats$sd, points$Percetages),
+                  c(as.character(stats$Gate), as.character(points$Gate)), max, na.rm = TRUE)
+    pairs$k <- stats::ave(seq_len(nrow(pairs)), pairs$Gate, FUN = seq_along)
+    pairs$y <- as.numeric(top[pairs$Gate]) * (1.05 + 0.12 * (pairs$k - 1))
+    pairs$Gate <- factor(pairs$Gate, levels = levels(points$Gate))
+    p <- p + suppressWarnings(ggsignif::geom_signif(
+      data = pairs, ggplot2::aes(xmin = group1, xmax = group2, annotations = stars, y_position = y),
+      manual = TRUE, inherit.aes = FALSE, tip_length = 0.01, textsize = 8 / 1.5, vjust = 0.2))
+  }
+  # Gates with a non-significant main test have no pairwise comparisons to draw.
+  main <- tests[is.na(tests$group2) & !tests$Gate %in% tests$Gate[!is.na(tests$group2)], , drop = FALSE]
+  if (nrow(main)) {
+    main$label <- paste0(main$Test, " p = ", signif(main$pValue, 3))
+    main$Gate <- factor(main$Gate, levels = levels(points$Gate))
+    p <- p + ggplot2::geom_text(data = main, ggplot2::aes(label = label), x = Inf, y = Inf,
+                                hjust = 1.05, vjust = 1.5, size = 4, inherit.aes = FALSE)
+  }
+  p
+}
+
+# Local point density from a smoothed 2D histogram (fast enough for large FCS files).
+facsPointDensity <- function(x, y, bins = 100L) {
+  dens <- rep(NA_real_, length(x))
+  ok <- is.finite(x) & is.finite(y)
+  if (!any(ok)) return(dens)
+  binIndex <- function(v) {
+    rng <- range(v)
+    if (rng[2] == rng[1]) return(rep(1L, length(v)))
+    pmin(bins, 1L + as.integer(floor((v - rng[1]) / (rng[2] - rng[1]) * bins)))
+  }
+  bx <- binIndex(x[ok])
+  by <- binIndex(y[ok])
+  counts <- matrix(tabulate((by - 1L) * bins + bx, bins * bins), bins, bins)
+  padded <- matrix(0, bins + 2L, bins + 2L)
+  padded[2:(bins + 1L), 2:(bins + 1L)] <- counts
+  smooth <- matrix(0, bins, bins)
+  for (i in 0:2) for (j in 0:2) smooth <- smooth + padded[seq_len(bins) + i, seq_len(bins) + j]
+  dens[ok] <- smooth[cbind(bx, by)]
+  dens
+}
+
+# Adds a Density column and sorts so the densest points are drawn on top.
+# With log = TRUE the density is computed on log10 values to match the displayed axes.
+facsAddDensity <- function(df, x = "x", y = "y", log = FALSE) {
+  xv <- df[[x]]
+  yv <- df[[y]]
+  if (isTRUE(log)) {
+    xv[!is.na(xv) & xv <= 0] <- NA
+    yv[!is.na(yv) & yv <= 0] <- NA
+    xv <- log10(xv)
+    yv <- log10(yv)
+  }
+  df$Density <- facsPointDensity(xv, yv)
+  df[order(df$Density, na.last = FALSE), , drop = FALSE]
+}
+
+# Events with values <= 0 cannot be shown on a log axis.
+facsLogScales <- function(log = FALSE) {
+  if (!isTRUE(log)) return(list())
+  list(ggplot2::scale_x_log10(), ggplot2::scale_y_log10())
+}
+
+# Point layers for FACS scatter plots: fixed colour, or green-to-red by local density.
+facsScatterLayers <- function(density = FALSE, color = "blue", size = 0.8, alpha = 0.5) {
+  if (!isTRUE(density)) {
+    return(list(ggplot2::geom_point(alpha = alpha, color = color, size = size)))
+  }
+  list(ggplot2::geom_point(ggplot2::aes(color = Density), alpha = alpha, size = size),
+       ggplot2::scale_color_gradientn(colours = c("green", "yellow", "red"), guide = "none"))
+}
+
+isFacsDensityLayer <- function(layer) {
+  !is.null(layer$mapping$colour) && identical(rlang::quo_name(layer$mapping$colour), "Density")
+}
+
 # Size the on-screen overview without changing the user's export dimensions.
 facsOverviewHeight <- function(plot) {
   if (is.null(plot)) return(400L)
@@ -3186,7 +3389,8 @@ facsOverviewGatePaths <- function(selections, sample) {
 }
 
 buildFACSOverview <- function(data, selections, channelx, channely,
-                              gate = "", showGates = TRUE, settings = list()) {
+                              gate = "", showGates = TRUE, settings = list(),
+                              density = FALSE, logScale = FALSE) {
   samples <- flowCore::sampleNames(data)
   points <- list()
   outlines <- list()
@@ -3204,6 +3408,7 @@ buildFACSOverview <- function(data, selections, channelx, channely,
     if (!all(c(channelx, channely) %in% colnames(values))) next
     points[[sample]] <- data.frame(x = values[, channelx], y = values[, channely],
                                   Name = rep(sample, nrow(values)))
+    if (density) points[[sample]] <- facsAddDensity(points[[sample]], log = logScale)
     if (!showGates) next
     for (key in names(sampleSelections)) {
       selection <- sampleSelections[[key]]
@@ -3228,14 +3433,15 @@ buildFACSOverview <- function(data, selections, channelx, channely,
                    fontSize = 12, columns = 3)
   style <- utils::modifyList(defaults, settings)
   expr <- if (length(points)) do.call(rbind, points) else {
-    data.frame(x = numeric(0), y = numeric(0), Name = character(0))
+    data.frame(x = numeric(0), y = numeric(0), Name = character(0), Density = numeric(0))
   }
   expr$Name <- factor(expr$Name, levels = samples)
   title <- if (nzchar(style$title)) style$title else {
     if (nzchar(gate)) paste("Population:", gate) else "All samples"
   }
   plot <- ggplot2::ggplot(expr, ggplot2::aes(x = x, y = y)) +
-    ggplot2::geom_point(alpha = style$alpha, color = style$color, size = style$size) +
+    facsScatterLayers(density, style$color, style$size, style$alpha) +
+    facsLogScales(logScale) +
     ggplot2::labs(x = channelx, y = channely, title = title) +
     ggplot2::theme_minimal(base_size = style$fontSize) +
     ggplot2::facet_wrap(~Name, ncol = style$columns, drop = FALSE)

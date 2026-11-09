@@ -1204,6 +1204,7 @@ ui <- dashboardPage(
                     the normalizer, enabling lane-specific normalization."
                   )
               ),
+              helpText("For faster uploads, select WB_for_quantification-*.rds from each WB analysis ZIP. Full WB RDS files are also supported."),
               div(class = "wb-quantification",
                   fluidRow(
                     box( width = 6,
@@ -2407,10 +2408,12 @@ ui <- dashboardPage(
                       )
                     ),
                     fluidRow(
-                      column(6, selectInput("facs_overviewGate", "Overview population / gate",
+                      column(4, selectInput("facs_overviewGate", "Overview population / gate",
                                             choices = c("All cells" = ""))),
-                      column(3, checkboxInput("facs_overviewShowGates", "Show gate outlines", TRUE)),
-                      column(3, actionButton("facs_plotChannelButton", "Plot") )
+                      column(2, checkboxInput("facs_overviewShowGates", "Show gate outlines", TRUE)),
+                      column(2, checkboxInput("facs_overviewDensity", "Density plot", FALSE)),
+                      column(2, checkboxInput("facs_overviewLog", "Log scale", FALSE)),
+                      column(2, actionButton("facs_plotChannelButton", "Plot") )
                     ),
                     helpText("All samples keep their position. Samples without the selected gate have an empty panel. Outlines are shown only for gates defined on the selected channels."),
                     fluidRow(
@@ -2434,6 +2437,11 @@ ui <- dashboardPage(
                                          "Hierarchical level:",
                                          choices = character(0),
                                          selected = NULL)
+                      ),
+                      column(4,
+                             div(style = "margin-top: 25px;",
+                                 checkboxInput("facs_densityPlot", "Density plot (green = few, red = many)", FALSE),
+                                 checkboxInput("facs_logScale", "Log scale (events <= 0 are hidden)", FALSE))
                       )
                     ),
                     fluidRow(
@@ -2647,7 +2655,8 @@ ui <- dashboardPage(
                            dataTableOutput("FACSexpcond_tab") 
                     ),
                     column(6,
-                           uiOutput("FACSexpcond_plot")
+                           uiOutput("FACSexpcond_plot"),
+                           actionButton("Customize_FACS_BarButton", "Customize or Download Bar Plots")
                     )
                   ),
                   fluidRow(
@@ -2659,7 +2668,21 @@ ui <- dashboardPage(
                   ),
                   fluidRow(
                     style="width: 95%; margin-left: 30px;", 
-                    dataTableOutput("FACSstat_tab")
+                    plotOutput("FACSstat_plot", height = "auto"),
+                    actionButton("Customize_FACS_StatButton", "Customize or Download Plot")
+                  ),
+                  fluidRow(
+                    style="width: 95%; margin-left: 30px; margin-top: 15px;", 
+                    tags$div(
+                      style = "background-color: #f0f8ff; padding: 10px; border-left: 4px solid #0066cc; margin-bottom: 15px; border-radius: 4px;",
+                      tags$p(
+                        style = "margin: 0; color: #333;",
+                        icon("info-circle"),
+                        tags$strong(" Tip: "),
+                        "Click on rows in the table below to select/deselect which comparisons to display in the plot. By default, all comparisons are shown."
+                      )
+                    ),
+                    DTOutput("FACSstat_tab")
                   )
               ),
               fluidRow(

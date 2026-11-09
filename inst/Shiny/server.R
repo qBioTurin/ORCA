@@ -2692,8 +2692,11 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
       
-      tempDir <- tempdir()
+      tempDir <- tempfile("wb-export-")
+      dir.create(tempDir)
+      on.exit(unlink(tempDir, recursive = TRUE), add = TRUE)
       
       nomeRDS <- paste0("WBquant_analysis-", Sys.Date(), ".rds")
       nomeXLSX <- paste0("WBquant_analysis-", Sys.Date(), ".xlsx")
@@ -2702,11 +2705,12 @@ server <- function(input, output, session) {
       tempXlsxPath <- file.path(tempDir, nomeXLSX)
       results <- DataAnalysisModule$wbResult
       saveRDS(results, file = tempRdsPath)
+      quantPath <- file.path(tempDir, paste0("WB_for_quantification-", Sys.Date(), ".rds"))
+      saveRDS(wbQuantificationInput(results), quantPath)
       
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "WB", PanelStructures = PanelStructures)
       
-      utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
-      manageSpinner(FALSE)
+      utils::zip(file, files = c(tempRdsPath, tempXlsxPath, quantPath), flags = "-j -1")
     },
   )
   
@@ -2894,15 +2898,6 @@ server <- function(input, output, session) {
     }  
   })
   
-  ## next buttons
-  observeEvent(input$NextWBQuantif,{
-    if(!is.null(wbResult$AUCdf))
-      wbquantResult$WBanalysis = reactiveValuesToList(wbResult)
-    
-    updateTabsetPanel(session, "SideTabs",
-                      selected = "quantification")
-  })
-  
   ## quantification WB
   wbquantResult = reactiveValues(NormWBanalysis = NULL,
                                  NormWBanalysis_filtered = NULL,
@@ -2926,23 +2921,16 @@ server <- function(input, output, session) {
   
   observeEvent(input$NextWBQuantif,{
     if(!is.null(wbResult$AUCdf))
-      wbquantResult$WBanalysis = reactiveValuesToList(wbResult)
+      wbquantResult$WBanalysis = wbQuantificationInput(reactiveValuesToList(wbResult))
     
     updateTabsetPanel(session, "SideTabs",
                       selected = "quantification")
   })
   
-  wbquantResult = reactiveValues(NormWBanalysis = NULL,
-                                 NormWBanalysis_filtered = NULL,
-                                 WBanalysis = NULL,
-                                 WBanalysis_filtered = NULL,
-                                 RelDensitiy = NULL,
-                                 AdjRelDensity = NULL
-  )
-  
   loadWBanalysi4Quant = function(datapath,wbResult){
     alert$alertContext <- ""
     manageSpinner(TRUE)
+    on.exit(manageSpinner(FALSE), add = TRUE)
     names(wbResult) -> namesAll
     
     mess = readfile(
@@ -2952,16 +2940,12 @@ server <- function(input, output, session) {
     )
     
     if( setequal(names(mess),c("message","call")) ) {
-      manageSpinner(FALSE)
       showAlert("Error", mess[["message"]], "error", 5000)
       return(NULL)
     }
     
-    #wbquantResult$NormWBanalysis = mess
-    manageSpinner(FALSE)
-    
     showAlert("Success", "The RDS has been uploaded with success", "success", 2000)
-    return(mess)
+    return(wbQuantificationInput(mess))
   }
   
   observeEvent(input$actionB_loadingNormWB, {
@@ -3126,7 +3110,7 @@ server <- function(input, output, session) {
                             RelDens_Norm = "-")
         tableAdjRel = data.frame(SampleName = "-",
                                  AdjRelDensity = "-")
-        barPlotAdjRelDens = ggplot()
+        barPlotAdjRelDens = wbQuantificationPlot(tableAdjRel)
         if(!is.null(wbquantResult$WBanalysis_filtered) & !is.null(wbquantResult$NormWBanalysis_filtered) && IdLaneNorm_RelDens != "" && IdLaneNorm_RelDens != "Nothing selected"){
           IdLaneNorm_RelDens = input$IdLaneNorm_RelDens
           
@@ -3157,13 +3141,7 @@ server <- function(input, output, session) {
               table = merge(tbWB,tbWBnorm,all =T) %>%
                 dplyr::select(SampleName, Truncation, AUC, RelDens, AUC_Norm, RelDens_Norm) 
               tableAdjRel = table %>% na.omit() %>% dplyr::mutate(AdjRelDensity = RelDens/RelDens_Norm) %>% dplyr::select(SampleName,AdjRelDensity)
-              barPlotAdjRelDens = tableAdjRel  %>%
-                ggplot() +
-                geom_bar(aes(x = SampleName,
-                             y = AdjRelDensity,
-                             fill = SampleName ),
-                         stat = "identity" ) +
-                theme_bw()
+              barPlotAdjRelDens <- wbQuantificationPlot(tableAdjRel)
             }
           }
         }
@@ -3250,19 +3228,21 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
       
-      tempDir <- tempdir()
+      tempDir <- tempfile("wb-quant-export-")
+      dir.create(tempDir)
+      on.exit(unlink(tempDir, recursive = TRUE), add = TRUE)
       tempRDSPath <- file.path(tempDir, paste0("QuantificAnalysis-", Sys.Date(), ".rds"))
       tempExcelPath <- file.path(tempDir, paste0("QuantificAnalysis-", Sys.Date(), ".xlsx"))
       
-      resultsRDS <- DataAnalysisModule$wbquantResult
-      saveRDS(resultsRDS, tempRDSPath)
+      resultsRDS <- wbQuantificationExport(reactiveValuesToList(wbquantResult))
+      saveRDS(resultsRDS, tempRDSPath, compress = FALSE)
       
-      resultsExcel <- DataAnalysisModule$wbquantResult
+      resultsExcel <- resultsRDS
       saveExcel(filename = tempExcelPath, ResultList=resultsExcel, analysis = "WB comparison")
       
-      utils::zip(file, files = c(tempRDSPath, tempExcelPath), flags = "-j")
-      manageSpinner(FALSE)
+      utils::zip(file, files = c(tempRDSPath, tempExcelPath), flags = "-j -1")
     }
   )
   
@@ -6503,6 +6483,42 @@ server <- function(input, output, session) {
     }
   })
   
+  # Fills the Raw data tab (selectors, median table) for a flowSet and clears the gates.
+  initRawFACSData <- function(data) {
+    rawfacsResult$Initdata <- data
+    
+    fileNames = sampleNames(data)
+    
+    medianTable = fsApply(data, each_col, median)
+    
+    channels =colnames(medianTable)
+    
+    updateSelectInput(session, "facs_xChannel", choices = channels, selected = channels[1])
+    updateSelectInput(session, "facs_yChannel", choices = channels, selected = channels[2])
+    
+    updateSelectInput(session, "facs_sampleSelector", 
+                      choices = fileNames,
+                      selected = fileNames[1])
+    updateSelectInput(session, "facs_hierarchySelector", 
+                      choices = "None",
+                      selected = NULL)
+    updateSelectInput(session, "facs_sampleSelector_to_norm", 
+                      choices = fileNames,
+                      selected = fileNames[1])
+    updateSelectInput(session, "facs_sampleSelector_normalizer", 
+                      choices = fileNames,
+                      selected = fileNames[1])
+    
+    facsSelections$selections <- list()  
+    facsSelections$currentPlot <- NULL  
+    facsSelections$polygonPoints <- list()  # Reset dei punti del poligono
+    
+    output$rawFACSmatrix = renderTable({
+      medianTable
+    })
+    updateTabsetPanel(session, "SideTabs", selected = "plotRawFACS")
+  }
+  
   loadRawFileFACS <- function() {
     alert$alertContext <- ""
     
@@ -6519,42 +6535,45 @@ server <- function(input, output, session) {
     if (setequal(names(mess), c("message", "call"))) {
       showAlert("Error", mess[["message"]], "error", 5000)
     } else {
-      
-      rawfacsResult$Initdata <- data <- mess
-      
-      fileNames = sampleNames(data)
-      
-      medianTable = fsApply(data, each_col, median)
-      
-      channels =colnames(medianTable)
-      
-      updateSelectInput(session, "facs_xChannel", choices = channels, selected = channels[1])
-      updateSelectInput(session, "facs_yChannel", choices = channels, selected = channels[2])
-      
-      updateSelectInput(session, "facs_sampleSelector", 
-                        choices = fileNames,
-                        selected = fileNames[1])
-      updateSelectInput(session, "facs_hierarchySelector", 
-                        choices = "None",
-                        selected = NULL)
-      updateSelectInput(session, "facs_sampleSelector_to_norm", 
-                        choices = fileNames,
-                        selected = fileNames[1])
-      updateSelectInput(session, "facs_sampleSelector_normalizer", 
-                        choices = fileNames,
-                        selected = fileNames[1])
-      
-      facsSelections$selections <- list()  
-      facsSelections$currentPlot <- NULL  
-      facsSelections$polygonPoints <- list()  # Reset dei punti del poligono
-      
+      initRawFACSData(mess)
       removeModal()
       showAlert("Success", "The FCS file has been uploaded with success", "success", 2000)
-      
-      output$rawFACSmatrix = renderTable({
-        medianTable
-      })
-      updateTabsetPanel(session, "SideTabs", selected = "plotRawFACS")
+    }
+  }
+  
+  # Gate data are recomputed from the polygons on load, so saved files omit them.
+  facsGateWithoutData <- function(selection) {
+    selection$data <- NULL
+    selection
+  }
+  
+  restoreRawFACS <- function(saved) {
+    req(saved$Initdata)
+    initRawFACSData(saved$Initdata)
+    failed <- character(0)
+    restored <- list()
+    for (sampleName in names(saved$selections)) {
+      rebuilt <- applySelectionsToSample(saved$selections[[sampleName]], sampleName, saved$Initdata)
+      if (!length(rebuilt)) {
+        failed <- c(failed, sampleName)
+        next
+      }
+      # Keep counts changed by normalization.
+      for (key in intersect(names(rebuilt), names(saved$selections[[sampleName]]))) {
+        old <- saved$selections[[sampleName]][[key]]
+        if (!is.null(old$n_cells)) rebuilt[[key]]$n_cells <- old$n_cells
+        if (!is.null(old$statistic)) rebuilt[[key]]$statistic <- old$statistic
+      }
+      restored[[sampleName]] <- rebuilt
+    }
+    facsSelections$selections <- restored
+    savedHierarchies$data <- if (is.null(saved$savedHierarchies)) list() else saved$savedHierarchies
+    mapping_sample$data <- if (is.null(saved$mapping)) list() else saved$mapping
+    if (length(failed)) {
+      showAlert("Warning", paste("Raw FACS data loaded, but the gates could not be rebuilt for:",
+                                 paste(failed, collapse = ", ")), "warning", 6000)
+    } else {
+      showAlert("Success", "Raw FACS data and gates loaded.", "success", 3000)
     }
   }
   
@@ -6599,9 +6618,13 @@ server <- function(input, output, session) {
     
     sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
     sample_expr$Name <- rep(selectedSample, nrow(sample_expr))
+    useDensity <- isTRUE(input$facs_densityPlot)
+    useLog <- isTRUE(input$facs_logScale)
+    if (useDensity) sample_expr <- facsAddDensity(sample_expr, channelx, channely, useLog)
     
     p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
-      geom_point(alpha = 0.5, color = "blue", size = 0.8) +
+      facsScatterLayers(useDensity) +
+      facsLogScales(useLog) +
       labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
       theme_minimal() +
       theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
@@ -6762,7 +6785,9 @@ server <- function(input, output, session) {
     if (is.null(gate)) gate <- ""
     plot <- buildFACSOverview(rawfacsResult$Initdata, facsSelections$selections,
                               input$facs_xChannel, input$facs_yChannel,
-                              gate, isTRUE(input$facs_overviewShowGates), facsOverviewSettings())
+                              gate, isTRUE(input$facs_overviewShowGates), facsOverviewSettings(),
+                              density = isTRUE(input$facs_overviewDensity),
+                              logScale = isTRUE(input$facs_overviewLog))
     #validate(need(!is.null(plot), "No samples contain this gate and the selected channels."))
     plot
   })
@@ -6907,9 +6932,13 @@ server <- function(input, output, session) {
       
       sample_expr <- as.data.frame(exprs(data@frames[[selectedSample]]))
       sample_expr$Name <- rep(selectedSample, nrow(sample_expr))
+      useDensity <- isTRUE(input$facs_densityPlot)
+      useLog <- isTRUE(input$facs_logScale)
+      if (useDensity) sample_expr <- facsAddDensity(sample_expr, channelx, channely, useLog)
       
       p <- ggplot(sample_expr, aes(x = !!sym(channelx), y = !!sym(channely))) +
-        geom_point(alpha = 0.5, color = "blue", size = 0.8) +
+        facsScatterLayers(useDensity) +
+        facsLogScales(useLog) +
         labs(x = channelx, y = channely, title = paste("Sample:", selectedSample)) +
         theme_minimal() +
         theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"))
@@ -7466,22 +7495,21 @@ server <- function(input, output, session) {
   output$facs_selectionsInfo <- renderTable({ rawFACSSummary() })
   
   
-  # Funzione per verificare se un punto è dentro un poligono (algoritmo ray casting)
+  # Ray casting vectorised over points: x and y can be scalars or vectors.
   pointInPolygon <- function(x, y, polygon) {
-    n <- nrow(polygon)
-    inside <- FALSE
-    
-    j <- n
-    for(i in 1:n) {
-      if(((polygon[i, "y"] > y) != (polygon[j, "y"] > y)) &&
-         (x < (polygon[j, "x"] - polygon[i, "x"]) * (y - polygon[i, "y"]) / 
-          (polygon[j, "y"] - polygon[i, "y"]) + polygon[i, "x"])) {
-        inside <- !inside
+    px <- polygon[["x"]]
+    py <- polygon[["y"]]
+    inside <- rep(FALSE, length(x))
+    j <- length(px)
+    for (i in seq_along(px)) {
+      if (py[i] != py[j]) {
+        crosses <- ((py[i] > y) != (py[j] > y)) &
+          (x < (px[j] - px[i]) * (y - py[i]) / (py[j] - py[i]) + px[i])
+        inside <- xor(inside, crosses)
       }
       j <- i
     }
-    
-    return(inside)
+    inside
   }
   
   # Filtra i dati basandosi sulla selezione del poligono per il campione specifico
@@ -7501,12 +7529,9 @@ server <- function(input, output, session) {
           !all(is.finite(as.matrix(polygon_coords[, c("x", "y")])))) {
         return(NULL)
       }
+      finite <- is.finite(expr_data[, channelx]) & is.finite(expr_data[, channely])
       mask <- logical(nrow(expr_data))
-      for (i in seq_len(nrow(expr_data))) {
-        if (all(is.finite(expr_data[i, c(channelx, channely)]))) {
-          mask[i] <- pointInPolygon(expr_data[i, channelx], expr_data[i, channely], polygon_coords)
-        }
-      }
+      mask[finite] <- pointInPolygon(expr_data[finite, channelx], expr_data[finite, channely], polygon_coords)
       # Subset an existing flowSet: constructing one from a zero-row frame can
       # trigger an invalid FCS round-trip in flowCore. Preserve channel metadata.
       filtered_flowset <- data[selectedSample]
@@ -7535,7 +7560,13 @@ server <- function(input, output, session) {
       tempRdsPath <- file.path(tempDir, nomeRDS)
       tempXlsxPath <- file.path(tempDir, nomeXLSX)
       
-      saveRDS(rawfacsResult$tableSelections, file = tempRdsPath)
+      saveRDS(list(format = "ORCA-rawFACS", version = 1L,
+                   Initdata = rawfacsResult$Initdata,
+                   selections = lapply(facsSelections$selections, function(gates) lapply(gates, facsGateWithoutData)),
+                   savedHierarchies = lapply(savedHierarchies$data, function(gates) lapply(gates, facsGateWithoutData)),
+                   mapping = mapping_sample$data,
+                   tableSelections = rawfacsResult$tableSelections),
+              file = tempRdsPath)
       
       saveExcel(filename = tempXlsxPath, ResultList=rawfacsResult$tableSelections, analysis = "RAWFACS")
       
@@ -7544,10 +7575,8 @@ server <- function(input, output, session) {
     } 
   )
   
-  observeEvent(input$NextFacsHierarchicalGating, {
-    req(rawfacsResult$Initdata)
-    data <- rawFACSSummary()
-    req(nrow(data) > 0)
+  # Shared by the raw-gating button and by loading a RawFacs_analysis RDS.
+  startFACSHierarchicalGating <- function(data, successMessage) {
     alert$alertContext <- ""
     generation <- if (is.null(FlagsFACS$generation)) 1L else FlagsFACS$generation + 1L
 
@@ -7573,8 +7602,15 @@ server <- function(input, output, session) {
       updateSelectizeUI(maxDepth, generation, firstChoices)
     })
     updateTabsetPanel(session, "SideTabs", selected = "tablesFACS")
-    showAlert("Success", "Hierarchical gating reinitialized from the current raw gates. Previous results have been cleared.",
-              "success", 3000)
+    showAlert("Success", successMessage, "success", 3000)
+  }
+
+  observeEvent(input$NextFacsHierarchicalGating, {
+    req(rawfacsResult$Initdata)
+    data <- rawFACSSummary()
+    req(nrow(data) > 0)
+    startFACSHierarchicalGating(
+      data, "Hierarchical gating reinitialized from the current raw gates. Previous results have been cleared.")
   })
 
   #### END RAW FACS analysis ####
@@ -7595,7 +7631,9 @@ server <- function(input, output, session) {
     cells = NULL,
     ExpConditionDF = NULL,
     Barplot = NULL,
-    StatDF = NULL
+    StatDF = NULL,
+    StatPoints = NULL,
+    StatPlot = NULL
   )
   
   facsResult0 = reactiveValues(
@@ -7612,7 +7650,9 @@ server <- function(input, output, session) {
     cells = NULL,
     ExpConditionDF = NULL,
     Barplot = NULL,
-    StatDF = NULL
+    StatDF = NULL,
+    StatPoints = NULL,
+    StatPlot = NULL
   )
   
   FACSresultListen <- reactive({
@@ -7769,29 +7809,37 @@ server <- function(input, output, session) {
         }
       }
       
-      ## update the table for the barplot in which an expcondition is associated to each name
-      ExpConditionDF <- facsResult$ExpConditionDF <- data.frame(Name = unique(unlist(filtered_names)), ExpCondition = "")
-      
-      output$FACSexpcond_tab = renderDT({
-        DT::datatable( ExpConditionDF,
-                       selection = 'none',
-                       editable = list(target = "cell",
-                                       disable = list(columns = 0) ),
-                       rownames= FALSE,
-                       options = list(scrollX = TRUE,
-                                      searching = FALSE,
-                                      dom = 't' # Only display the table
-                       )
+      # Revisiting the hierarchy must not reset experimental conditions.
+      sample_names <- unique(as.character(unlist(filtered_names)))
+      previous <- facsResult$ExpConditionDF
+      conditions <- data.frame(Name = sample_names,
+                               ExpCondition = rep("", length(sample_names)),
+                               stringsAsFactors = FALSE)
+      if (!is.null(previous)) {
+        matched <- match(sample_names, previous$Name)
+        keep <- !is.na(matched)
+        conditions$ExpCondition[keep] <- as.character(previous$ExpCondition[matched[keep]])
+      }
+      if (!identical(previous, conditions)) facsResult$ExpConditionDF <- conditions
+
+      # Create data_for_table with proper handling of empty filtered_names
+      unlist_names <- unlist(filtered_names)
+      if (length(unlist_names) > 0) {
+        data_for_table <- data.frame(
+          Name = unlist_names,
+          Start = rep("100%", length(unlist_names)),
+          stringsAsFactors = FALSE
         )
-      })
-      ######
-      data_for_table <- data.frame(
-        Name = unlist(filtered_names),
-        Start = "100%",
-        stringsAsFactors = FALSE
-      )
+      } else {
+        # Create empty data.frame with correct structure
+        data_for_table <- data.frame(
+          Name = character(0),
+          Start = character(0),
+          stringsAsFactors = FALSE
+        )
+      }
       
-      facsResult$originalName <- unlist(filtered_names)
+      facsResult$originalName <- unlist_names
       FlagsFACS$data <- data_for_table  
       FlagsFACS$actualPath <- ""
       
@@ -7802,11 +7850,21 @@ server <- function(input, output, session) {
         ))
       })
       
-      data_for_name_update <- data.frame(
-        Name = unlist(filtered_names),
-        New_name = rep("-", length(filtered_names)),  
-        stringsAsFactors = FALSE
-      )
+      # Create data_for_name_update with proper handling of empty filtered_names
+      if (length(unlist_names) > 0) {
+        data_for_name_update <- data.frame(
+          Name = unlist_names,
+          New_name = rep("-", length(unlist_names)),  
+          stringsAsFactors = FALSE
+        )
+      } else {
+        # Create empty data.frame with correct structure
+        data_for_name_update <- data.frame(
+          Name = character(0),
+          New_name = character(0),
+          stringsAsFactors = FALSE
+        )
+      }
       
       output$FACSnameUpdate <- renderDT({
         datatable(data_for_name_update, options = list(
@@ -8012,33 +8070,27 @@ server <- function(input, output, session) {
     })
   })
   
+  output$FACSexpcond_tab <- renderDT({
+    req(facsResult$ExpConditionDF)
+    DT::datatable(facsResult$ExpConditionDF,
+                  selection = "none", rownames = FALSE,
+                  editable = list(target = "cell", disable = list(columns = 0)),
+                  options = list(scrollX = TRUE, searching = FALSE, dom = "t"))
+  })
+
   observeEvent(input$FACSexpcond_tab_cell_edit, {
     info <- input$FACSexpcond_tab_cell_edit
-    str(info)  # Debugging line to show what 'info' contains
-    info$col = 2
-    # Update the data in the reactive value
-    facsResult$ExpConditionDF <- editData(facsResult$ExpConditionDF, info)
+    req(facsResult$ExpConditionDF, all(info$col == 1L),
+        all(info$row >= 1L & info$row <= nrow(facsResult$ExpConditionDF)))
+    facsResult$ExpConditionDF <- DT::editData(facsResult$ExpConditionDF, info, rownames = FALSE)
   })
-  
+
   observe({
     facsResult$ExpConditionDF -> ExpConditionDF
     facsResult$dataFinal -> dataFinal
     
     isolate({
       if(!is.null(dataFinal) && !is.null(ExpConditionDF)  ){
-        
-        output$FACSexpcond_tab = renderDT({
-          DT::datatable( ExpConditionDF,
-                         selection = 'none',
-                         editable = list(target = "cell",
-                                         disable = list(columns = 0) ),
-                         rownames= FALSE,
-                         options = list(scrollX = TRUE,
-                                        searching = FALSE,
-                                        dom = 't' # Only display the table
-                         )
-          )
-        })
         
         dataFinalExpCond = merge(dataFinal,ExpConditionDF) %>%
           tidyr::gather(-Name,-ExpCondition, value = "Percetages", key = "Gate" ) %>%
@@ -8048,30 +8100,20 @@ server <- function(input, output, session) {
           geom_bar(stat = "identity", position = "dodge") +
           facet_wrap(~Gate) + theme_bw() + labs(y = "Percetages %", x = "Experimetal condition")
         
-        plot1 = lapply(unique(dataFinalExpCond$Gate),function(g){
-          ggplot(dataFinalExpCond %>% dplyr::filter(Gate == g),
-                 aes(x =  ExpCondition , y =  Percetages, color = Name, fill = Name)) + 
-            geom_bar(stat = "identity", position = "dodge") +
-            facet_wrap(~Gate) +
-            theme_bw() +
-            labs(y = "Percetages %", x = "Experimetal condition")
-        })
-        
-        
-        # Dynamically generate plot output UI
+        gates <- unique(dataFinalExpCond$Gate)
         output$FACSexpcond_plot <- renderUI({
-          plot_output_list_1 <- lapply(1:length(plot1), function(i) {
-            plotOutput(paste0("FACSplot_", i), width = "100%" )
-          })
-          do.call(tagList, list(plot_output_list_1))
+          tagList(lapply(seq_along(gates), function(i) {
+            plotOutput(paste0("FACSplot_", i), width = "100%")
+          }))
         })
-        
-        lapply(1:length(plot1), function(i) {
+        lapply(seq_along(gates), function(i) {
           output[[paste0("FACSplot_", i)]] <- renderPlot({
-            plot1[[i]]
+            p <- req(facsResult$Barplot)
+            p$data <- p$data[p$data$Gate == gates[[i]], , drop = FALSE]
+            p
           })
         })
-        
+
         facsResult$Barplot = pl
       }
     })
@@ -8090,11 +8132,12 @@ server <- function(input, output, session) {
         
         ### Ttest
         if(length(unique(dataFinalExpCond$ExpCondition)) > 1){
-          StatDF = do.call( rbind, 
-                            lapply(unique(dataFinalExpCond$Gate), function(gate){
-                              subdata = dataFinalExpCond %>% dplyr::filter(Gate == gate) %>% dplyr::select(ExpCondition,Percetages)
-                              testStat.function(tibble(subdata), var = gate)
-                            }) )
+          StatDF = facsGateTests(dataFinalExpCond)
+          if (is.null(StatDF)) {
+            showAlert("Info", "Statistical tests could not be computed: each experimental condition needs at least 3 replicates.", "info", 5000)
+          } else {
+            facsResult$StatPoints <- dataFinalExpCond
+          }
         } else {
           showAlert("Info", "Not enough experimental conditions for statistical analysis. Please ensure you have assigned at least 2 different experimental conditions.", "info", 5000)
         }
@@ -8108,7 +8151,7 @@ server <- function(input, output, session) {
       facsResult$StatDF = StatDF
       output$FACSstat_tab = renderDT({
         DT::datatable( StatDF,
-                       selection = 'none',
+                       selection = 'multiple',
                        rownames= FALSE,
                        options = list(scrollX = TRUE,
                                       searching = FALSE,
@@ -8118,6 +8161,102 @@ server <- function(input, output, session) {
       })
     }
     
+  })
+  
+  # Redraw the statistics plot when the tests change or other comparisons are selected.
+  observe({
+    points <- req(facsResult$StatPoints)
+    tests <- req(facsResult$StatDF)
+    selected <- input$FACSstat_tab_rows_selected
+    facsResult$StatPlot <- tryCatch(facsStatPlot(points, tests, selected), error = function(e) {
+      showAlert("Error", paste("Unable to draw the statistics plot:", e$message), "error", 5000)
+      NULL
+    })
+  })
+  
+  output$FACSstat_plot <- renderPlot({
+    req(facsResult$StatPlot)
+    facsResult$StatPlot
+  }, height = function() {
+    nGates <- length(unique(facsResult$StatPoints$Gate))
+    rows <- ceiling(nGates / min(3L, max(nGates, 1L)))
+    150 + 300 * rows
+  })
+  
+  observeEvent(input$Customize_FACS_BarButton, {
+    req(facsResult$Barplot)
+    layer_tabs <- generateLayerParameters(facsResult$Barplot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel("Layer Customization", do.call(tagList, layer_tabs)),
+        tabPanel("Common Parameters", generatePlotParameters(facsResult$Barplot)),
+        tabPanel("X-Axis Order", generateXAxisOrderTab(facsResult$Barplot)),
+        tabPanel("Save Plot", generateSavePlotTab(formats = TRUE))
+      ),
+      footer = tagList(
+        actionButton("applyChangesFACS_Bar", "Apply Changes"),
+        downloadButton("downloadPlotButtonFACS_Bar", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  output$downloadPlotButtonFACS_Bar <- downloadHandler(
+    filename = function() {
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_FACS_bar_", Sys.Date(), ".", format)
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(facsResult$Barplot, file, input$plotWidth, input$plotHeight, input$plotResolution, format)
+    }
+  )
+  
+  observeEvent(input$applyChangesFACS_Bar, {
+    facsResult$Barplot <- customizePlot(facsResult$Barplot, input)
+    removeModal()
+  })
+  
+  observeEvent(input$Customize_FACS_StatButton, {
+    req(facsResult$StatPlot)
+    layer_tabs <- generateLayerParameters(facsResult$StatPlot)
+    showModal(modalDialog(
+      title = "Customize or Download Plot",
+      tabsetPanel(
+        tabPanel("Layer Customization", do.call(tagList, layer_tabs)),
+        tabPanel("Common Parameters", generatePlotParameters(facsResult$StatPlot)),
+        tabPanel("X-Axis Order", generateXAxisOrderTab(facsResult$StatPlot)),
+        tabPanel("Save Plot", generateSavePlotTab(formats = TRUE))
+      ),
+      footer = tagList(
+        actionButton("applyChangesFACS_Stat", "Apply Changes"),
+        downloadButton("downloadPlotButtonFACS_Stat", "Download Plot"),
+        modalButton("Close")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  output$downloadPlotButtonFACS_Stat <- downloadHandler(
+    filename = function() {
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      paste0("plot_FACS_stat_", Sys.Date(), ".", format)
+    },
+    content = function(file) {
+      manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
+      format <- if (!is.null(input$plotFormat)) input$plotFormat else "png"
+      savePlot(facsResult$StatPlot, file, input$plotWidth, input$plotHeight, input$plotResolution, format)
+    }
+  )
+  
+  observeEvent(input$applyChangesFACS_Stat, {
+    facsResult$StatPlot <- customizePlot(facsResult$StatPlot, input)
+    removeModal()
   })
   
   observeEvent(input$FACSnameUpdate_cell_edit, {
@@ -8988,10 +9127,30 @@ server <- function(input, output, session) {
     
     manageSpinner(TRUE)
     if( is.null(input$loadAnalysis_file) || !all(file.exists(input$loadAnalysis_file$datapath) ) ) {
+      manageSpinner(FALSE)
       showAlert("Error", "Please select one RDs file generated throught the Data Analysis module.", "error", 5000)
       return()
     }
     mess = readRDS(input$loadAnalysis_file$datapath)
+    
+    # RawFacs_analysis RDS saved with data and gates: restore the Raw data tab.
+    if (is.list(mess) && !is.data.frame(mess) && identical(mess$format, "ORCA-rawFACS")) {
+      manageSpinner(FALSE)
+      restoreRawFACS(mess)
+      return()
+    }
+    
+    # Older RawFacs_analysis RDS: only the gate summary table that feeds hierarchical gating.
+    if (is.data.frame(mess) && all(c("Depth", "Name", "Statistic", "Cells") %in% names(mess))) {
+      manageSpinner(FALSE)
+      if (!nrow(mess)) {
+        showAlert("Error", "The raw FACS file contains no gates.", "error", 5000)
+        return()
+      }
+      startFACSHierarchicalGating(
+        mess, "Raw FACS gates loaded: you can proceed with the hierarchical gating. Previous results have been cleared.")
+      return()
+    }
     
     #Control dependencies for DT
     if(!is.null(mess$TablePlot)){
@@ -9011,6 +9170,7 @@ server <- function(input, output, session) {
          all(messNames %in% names(ifResult)) ||
          all(messNames %in% names(bcaResult)) ||
          all(messNames %in% names(facsResult)) ) ) {
+      manageSpinner(FALSE)
       showAlert("Error", "The file must be RDs saved throught the Data Analysis module.", "error", 5000)
       return()
     }
