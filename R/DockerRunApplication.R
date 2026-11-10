@@ -12,7 +12,7 @@
 docker.application.run <- function(port = 3838, image = "qbioturin/orca-application:latest", debug = FALSE) {
   
   # Check if Docker is installed
-  if (system("docker --version", ignore.stdout = TRUE, ignore.stderr = TRUE) != 0) {
+  if (system("docker --version") != 0) {
     cat("Docker is not installed or not available in PATH.\n")
     system("echo 1 > ExitStatusFile 2>&1")
     return(1)
@@ -45,7 +45,8 @@ docker.application.run <- function(port = 3838, image = "qbioturin/orca-applicat
   }
   
   # Open app in browser
-  browse_url <- paste0("http://0.0.0.0:", port)
+  # The browser connects to the host; 0.0.0.0 is only a server bind address.
+  browse_url <- paste0("http://localhost:", port)
   cat("\nOpening Shiny app in your browser: ", browse_url, "\n")
   utils::browseURL(browse_url)
   

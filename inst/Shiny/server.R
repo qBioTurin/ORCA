@@ -331,12 +331,46 @@ server <- function(input, output, session) {
                finalTable = results %>% mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
                  MeanScaled = OmicsValue*Mean/100 # I have to divide 100 because Mean is in %
-               )%>% dplyr::select(-sd) 
-               
-               list(Table = finalTable)
+               )%>% select(-sd) 
              },
              "WB" =  {
+               results = do.call(rbind, results)
+               finalTable = results %>% mutate(
+                 OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
+                 AdjRelDensityScaled = OmicsValue*AdjRelDensity 
+               ) %>% 
+                 group_by(SampleName) %>%
+                 summarise(meanAdjRelDensity = mean(AdjRelDensity),
+                           OmicsValue = OmicsValue,
+                           meanAdjRelDensityScaled = mean(AdjRelDensityScaled) )
+             },
+             "PCR" = {
+               # Collect all tables from all results
+               all_tables <- lapply(results, function(res) {
+                 if (!is.null(res$plotPCR)) {
+                   lapply(res$plotPCR, function(x) x$table)
+                 } else {
+                   NULL
+                 }
+               })
                
+               # Flatten the nested list and remove NULLs/empty tables
+               all_tables_flat <- unlist(all_tables, recursive = FALSE)
+               valid_tables <- Filter(function(tbl) !is.null(tbl) && nrow(tbl) > 0, all_tables_flat)
+               
+               if (length(valid_tables) > 0) {
+                 combined_table <- bind_rows(valid_tables)
+               }
+               
+               finalTable = combined_table %>% mutate(
+                 OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
+                 Qscaled = OmicsValue*`2^(-DDCT)` # I have to divide 100 because Mean is in %
+               ) %>% select(-GeneH, - DDCT , -Sd) %>% 
+                 rename(Q = `2^(-DDCT)` )%>% 
+                 group_by(Sample) %>%
+                 summarise(meanQ = mean(Q),
+                           OmicsValue = OmicsValue,
+                           meanQScaled = mean(Qscaled) )
              },
              "IF" = {
                
@@ -345,6 +379,7 @@ server <- function(input, output, session) {
                
              }
       )
+      list(Table = finalTable)
     } else {
       NULL
     }
@@ -1960,6 +1995,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$Customize_IF_TTestButton, {
+    req(ifResult$resplot)
     layer_tabs <- generateLayerParameters(ifResult$resplot)
     showModal(modalDialog(
       title = "Customize or Download Plot",
@@ -2011,7 +2047,6 @@ server <- function(input, output, session) {
   observeEvent(input$applyChangesIF_TT, {
     updatedPlot<-customizePlot(ifResult$resplot,input)
     ifResult$resplot<- updatedPlot
-    output$IFsummarise_plot <- renderPlot({updatedPlot})
     removeModal()
   })
   
@@ -2176,7 +2211,8 @@ server <- function(input, output, session) {
         ifResult$TTestData = test_to_show
         ifResult$basePlot = resplot
       }else{
-        output$IFsummarise_plot = renderPlot({NULL})
+        ifResult$basePlot <- NULL
+        ifResult$resplot <- NULL
         output$IFsummariseMean = renderDT({ NULL })
       }
     })
@@ -2246,8 +2282,11 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
       
-      tempDir <- tempdir()
+      tempDir <- tempfile("analysis-export-")
+      dir.create(tempDir)
+      on.exit(unlink(tempDir, recursive = TRUE), add = TRUE)
       
       nomeRDS <- paste0("IFanalysis-", Sys.Date(), ".rds")
       nomeXLSX <- paste0("IFanalysis-", Sys.Date(), ".xlsx")
@@ -2260,7 +2299,6 @@ server <- function(input, output, session) {
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "IF")
       
       utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
-      manageSpinner(FALSE)
     },
   )
   
@@ -8391,8 +8429,11 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       manageSpinner(TRUE)
+      on.exit(manageSpinner(FALSE), add = TRUE)
       
-      tempDir <- tempdir()
+      tempDir <- tempfile("analysis-export-")
+      dir.create(tempDir)
+      on.exit(unlink(tempDir, recursive = TRUE), add = TRUE)
       
       nomeRDS <- paste0("FACSquant_analysis-", Sys.Date(), ".rds")
       nomeXLSX <- paste0("FACSquant_analysis-", Sys.Date(), ".xlsx")
@@ -8404,7 +8445,6 @@ server <- function(input, output, session) {
       saveExcel(filename = tempXlsxPath, ResultList=results, analysis = "FACS", PanelStructures)
       
       utils::zip(file, files = c(tempRdsPath, tempXlsxPath), flags = "-j")
-      manageSpinner(FALSE)
     }
   )
   

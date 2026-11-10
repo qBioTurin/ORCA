@@ -215,7 +215,6 @@ resetPanel <- function(type, flags = NULL, panelStructures = NULL, numberOfPlane
            output$IFtable_stat <- renderDT({data.frame()})
            output$IFtable <- renderDT({data.frame()})
            output$IFsummariseMean <- renderDT({data.frame()})
-           output$IFsummarise_plot <- renderPlot({}) 
            
          },
          error = function(cond) {
@@ -534,6 +533,7 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
   # Create a temporary directory for plot files that persists until workbook is saved
   tmpPlotDir <- tempdir()
   tmpPlotFiles <- character(0)  # Track files to cleanup later
+  on.exit(unlink(tmpPlotFiles), add = TRUE)
   
   switch(analysis, 
          "WB" = {
@@ -611,10 +611,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
            finaldata = ResultList[["AUCdf"]]
            writeDataTable(wb, finaldata, sheet="AUC")
            
-           saveWorkbook(wb, filename)
-           # Clean up temporary plot files after workbook is saved
-           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
-           return(1)
          },
          "WB comparison" = {
            ## Create a new workbook
@@ -651,10 +647,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              
            }
            
-           saveWorkbook(wb, filename)
-           # Clean up temporary plot files after workbook is saved
-           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
-           return(1)
          }, 
          "RT-qPCR" = {
            wb <- createWorkbook("RTqPCR")
@@ -954,9 +946,6 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              print("resplot non disponibile o non è un data.frame")
            }
            
-           saveWorkbook(wb, filename)
-           # Clean up temporary plot files after workbook is saved
-           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
          },
          "CYTOTOX" = {
            wb <- createWorkbook("CYTOTOX")  
@@ -994,16 +983,12 @@ saveExcel <- function(filename, ResultList, analysis, PanelStructures = NULL) {
              print("Barplot non disponibile o non è un data.frame")
            }
            
-           saveWorkbook(wb, filename)
-           # Clean up temporary plot files after workbook is saved
-           for (f in tmpPlotFiles) { if (file.exists(f)) unlink(f) }
          }
          
   )
   
   saveWorkbook(wb, filename)  # Salva il workbook
-  # Note: Temporary PNG files will be cleaned up automatically by R's tempdir cleanup
-  # We keep them persistent until workbook is fully saved to ensure openxlsx can access them
+  # Save once, while all embedded plot files are still available.
   return(1)  # Restituisce 1 per indicare il successo
 }
 

@@ -69,7 +69,7 @@ RUN mkdir ./home/data; chmod 777 ./home/data
 
 RUN R -e 'install.packages("shinyAce")'
 
-RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="v3.0-(on-going)");'
+RUN R -e 'remotes::install_github("qBioTurin/ORCA", ref="v3.0-(on-going)")'
 
 # expose port
 EXPOSE 3838
