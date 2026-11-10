@@ -2,13 +2,11 @@ Package: ORCA
 Title: ORCA: Omni Reproducible Cell Analysis.
 Version: 2.0
 Authors@R: 
-    c(person("Simone", "Pernice", , "simone.pernice@unito.it", role = c("cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID")),
-    person("Dora", "Tortarolo", , "dora.tortarolo@unito.it", role = c("aut"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
+    c(person("Simone", "Pernice", , "simone.pernice@unito.it", role = c("cre")),
+    person("Dora", "Tortarolo", , "dora.tortarolo@unito.it", role = c("aut"))
            )
 Description: A cellular biologist’s toolbox for data analysis. ORCA  provides an exhaustive platform where scientists can analyze raw Western Blot (WB), Reverse Transcription-quantitative PCR (RT-qPCR), Enzyme-Linked ImmunoSorbent Assay (ELISA), Endocytosis and, Cytotoxicity experiments.
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a license
+License: `use_gpl3_license()`
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
@@ -20,10 +18,10 @@ Imports:
     shinybusy,
     zoo,
     knitr,
-    ggplot2,
+    ggplot2 (>= 3.4.0),
     shinythemes,
     OpenImageR,
-    dplyr,
+    dplyr (>= 1.1.0),
     openxlsx,
     patchwork,
     stringr,
@@ -37,4 +35,23 @@ Imports:
     visNetwork,
     shinyFiles,
     sortable,
-    svglite
+    svglite,
+    colourpicker,
+    ggpubr,
+    ggsignif,
+    tibble,
+    igraph,
+    ggraph,
+    tidyverse,
+    tidyr (>= 1.0.0),
+    ggcyto,
+    shinyAce,
+    RColorBrewer,
+    gridExtra,
+    httpuv,
+    jpeg,
+    readxl,
+    rjson,
+    rlang,
+    rmarkdown
+biocViews:

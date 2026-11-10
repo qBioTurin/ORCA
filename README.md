@@ -1,5 +1,7 @@
 # ORCA: Omni Reproducible Cell Analysis
 
+This is **ORCA v2.0**. Users looking for the previous version can find it in the [`v1.0` branch](https://github.com/qBioTurin/ORCA/tree/v1.0).
+
 <p align="center">
   <img src="./inst/Shiny/www/ORCAlogo.png" alt="ORCA Logo" width="200">
 </p>
@@ -20,29 +22,32 @@ ORCA provides an exhaustive platform where scientists can analyze raw data from:
     <img src="./inst/Shiny/www/ORCAgoals.png" alt="ORCA goals" width="800">
 </p>
 
-## Required Installed Packages
-
-The following R packages must be installed:
-
-```r
-install.packages(c("rjson", "openxlsx", "patchwork", "ggplot2", "shinydashboard", 
-                   "shinyWidgets", "shiny", "dashboardthemes", "dplyr", "OpenImageR", 
-                   "knitr", "zoo", "shinythemes", "readxl", "DT", "shinyjs","randomcoloR",
-                   "plotly"))
-                   
-BiocManager::install("flowCore")
-BiocManager::install("ggcyto")
-
-```
-
 ## How to Install
 
-To install ORCA, you can use **devtools**:
+Install ORCA and its required dependencies from GitHub:
 
 ```r
-install.packages("devtools")
-devtools::install_github("qBioTurin/ORCA", ref="main", dependencies=TRUE)
+install.packages(c("remotes", "BiocManager"))
+remotes::install_github(
+  "qBioTurin/ORCA",
+  ref = "main",
+  dependencies = NA,
+  repos = BiocManager::repositories(),
+  upgrade = "never"
+)
 ```
+
+Use the branch containing the version you want to install in `ref`.
+Required packages are declared in `DESCRIPTION`; `flowCore` and `ggcyto`
+come from Bioconductor. The `biocViews` field also enables Bioconductor
+repository discovery by `remotes`. `dependencies = NA` installs required
+packages without forcing optional modules such as `epimod`, which is needed
+only for model generation and analysis.
+
+On Windows, prefer package binaries when available. If R needs to compile a
+source dependency, install the Rtools version matching your R installation.
+PDF reports require a LaTeX installation; report rendering also requires Pandoc
+(which is bundled with RStudio). Docker workflows require Docker separately.
 
 ## How to Run
 

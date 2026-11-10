@@ -5,7 +5,12 @@
 #' @param port Port to use
 #'
 #' @author Beccuti Marco, Pernice Simone, Tortarolo Dora
-#' @import shinydashboard shinyjs jsonlite shinyalert shinybusy zoo knitr ggplot2 shinythemes OpenImageR dplyr openxlsx patchwork stringr randomcoloR plotly flowCore xml2 visNetwork shinyFiles
+#' @import shinydashboard shinybusy zoo knitr ggplot2 shinythemes OpenImageR dplyr openxlsx patchwork stringr randomcoloR xml2 visNetwork shinyFiles
+#' @rawNamespace import(flowCore, except = filter)
+#' @rawNamespace import(plotly, except = c(filter, last_plot))
+#' @rawNamespace import(jsonlite, except = validate)
+#' @rawNamespace import(shinyalert, except = runExample)
+#' @rawNamespace import(shinyjs, except = show)
 #' @rawNamespace import(DT, except=c(dataTableOutput,renderDataTable))
 #' @rawNamespace import(shiny,except=runExample)
 #' @rawNamespace import(shinyWidgets,except=alert)

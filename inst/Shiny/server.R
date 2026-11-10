@@ -286,7 +286,7 @@ server <- function(input, output, session) {
     
     datapaths <- input$IntGImport$datapath
     
-    updateMultiValues(datapaths,DataIntegrationModule)
+    updateMultiValues(datapaths,DataIntegrationModule, DataAnalysisModule)
     
     manageSpinner(FALSE)
     showAlert("Success", "The RDs files have been uploaded with success", "success", 2000)
@@ -328,19 +328,21 @@ server <- function(input, output, session) {
       switch(input$IntegrAnalysis, 
              "Stat" = {
                results = do.call(rbind, results)
-               finalTable = results %>% mutate(
+               finalTable = results %>% dplyr::mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
                  MeanScaled = OmicsValue*Mean/100 # I have to divide 100 because Mean is in %
-               )%>% select(-sd) 
+               )%>% dplyr::select(-sd) 
              },
              "WB" =  {
                results = do.call(rbind, results)
-               finalTable = results %>% mutate(
+               finalTable = results %>% 
+                 dplyr::mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
                  AdjRelDensityScaled = OmicsValue*AdjRelDensity 
                ) %>% 
-                 group_by(SampleName) %>%
-                 summarise(meanAdjRelDensity = mean(AdjRelDensity),
+                 dplyr::group_by(SampleName) %>%
+                 dplyr::reframe(
+                   meanAdjRelDensity = mean(AdjRelDensity),
                            OmicsValue = OmicsValue,
                            meanAdjRelDensityScaled = mean(AdjRelDensityScaled) )
              },
@@ -362,13 +364,15 @@ server <- function(input, output, session) {
                  combined_table <- bind_rows(valid_tables)
                }
                
-               finalTable = combined_table %>% mutate(
+               finalTable = combined_table %>% 
+                 dplyr::mutate(
                  OmicsValue = mean(Omics$FinalSelectedRow$iBAQ),
                  Qscaled = OmicsValue*`2^(-DDCT)` # I have to divide 100 because Mean is in %
-               ) %>% select(-GeneH, - DDCT , -Sd) %>% 
+               ) %>% 
+                 dplyr::select(-GeneH, - DDCT , -Sd) %>% 
                  rename(Q = `2^(-DDCT)` )%>% 
                  group_by(Sample) %>%
-                 summarise(meanQ = mean(Q),
+                 dplyr::reframe(meanQ = mean(Q),
                            OmicsValue = OmicsValue,
                            meanQScaled = mean(Qscaled) )
              },
@@ -707,7 +711,10 @@ server <- function(input, output, session) {
   
   observeEvent(input$generateModel, {
     
-    if(!require("epimod"))  showAlert("Error", "The epimod library has to be installed.", "error", 5000)
+    if (!requireNamespace("epimod", quietly = TRUE)) {
+      showAlert("Error", "Install the optional epimod package to use this module.", "error", 5000)
+      return()
+    }
     
     if(is.null(GreatModResult$working_dir)){
       showAlert("Error", "A working directory has to be set.", "error", 5000)
@@ -822,7 +829,10 @@ server <- function(input, output, session) {
   
   observeEvent(input$runModelAnalysis, {
     
-    if(!require("epimod"))  showAlert("Error", "The epimod library has to be installed.", "error", 5000)
+    if (!requireNamespace("epimod", quietly = TRUE)) {
+      showAlert("Error", "Install the optional epimod package to use this module.", "error", 5000)
+      return()
+    }
     
     if(is.null(GreatModResult$working_dir)){
       showAlert("Error", "A working directory has to be set.", "error", 5000)
